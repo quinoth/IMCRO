@@ -343,6 +343,26 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
   const bgDragCounter = useRef(0);
   const [bgDrag, setBgDrag] = useState(false);
 
+  // ── Новые возможности конструктора ────────────────────────────────────────
+  // Пользовательские переменные шаблона
+  const [userVariables, setUserVariables] = useState([]);
+  const [variableDraft, setVariableDraft] = useState("");
+  const [showVariableInput, setShowVariableInput] = useState(false);
+
+  // Изображения (печати, подписи, декор)
+  // { id, kind: 'stamp'|'signature'|'image', label, file, url, x, y, widthMm, heightMm, opacity }
+  const [images, setImages] = useState([]);
+  const [selectedImageId, setSelectedImageId] = useState(null);
+  const stampInputRef = useRef(null);
+  const signatureInputRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const imageReplaceInputRef = useRef(null);
+
+  // Сетка, масштаб, слои
+  const [showGrid, setShowGrid] = useState(true);
+  const [zoom, setZoom] = useState(100);
+  const [layersOpen, setLayersOpen] = useState(false);
+
   const createTrackedObjectUrl = useCallback((file) => {
     const url = URL.createObjectURL(file);
     objectUrlsRef.current.push(url);
@@ -795,6 +815,86 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     }
   };
 
+  // ── Пользовательские переменные ───────────────────────────────────────────
+  const addCustomVariable = useCallback((rawName) => {
+    const cleaned = String(rawName || "").trim().replace(/[{}]/g, "").trim();
+    if (!cleaned) {
+      setMsg("Введите название переменной"); setMsgType("error"); return;
+    }
+    if (!/^[А-Яа-яЁё A-Za-z0-9_-]+$/.test(cleaned)) {
+      setMsg("Используйте буквы, цифры, пробелы и дефис"); setMsgType("error"); return;
+    }
+    const exists = [...QUICK_VARIABLES, ...userVariables].some((v) => v.toLowerCase() === cleaned.toLowerCase());
+    if (exists) {
+      setMsg("Такая переменная уже существует"); setMsgType("error"); return;
+    }
+    setUserVariables((prev) => [...prev, cleaned]);
+    setVariableDraft("");
+    setShowVariableInput(false);
+    setMsg(`Переменная «${cleaned}» добавлена`);
+    setMsgType("success");
+  }, [userVariables]);
+
+  const removeCustomVariable = useCallback((name) => {
+    setUserVariables((prev) => prev.filter((v) => v !== name));
+  }, []);
+
+  // ── Изображения (печати, подписи, декор) ──────────────────────────────────
+  const addImage = useCallback((kind, file) => {
+    if (!file || !file.type?.startsWith("image/")) {
+      setMsg("Выберите файл изображения"); setMsgType("error"); return;
+    }
+    const url = createTrackedObjectUrl(file);
+    const presets = {
+      stamp:     { label: "Печать", widthMm: 45, heightMm: 45, x: 70, y: 75, opacity: 0.92 },
+      signature: { label: "Подпись", widthMm: 55, heightMm: 22, x: 70, y: 70, opacity: 1 },
+      image:     { label: "Изображение", widthMm: 50, heightMm: 30, x: 50, y: 60, opacity: 1 },
+    };
+    const preset = presets[kind] || presets.image;
+    const id = `img_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    pushUndo();
+    setImages((prev) => [...prev, {
+      id, kind, label: preset.label,
+      file, url, x: preset.x, y: preset.y,
+      widthMm: preset.widthMm, heightMm: preset.heightMm,
+      opacity: preset.opacity,
+    }]);
+    setSelectedImageId(id);
+    setSelectedElementId(null);
+  }, [createTrackedObjectUrl, pushUndo]);
+
+  const updateImage = useCallback((id, patch) => {
+    setImages((prev) => prev.map((img) => img.id === id ? { ...img, ...patch } : img));
+  }, []);
+
+  const moveImage = useCallback((id, newX, newY) => {
+    setImages((prev) => prev.map((img) => img.id === id ? { ...img, x: newX, y: newY } : img));
+  }, []);
+
+  const removeImage = useCallback((id) => {
+    setImages((prev) => prev.filter((img) => img.id !== id));
+    if (selectedImageId === id) setSelectedImageId(null);
+  }, [selectedImageId]);
+
+  const replaceImage = useCallback((id, file) => {
+    if (!file || !file.type?.startsWith("image/")) return;
+    const url = createTrackedObjectUrl(file);
+    setImages((prev) => prev.map((img) => img.id === id ? { ...img, file, url } : img));
+  }, [createTrackedObjectUrl]);
+
+  // ── Слои ───────────────────────────────────────────────────────────────────
+  const moveElementZ = useCallback((id, direction) => {
+    setElements((prev) => {
+      const idx = prev.findIndex((e) => e.id === id);
+      if (idx === -1) return prev;
+      const next = [...prev];
+      const target = direction === "up" ? idx + 1 : idx - 1;
+      if (target < 0 || target >= next.length) return prev;
+      [next[idx], next[target]] = [next[target], next[idx]];
+      return next;
+    });
+  }, []);
+
   // ── Сохранение ────────────────────────────────────────────────────────────
   const handleSave = async () => {
     setSaving(true); setMsg(null);
@@ -940,9 +1040,53 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     setMsg("Предпросмотр обновляется на холсте в реальном времени.");
     setMsgType("info");
   };
-  const visibleVariables = detectedPlaceholders.length
-    ? detectedPlaceholders
-    : ["ФИО участника", "Название мероприятия", "Дата", "Достижение"];
+  const visibleVariables = useMemo(() => {
+    const merged = new Set();
+    QUICK_VARIABLES.forEach((v) => merged.add(v));
+    detectedPlaceholders.forEach((v) => merged.add(v));
+    userVariables.forEach((v) => merged.add(v));
+    return [...merged];
+  }, [detectedPlaceholders, userVariables]);
+
+  const selectedImage = images.find((img) => img.id === selectedImageId) || null;
+  const ZOOM_STOPS = [50, 75, 100, 125, 150];
+  const setZoomStep = (delta) => {
+    const idx = ZOOM_STOPS.indexOf(zoom);
+    if (idx === -1) {
+      const nearest = ZOOM_STOPS.reduce((acc, v) => (Math.abs(v - zoom) < Math.abs(acc - zoom) ? v : acc), 100);
+      setZoom(nearest);
+      return;
+    }
+    const next = Math.max(0, Math.min(ZOOM_STOPS.length - 1, idx + delta));
+    setZoom(ZOOM_STOPS[next]);
+  };
+
+  const handleSelectElement = (id) => {
+    setSelectedElementId(id);
+    setSelectedImageId(null);
+  };
+
+  const handleSelectImage = (id) => {
+    setSelectedImageId(id);
+    setSelectedElementId(null);
+  };
+
+  const handleStampFile = (e) => {
+    const f = e.target.files?.[0]; e.target.value = "";
+    if (f) addImage("stamp", f);
+  };
+  const handleSignatureFile = (e) => {
+    const f = e.target.files?.[0]; e.target.value = "";
+    if (f) addImage("signature", f);
+  };
+  const handleGenericImageFile = (e) => {
+    const f = e.target.files?.[0]; e.target.value = "";
+    if (f) addImage("image", f);
+  };
+  const handleReplaceImageFile = (e) => {
+    const f = e.target.files?.[0]; e.target.value = "";
+    if (f && selectedImageId) replaceImage(selectedImageId, f);
+  };
 
   return (
     <section
@@ -958,297 +1102,573 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           --tpl-primary: #19789c;
           --tpl-primary-dark: #004f75;
           --tpl-border: #cdd8df;
+          --tpl-border-soft: #e5ebef;
           --tpl-soft: #f4f8fa;
+          --tpl-muted: #667783;
+          --tpl-text: #17232b;
           height: 100%;
           min-height: 0;
           display: grid;
-          grid-template-columns: 360px minmax(0, 1fr);
+          grid-template-columns: 280px minmax(0, 1fr) 320px;
           grid-template-rows: auto minmax(0, 1fr);
           gap: 0;
           margin: 0;
-          background: #f8fbfc;
+          background: #f4f7f9;
           border-top: 1px solid var(--tpl-border);
           overflow: hidden;
+          font-family: inherit;
         }
         .template-toolbar {
           grid-column: 1 / -1;
-          min-height: 64px;
+          min-height: 56px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 16px;
-          padding: 12px 24px;
+          gap: 14px;
+          padding: 10px 18px;
           border-bottom: 1px solid var(--tpl-border);
           background: #fff;
-        }
-        .template-toolbar-left,
-        .template-toolbar-actions {
-          display: flex;
-          align-items: center;
-          gap: 12px;
           flex-wrap: wrap;
         }
-        .template-toolbar-left {
+        .tpl-toolbar-group {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
           min-width: 0;
-          flex: 1;
         }
-        .template-toolbar strong {
+        .tpl-toolbar-title {
           color: var(--tpl-primary-dark);
-          font-size: 20px;
-          font-weight: 950;
+          font-size: 15px;
+          font-weight: 900;
+          white-space: nowrap;
         }
-        .template-title-input {
-          width: min(380px, 42vw);
-          min-width: 220px;
-          font-weight: 850;
-        }
-        .template-select,
-        .template-input,
-        .template-props input,
-        .template-props select {
-          min-height: 40px;
-          border: 1px solid #d6e0e6;
+        .tpl-back-btn {
+          width: 34px;
+          height: 34px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--tpl-border);
           border-radius: 8px;
           background: #fff;
-          color: #17232b;
+          color: var(--tpl-primary-dark);
+          cursor: pointer;
+          font-size: 16px;
+        }
+        .tpl-back-btn:hover { border-color: var(--tpl-primary); background: #edf6f8; }
+        .tpl-title-input {
+          min-height: 34px;
+          width: 220px;
+          padding: 0 10px;
+          border: 1px solid var(--tpl-border);
+          border-radius: 8px;
+          background: #fff;
+          color: var(--tpl-text);
           font: inherit;
           font-size: 14px;
-          padding: 0 12px;
-          outline: 0;
+          font-weight: 750;
         }
-        .template-input {
-          width: 100%;
-        }
-        .template-tool-button {
-          min-height: 40px;
+        .tpl-title-input:focus { outline: 0; border-color: var(--tpl-primary); box-shadow: 0 0 0 3px rgba(25,120,156,.14); }
+        .tpl-template-select {
+          min-height: 34px;
+          max-width: 200px;
+          padding: 0 10px;
+          border: 1px solid var(--tpl-border);
           border-radius: 8px;
+          background: #fff;
+          color: var(--tpl-text);
+          font: inherit;
+          font-size: 13px;
+        }
+        .tpl-zoom {
+          display: inline-flex;
+          align-items: center;
+          border: 1px solid var(--tpl-border);
+          border-radius: 8px;
+          background: #fff;
+          overflow: hidden;
+        }
+        .tpl-zoom button {
+          width: 28px;
+          height: 32px;
+          border: 0;
+          background: transparent;
+          color: var(--tpl-text);
+          font: inherit;
+          font-size: 15px;
+          cursor: pointer;
+        }
+        .tpl-zoom button:hover:not(:disabled) { background: #edf6f8; }
+        .tpl-zoom button:disabled { color: #b2bec5; cursor: not-allowed; }
+        .tpl-zoom-value {
+          min-width: 48px;
+          text-align: center;
+          color: var(--tpl-text);
+          font: inherit;
+          font-size: 13px;
+          font-weight: 800;
+          border-left: 1px solid var(--tpl-border-soft);
+          border-right: 1px solid var(--tpl-border-soft);
+          height: 32px;
+          line-height: 32px;
+          background: #f8fbfc;
+        }
+        .tpl-icon-btn {
+          width: 34px;
+          height: 34px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--tpl-border);
+          border-radius: 8px;
+          background: #fff;
+          color: var(--tpl-text);
+          cursor: pointer;
+          font-size: 14px;
+          padding: 0;
+        }
+        .tpl-icon-btn:hover:not(:disabled) { border-color: var(--tpl-primary); color: var(--tpl-primary-dark); background: #edf6f8; }
+        .tpl-icon-btn:disabled { color: #b2bec5; cursor: not-allowed; }
+        .tpl-icon-btn.is-active { border-color: var(--tpl-primary); background: var(--tpl-primary); color: #fff; }
+        .tpl-icon-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .tpl-btn {
+          min-height: 34px;
+          padding: 0 12px;
+          border: 1px solid var(--tpl-border);
+          border-radius: 8px;
+          background: #fff;
+          color: var(--tpl-text);
+          font: inherit;
+          font-size: 13px;
+          font-weight: 800;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .tpl-btn:hover:not(:disabled) { border-color: var(--tpl-primary); color: var(--tpl-primary-dark); background: #edf6f8; }
+        .tpl-btn:disabled { color: #b2bec5; cursor: not-allowed; }
+        .tpl-btn.secondary { border-color: var(--tpl-primary); color: var(--tpl-primary-dark); }
+        .tpl-btn.primary {
+          border-color: var(--tpl-primary);
+          background: var(--tpl-primary);
+          color: #fff;
+          box-shadow: 0 6px 16px rgba(25,120,156,.22);
+        }
+        .tpl-btn.primary:hover:not(:disabled) { background: var(--tpl-primary-dark); border-color: var(--tpl-primary-dark); }
+        .tpl-btn.primary:disabled { background: #b2bec5; border-color: #b2bec5; box-shadow: none; color: #fff; }
+        .tpl-btn.danger { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
+        .tpl-btn.danger:hover { background: #fee2e2; border-color: #fca5a5; }
+
+        .tpl-side {
+          min-height: 0;
+          background: #fff;
+          border-right: 1px solid var(--tpl-border);
+          overflow: auto;
+        }
+        .tpl-side.right {
+          border-right: 0;
+          border-left: 1px solid var(--tpl-border);
+        }
+        .tpl-section {
+          padding: 16px 16px 18px;
+          border-bottom: 1px solid var(--tpl-border-soft);
+        }
+        .tpl-section h3 {
+          margin: 0 0 10px;
+          color: var(--tpl-primary-dark);
+          font-size: 12px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: .04em;
+        }
+        .tpl-section p.tpl-hint {
+          margin: 0 0 10px;
+          color: var(--tpl-muted);
+          font-size: 12px;
+          line-height: 1.45;
+        }
+        .tpl-var-grid {
+          display: grid;
+          gap: 6px;
+        }
+        .tpl-var-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto auto;
+          align-items: center;
+          gap: 6px;
+          padding: 7px 9px;
+          border: 1px solid var(--tpl-border-soft);
+          border-radius: 8px;
+          background: #f8fbfc;
+        }
+        .tpl-var-row.custom { background: #edf6f8; border-color: #cfe0e7; }
+        .tpl-var-chip {
+          min-width: 0;
+          color: var(--tpl-primary-dark);
+          font-size: 13px;
+          font-weight: 850;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .tpl-var-insert {
+          min-height: 26px;
+          padding: 0 8px;
           border: 1px solid var(--tpl-primary);
           background: #fff;
           color: var(--tpl-primary-dark);
-          padding: 0 16px;
           font: inherit;
-          font-size: 14px;
-          font-weight: 850;
-          cursor: pointer;
-        }
-        .template-tool-button.icon {
-          width: 40px;
-          padding: 0;
-        }
-        .template-tool-button.primary {
-          background: var(--tpl-primary);
-          color: #fff;
-          box-shadow: 0 10px 22px rgba(25, 120, 156, .22);
-        }
-        .template-tool-button:disabled {
-          opacity: .55;
-          cursor: not-allowed;
-          box-shadow: none;
-        }
-        .template-side {
-          min-height: 0;
-          border-right: 1px solid var(--tpl-border);
-          background: #fff;
-          overflow: auto;
-        }
-        .template-panel {
-          padding: 16px 18px;
-          border-bottom: 1px solid var(--tpl-border);
-        }
-        .template-panel h3 {
-          margin: 0 0 14px;
-          color: #17232b;
-          font-size: 14px;
-          font-weight: 900;
-          text-transform: uppercase;
-        }
-        .template-action-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 8px;
-          margin-top: 10px;
-        }
-        .template-action-grid .template-tool-button {
-          width: 100%;
-          justify-content: flex-start;
-          text-align: left;
-        }
-        .template-variable-list {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 7px;
-        }
-        .template-variable-chip {
-          border: 1px solid #cfe0e7;
-          border-radius: 999px;
-          background: #edf6f8;
-          color: var(--tpl-primary-dark);
-          padding: 5px 9px;
-          font-size: 12px;
-          font-weight: 850;
-          cursor: pointer;
-        }
-        .template-variable-chip:hover {
-          border-color: var(--tpl-primary);
-          background: #e3f1f5;
-        }
-        .template-block-list {
-          display: grid;
-          gap: 10px;
-        }
-        .template-block-button {
-          min-height: 48px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          border: 1px solid #d6e0e6;
-          border-radius: 8px;
-          background: #fff;
-          color: #17232b;
-          padding: 0 14px;
-          font: inherit;
-          font-weight: 800;
-          cursor: pointer;
-        }
-        .template-block-button.is-active {
-          border-color: var(--tpl-primary);
-          background: #edf6f8;
-          color: var(--tpl-primary-dark);
-        }
-        .template-block-button small {
-          color: #667783;
           font-size: 11px;
           font-weight: 850;
-        }
-        .template-add {
-          border-style: dashed;
-          justify-content: center;
-          color: var(--tpl-primary-dark);
-        }
-        .template-props {
-          display: grid;
-          gap: 12px;
-        }
-        .template-props label {
-          display: grid;
-          gap: 6px;
-          color: #52636d;
-          font-size: 12px;
-          font-weight: 850;
-        }
-        .template-prop-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 12px;
-        }
-        .template-inline-toggle {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 8px;
-        }
-        .template-inline-toggle button {
-          min-height: 34px;
-          border: 1px solid #d6e0e6;
-          border-radius: 8px;
-          background: #fff;
-          color: #334155;
-          font: inherit;
-          font-weight: 900;
-          cursor: pointer;
-        }
-        .template-inline-toggle button.is-active {
-          border-color: var(--tpl-primary);
-          background: #edf6f8;
-          color: var(--tpl-primary-dark);
-        }
-        .template-color-row {
-          display: grid;
-          grid-template-columns: 42px minmax(0, 1fr);
-          gap: 8px;
-        }
-        .template-props input[type="color"] {
-          width: 42px;
-          padding: 2px;
-        }
-        .template-align {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 6px;
-          padding: 4px;
-          border: 1px solid #d6e0e6;
-          border-radius: 8px;
-          background: #f0f4f6;
-        }
-        .template-align button {
-          min-height: 34px;
-          border: 0;
           border-radius: 6px;
-          background: transparent;
-          font: inherit;
-          font-weight: 900;
           cursor: pointer;
         }
-        .template-align button.is-active {
+        .tpl-var-insert:hover { background: var(--tpl-primary); color: #fff; }
+        .tpl-var-remove {
+          width: 26px;
+          height: 26px;
+          border: 1px solid var(--tpl-border-soft);
           background: #fff;
-          color: var(--tpl-primary-dark);
-          box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
+          color: #b91c1c;
+          border-radius: 6px;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          padding: 0;
         }
-        .template-canvas-area {
+        .tpl-add-var {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 6px;
+          margin-top: 8px;
+        }
+        .tpl-add-var input {
+          min-height: 32px;
+          padding: 0 10px;
+          border: 1px solid var(--tpl-border);
+          border-radius: 8px;
+          background: #fff;
+          color: var(--tpl-text);
+          font: inherit;
+          font-size: 13px;
+        }
+        .tpl-add-var input:focus { outline: 0; border-color: var(--tpl-primary); box-shadow: 0 0 0 3px rgba(25,120,156,.14); }
+        .tpl-element-grid {
+          display: grid;
+          gap: 7px;
+        }
+        .tpl-element-btn {
+          min-height: 38px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 0 12px;
+          border: 1px solid var(--tpl-border-soft);
+          border-radius: 8px;
+          background: #fff;
+          color: var(--tpl-text);
+          font: inherit;
+          font-size: 13px;
+          font-weight: 750;
+          cursor: pointer;
+          text-align: left;
+        }
+        .tpl-element-btn:hover { border-color: var(--tpl-primary); background: #edf6f8; color: var(--tpl-primary-dark); }
+        .tpl-element-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+        .tpl-block-list {
+          display: grid;
+          gap: 6px;
+          max-height: 280px;
+          overflow: auto;
+        }
+        .tpl-block-row {
+          display: grid;
+          grid-template-columns: 18px minmax(0, 1fr) auto auto;
+          gap: 8px;
+          align-items: center;
+          padding: 8px 10px;
+          border: 1px solid var(--tpl-border-soft);
+          border-radius: 8px;
+          background: #fff;
+          cursor: pointer;
+          transition: border .14s ease, background .14s ease;
+        }
+        .tpl-block-row:hover { border-color: var(--tpl-primary); background: #f3f9fb; }
+        .tpl-block-row.is-active { border-color: var(--tpl-primary); background: #edf6f8; }
+        .tpl-block-row .tpl-block-kind {
+          color: var(--tpl-primary-dark);
+          font-size: 12px;
+          font-weight: 900;
+        }
+        .tpl-block-row .tpl-block-label {
+          min-width: 0;
+          color: var(--tpl-text);
+          font-size: 13px;
+          font-weight: 700;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .tpl-block-row .tpl-block-tag {
+          font-size: 10px;
+          font-weight: 900;
+          text-transform: uppercase;
+          color: var(--tpl-muted);
+          letter-spacing: .04em;
+        }
+        .tpl-block-row .tpl-block-tag.variable { color: var(--tpl-primary-dark); }
+        .tpl-block-row .tpl-block-delete {
+          width: 24px;
+          height: 24px;
+          border: 0;
+          background: transparent;
+          color: #b91c1c;
+          cursor: pointer;
+          font-size: 14px;
+          padding: 0;
+          border-radius: 6px;
+        }
+        .tpl-block-row .tpl-block-delete:hover { background: #fef2f2; }
+
+        .tpl-canvas-area {
           min-width: 0;
           min-height: 0;
           overflow: auto;
-          background-color: #f5f8fa;
-          background-image: radial-gradient(#8fb3bf 1px, transparent 1px);
+          background-color: #eef3f6;
+          background-image: radial-gradient(rgba(143,179,191,.6) 1px, transparent 1px);
           background-size: 22px 22px;
-          padding: 46px;
+          padding: 32px 24px;
+          display: flex;
+          justify-content: center;
+          align-items: flex-start;
         }
-        .template-canvas-frame {
-          width: clamp(420px, 68vh, 760px);
+        .tpl-canvas-frame {
+          width: 100%;
+          max-width: calc(560px * var(--tpl-zoom, 1));
           margin: 0 auto;
-          border: 1px solid #cdd8df;
+          transition: max-width .18s ease;
+        }
+        .tpl-canvas-sheet {
           background: #fff;
-          box-shadow: 0 24px 58px rgba(15, 23, 42, .14);
-          padding: 24px;
+          border: 1px solid #cdd8df;
+          box-shadow: 0 24px 60px rgba(15,23,42,.14);
+          padding: 12px;
+          border-radius: 4px;
         }
-        .template-message {
-          margin-top: 12px;
+
+        .tpl-props {
+          display: grid;
+          gap: 12px;
         }
-        @media (max-width: 820px) {
+        .tpl-props label {
+          display: grid;
+          gap: 5px;
+          color: #52636d;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: .04em;
+          text-transform: uppercase;
+        }
+        .tpl-props input, .tpl-props select, .tpl-props textarea {
+          min-height: 34px;
+          border: 1px solid var(--tpl-border);
+          border-radius: 8px;
+          background: #fff;
+          color: var(--tpl-text);
+          font: inherit;
+          font-size: 14px;
+          font-weight: 600;
+          padding: 7px 10px;
+          outline: 0;
+        }
+        .tpl-props textarea { resize: vertical; }
+        .tpl-props input:focus, .tpl-props select:focus, .tpl-props textarea:focus {
+          border-color: var(--tpl-primary);
+          box-shadow: 0 0 0 3px rgba(25,120,156,.14);
+        }
+        .tpl-prop-grid-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+        .tpl-prop-color {
+          display: grid;
+          grid-template-columns: 42px minmax(0, 1fr);
+          gap: 8px;
+          align-items: center;
+        }
+        .tpl-prop-color input[type="color"] { padding: 2px; width: 42px; height: 34px; }
+        .tpl-toggle-row {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 4px;
+          padding: 3px;
+          border: 1px solid var(--tpl-border);
+          border-radius: 8px;
+          background: #f4f7f9;
+        }
+        .tpl-toggle-row button {
+          min-height: 30px;
+          border: 0;
+          border-radius: 6px;
+          background: transparent;
+          color: var(--tpl-text);
+          font: inherit;
+          font-size: 12px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+        .tpl-toggle-row button.is-active {
+          background: #fff;
+          color: var(--tpl-primary-dark);
+          box-shadow: 0 2px 6px rgba(15,23,42,.08);
+        }
+        .tpl-empty-props {
+          padding: 18px 14px;
+          color: var(--tpl-muted);
+          font-size: 13px;
+          line-height: 1.5;
+          text-align: center;
+        }
+        .tpl-divider { height: 1px; background: var(--tpl-border-soft); margin: 6px 0; }
+
+        .tpl-layers-popover {
+          position: absolute;
+          top: 56px;
+          right: 24px;
+          width: 280px;
+          max-height: 360px;
+          background: #fff;
+          border: 1px solid var(--tpl-border);
+          border-radius: 10px;
+          box-shadow: 0 18px 36px rgba(15,23,42,.16);
+          z-index: 40;
+          overflow: auto;
+          padding: 12px;
+        }
+        .tpl-layers-popover h4 {
+          margin: 0 0 8px;
+          font-size: 12px;
+          font-weight: 900;
+          text-transform: uppercase;
+          color: var(--tpl-primary-dark);
+        }
+        .tpl-layer-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto auto auto;
+          gap: 4px;
+          align-items: center;
+          padding: 6px 8px;
+          border: 1px solid var(--tpl-border-soft);
+          border-radius: 6px;
+          margin-bottom: 4px;
+          background: #fff;
+          cursor: pointer;
+        }
+        .tpl-layer-row.is-active { border-color: var(--tpl-primary); background: #edf6f8; }
+        .tpl-layer-row span {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 12px;
+          font-weight: 700;
+          color: var(--tpl-text);
+        }
+        .tpl-layer-row button {
+          width: 22px;
+          height: 22px;
+          border: 0;
+          background: transparent;
+          color: var(--tpl-muted);
+          cursor: pointer;
+          padding: 0;
+          font-size: 13px;
+        }
+        .tpl-layer-row button:hover { color: var(--tpl-primary-dark); background: #f0f4f6; border-radius: 4px; }
+        .tpl-layer-row .delete-btn:hover { color: #b91c1c; background: #fef2f2; }
+
+        @media (max-width: 1280px) {
+          .template-workbench {
+            grid-template-columns: 240px minmax(0, 1fr) 280px;
+          }
+        }
+        @media (max-width: 1040px) {
           .template-workbench {
             grid-template-columns: 1fr;
-            margin: -16px;
+            margin: 0;
           }
-          .template-side {
-            border-right: 0;
-          }
-          .template-canvas-area {
-            padding: 22px;
-          }
+          .tpl-side, .tpl-side.right { border: 0; border-bottom: 1px solid var(--tpl-border); max-height: none; }
+          .tpl-canvas-area { padding: 16px; }
         }
       `}</style>
 
       <div className="template-toolbar">
-        <div className="template-toolbar-left">
-          <button type="button" className="template-tool-button" onClick={() => navigate("/admin/certificates")}>
-            Назад
+        <div className="tpl-toolbar-group" style={{ minWidth: 0, flex: 1 }}>
+          <button type="button" className="tpl-back-btn" onClick={() => navigate("/admin/certificates")} aria-label="Назад" title="Назад">
+            ←
           </button>
-          <strong>Конструктор шаблонов</strong>
-          <input className="template-input template-title-input" value={name} onChange={(event) => setName(event.target.value)} aria-label="Название шаблона" />
+          <span className="tpl-toolbar-title">Конструктор шаблонов</span>
+          <input
+            className="tpl-title-input"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            aria-label="Название шаблона"
+            placeholder="Название шаблона"
+          />
           <select
-            className="template-select"
+            className="tpl-template-select"
             value={editingId ?? ""}
             disabled={loadingTemplate}
             onChange={(event) => loadTemplate(Number(event.target.value) || null)}
-            aria-label="Загрузить существующий шаблон"
+            aria-label="Загрузить шаблон"
+            title="Открыть существующий шаблон"
           >
-            <option value="">Новый шаблон</option>
+            <option value="">+ Новый шаблон</option>
             {templates.map((template) => (
               <option key={template.id} value={template.id}>{template.name}</option>
             ))}
           </select>
         </div>
-        <div className="template-toolbar-actions">
+
+        <div className="tpl-toolbar-group">
+          <button type="button" className="tpl-icon-btn" onClick={undo} disabled={undoStack.length === 0} title="Отменить (Ctrl+Z)" aria-label="Отменить">
+            <svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5M4 9h11a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5h-4"/></svg>
+          </button>
+          <button type="button" className="tpl-icon-btn" onClick={redo} disabled={redoStack.length === 0} title="Повторить (Ctrl+Shift+Z)" aria-label="Повторить">
+            <svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5M20 9H9a5 5 0 0 0-5 5v0a5 5 0 0 0 5 5h4"/></svg>
+          </button>
+          <div className="tpl-zoom" title="Масштаб холста">
+            <button type="button" onClick={() => setZoomStep(-1)} disabled={zoom <= ZOOM_STOPS[0]} aria-label="Уменьшить">−</button>
+            <span className="tpl-zoom-value">{zoom}%</span>
+            <button type="button" onClick={() => setZoomStep(1)} disabled={zoom >= ZOOM_STOPS[ZOOM_STOPS.length - 1]} aria-label="Увеличить">+</button>
+          </div>
+          <button
+            type="button"
+            className={`tpl-icon-btn${showGrid ? " is-active" : ""}`}
+            onClick={() => setShowGrid((value) => !value)}
+            title="Сетка"
+            aria-label="Сетка"
+            aria-pressed={showGrid}
+          >
+            <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 10h16M4 16h16M10 4v16M16 4v16"/></svg>
+          </button>
+          <button
+            type="button"
+            className={`tpl-icon-btn${layersOpen ? " is-active" : ""}`}
+            onClick={() => setLayersOpen((value) => !value)}
+            title="Слои"
+            aria-label="Слои"
+            aria-pressed={layersOpen}
+          >
+            <svg viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5-9-5ZM3 13l9 5 9-5M3 18l9 5 9-5"/></svg>
+          </button>
+        </div>
+
+        <div className="tpl-toolbar-group">
           <input
             ref={bgInputRef}
             type="file"
@@ -1262,114 +1682,293 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
               setBgUrl(createTrackedObjectUrl(file));
             }}
           />
-          <button type="button" className="template-tool-button" onClick={() => bgInputRef.current?.click()}>
+          <button type="button" className="tpl-btn secondary" onClick={() => bgInputRef.current?.click()}>
             Загрузить фон
           </button>
-          <button type="button" className="template-tool-button icon" onClick={undo} disabled={undoStack.length === 0} title="Отменить" aria-label="Отменить">
-            ↶
-          </button>
-          <button type="button" className="template-tool-button icon" onClick={redo} disabled={redoStack.length === 0} title="Повторить" aria-label="Повторить">
-            ↷
-          </button>
-          <button type="button" className="template-tool-button">Сетка</button>
-          <button type="button" className="template-tool-button">Слои</button>
-          <button type="button" className="template-tool-button" aria-label="Масштаб">
-            85%
-          </button>
-          <button type="button" className="template-tool-button" onClick={handleCanvasPreview}>
-            Предпросмотр
-          </button>
-          <button type="button" className="template-tool-button primary" onClick={handleSave} disabled={saving}>
+          {editingId && (
+            <button type="button" className="tpl-btn danger" onClick={handleDeleteTemplate} disabled={saving || loadingTemplate}>
+              Удалить
+            </button>
+          )}
+          <button type="button" className="tpl-btn primary" onClick={handleSave} disabled={saving}>
             {saving ? "Сохранение..." : "Сохранить шаблон"}
           </button>
         </div>
       </div>
 
-      <aside className="template-side">
-        <div className="template-panel">
-          <h3>Переменные шаблона</h3>
-          <div className="template-variable-list">
-            {visibleVariables.map((key) => (
-              <button
-                key={key}
-                type="button"
-                className="template-variable-chip"
-                onClick={() => addPresetBlock(key)}
-                title={`Вставить переменную {${key}}`}
+      {layersOpen && (
+        <div className="tpl-layers-popover" role="dialog" aria-label="Слои">
+          <h4>Слои на холсте</h4>
+          {elements.length === 0 && images.length === 0 && (
+            <p style={{ margin: 0, color: "#667783", fontSize: 12 }}>Добавьте элементы на холст, чтобы они появились здесь.</p>
+          )}
+          {elements.map((el) => {
+            const isVar = (el.text || "").includes("{");
+            return (
+              <div
+                key={`el-${el.id}`}
+                className={`tpl-layer-row${selectedElementId === el.id ? " is-active" : ""}`}
+                onClick={() => handleSelectElement(el.id)}
               >
-                {`{${key}}`}
-              </button>
+                <span>{isVar ? "🔤 " : "📝 "}{el.text}</span>
+                <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); moveElementZ(el.id, "up"); }} title="Выше">▲</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); moveElementZ(el.id, "down"); }} title="Ниже">▼</button>
+                <button type="button" className="delete-btn" onClick={(e) => { e.stopPropagation(); pushUndo(); removeEl(el.id); }} title="Удалить">×</button>
+              </div>
+            );
+          })}
+          {images.map((img) => (
+            <div
+              key={`img-${img.id}`}
+              className={`tpl-layer-row${selectedImageId === img.id ? " is-active" : ""}`}
+              onClick={() => handleSelectImage(img.id)}
+            >
+              <span>🖼 {img.label || img.kind}</span>
+              <button type="button" onClick={(e) => e.stopPropagation()} title="Изображение" style={{ visibility: "hidden" }}>▲</button>
+              <button type="button" onClick={(e) => e.stopPropagation()} title="Изображение" style={{ visibility: "hidden" }}>▼</button>
+              <button type="button" className="delete-btn" onClick={(e) => { e.stopPropagation(); removeImage(img.id); }} title="Удалить">×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <aside className="tpl-side" aria-label="Элементы и переменные">
+        <div className="tpl-section">
+          <h3>Переменные</h3>
+          <p className="tpl-hint">Подставляются при выпуске грамоты. Колонки Excel должны совпадать с названиями.</p>
+          <div className="tpl-var-grid">
+            {QUICK_VARIABLES.map((key) => (
+              <div className="tpl-var-row" key={`base-${key}`}>
+                <span className="tpl-var-chip">{`{${key}}`}</span>
+                <button type="button" className="tpl-var-insert" onClick={() => { pushUndo(); insertVariableBlock(key); }} title="Вставить на холст">Вставить</button>
+                <span style={{ width: 26 }} />
+              </div>
+            ))}
+            {userVariables.map((key) => (
+              <div className="tpl-var-row custom" key={`user-${key}`}>
+                <span className="tpl-var-chip">{`{${key}}`}</span>
+                <button type="button" className="tpl-var-insert" onClick={() => { pushUndo(); insertVariableBlock(key); }} title="Вставить на холст">Вставить</button>
+                <button type="button" className="tpl-var-remove" onClick={() => removeCustomVariable(key)} title="Убрать переменную">×</button>
+              </div>
             ))}
           </div>
-          <div className="template-action-grid">
-            <button type="button" className="template-tool-button" onClick={() => addDecorBlock("Новый текст", { y: 46, size: 20 })}>
-              Добавить текстовый блок
+          {showVariableInput ? (
+            <div className="tpl-add-var">
+              <input
+                value={variableDraft}
+                onChange={(event) => setVariableDraft(event.target.value)}
+                placeholder="Например: Школа"
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") { event.preventDefault(); addCustomVariable(variableDraft); }
+                  if (event.key === "Escape") { setShowVariableInput(false); setVariableDraft(""); }
+                }}
+                autoFocus
+              />
+              <button type="button" className="tpl-btn primary" onClick={() => addCustomVariable(variableDraft)} style={{ minHeight: 32, padding: "0 12px" }}>
+                Добавить
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="tpl-element-btn"
+              style={{ marginTop: 8, justifyContent: "center", color: "var(--tpl-primary-dark)", borderStyle: "dashed", borderColor: "#b9cbd4" }}
+              onClick={() => setShowVariableInput(true)}
+            >
+              + Добавить переменную
             </button>
-            <button type="button" className="template-tool-button" onClick={() => addPresetBlock("ФИО участника")}>
+          )}
+        </div>
+
+        <div className="tpl-section">
+          <h3>Элементы</h3>
+          <div className="tpl-element-grid">
+            <button type="button" className="tpl-element-btn" onClick={() => { pushUndo(); addDecorBlock("Новый текст", { y: 46, size: 20 }); }}>
+              <svg viewBox="0 0 24 24"><path d="M4 6h16M9 6v14M14 6v14M4 18h6M14 18h6"/></svg>
+              Добавить текст
+            </button>
+            <button type="button" className="tpl-element-btn" onClick={() => { pushUndo(); insertVariableBlock("ФИО участника"); }}>
+              <svg viewBox="0 0 24 24"><path d="M5 8h14M5 12h14M5 16h8"/></svg>
               Вставить переменную
             </button>
-            <button type="button" className="template-tool-button" onClick={() => addDecorBlock("Подпись", { y: 74, size: 12 })}>
-              Добавить подпись
+            <input type="file" accept="image/*" ref={stampInputRef} style={{ display: "none" }} onChange={handleStampFile} />
+            <button type="button" className="tpl-element-btn" onClick={() => stampInputRef.current?.click()}>
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/></svg>
+              Загрузить печать
             </button>
-            <button type="button" className="template-tool-button" onClick={() => addDecorBlock("Место для печати", { y: 70, size: 11, color: "#8fb3bf" })}>
-              Добавить печать
+            <input type="file" accept="image/*" ref={signatureInputRef} style={{ display: "none" }} onChange={handleSignatureFile} />
+            <button type="button" className="tpl-element-btn" onClick={() => signatureInputRef.current?.click()}>
+              <svg viewBox="0 0 24 24"><path d="M3 18c4-2 6-8 9-8s4 4 9 2"/></svg>
+              Загрузить подпись
             </button>
-            <button type="button" className="template-tool-button" onClick={() => bgInputRef.current?.click()}>
+            <input type="file" accept="image/*" ref={imageInputRef} style={{ display: "none" }} onChange={handleGenericImageFile} />
+            <button type="button" className="tpl-element-btn" onClick={() => imageInputRef.current?.click()}>
+              <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 17 4-5 4 4 3-3 5 5"/><circle cx="9" cy="10" r="1.4"/></svg>
+              Добавить изображение
+            </button>
+            <button type="button" className="tpl-element-btn" onClick={() => bgInputRef.current?.click()}>
+              <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 14l6-4 5 4 4-3 3 3"/></svg>
               Загрузить фон
             </button>
           </div>
         </div>
 
-        <div className="template-panel">
-          <h3>Блоки на холсте</h3>
-          <div className="template-block-list">
-            {elements.map((element) => (
-              <button
-                key={element.id}
-                type="button"
-                className={`template-block-button${selectedElementId === element.id ? " is-active" : ""}`}
-                onClick={() => setSelectedElementId(element.id)}
-              >
-                <span>{element.text}</span>
-                <small>{Math.round(element.size)} pt</small>
-              </button>
-            ))}
-            <button type="button" className="template-block-button template-add" onClick={() => { pushUndo(); addElement(); }}>
-              Добавить блок
-            </button>
+        <div className="tpl-section">
+          <h3>Блоки на холсте ({elements.length + images.length})</h3>
+          {elements.length === 0 && images.length === 0 ? (
+            <p style={{ margin: 0, color: "var(--tpl-muted)", fontSize: 12 }}>Добавьте элементы, чтобы они появились в списке.</p>
+          ) : (
+            <div className="tpl-block-list">
+              {elements.map((element) => {
+                const isVar = (element.text || "").includes("{");
+                return (
+                  <div
+                    key={`b-${element.id}`}
+                    className={`tpl-block-row${selectedElementId === element.id ? " is-active" : ""}`}
+                    onClick={() => handleSelectElement(element.id)}
+                  >
+                    <span className="tpl-block-kind">{isVar ? "▣" : "T"}</span>
+                    <span className="tpl-block-label">{element.text}</span>
+                    <span className={`tpl-block-tag${isVar ? " variable" : ""}`}>{isVar ? "Переменная" : "Текст"}</span>
+                    <button
+                      type="button"
+                      className="tpl-block-delete"
+                      onClick={(e) => { e.stopPropagation(); pushUndo(); removeEl(element.id); }}
+                      title="Удалить блок"
+                      aria-label="Удалить блок"
+                    >×</button>
+                  </div>
+                );
+              })}
+              {images.map((img) => (
+                <div
+                  key={`bi-${img.id}`}
+                  className={`tpl-block-row${selectedImageId === img.id ? " is-active" : ""}`}
+                  onClick={() => handleSelectImage(img.id)}
+                >
+                  <span className="tpl-block-kind">⬚</span>
+                  <span className="tpl-block-label">{img.label}</span>
+                  <span className="tpl-block-tag">{img.kind === "stamp" ? "Печать" : img.kind === "signature" ? "Подпись" : "Изобр."}</span>
+                  <button
+                    type="button"
+                    className="tpl-block-delete"
+                    onClick={(e) => { e.stopPropagation(); removeImage(img.id); }}
+                    title="Удалить"
+                    aria-label="Удалить изображение"
+                  >×</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </aside>
+
+      <div className="tpl-canvas-area">
+        <div className="tpl-canvas-frame" style={{ "--tpl-zoom": zoom / 100 }}>
+          <div className="tpl-canvas-sheet">
+            <AccuratePreview
+              bgUrl={bgUrl}
+              elements={elements}
+              signers={signers}
+              signersLayout={signersLayout}
+              margins={margins}
+              previewVariables={effectivePreviewVariables}
+              fontFaces={availableFonts}
+              selectedElementId={selectedElementId}
+              onElementSelect={handleSelectElement}
+              onElementMove={handleElementMove}
+              onElementContextMenu={handleElementContextMenu}
+              onElementDoubleClick={handleElementDoubleClick}
+              onSignersMove={handleSignersMove}
+              showGrid={showGrid}
+              showSafeZone={showGrid}
+              showRulers={showGrid}
+              maxWidth={9999}
+              images={images}
+              selectedImageId={selectedImageId}
+              onImageSelect={handleSelectImage}
+              onImageMove={moveImage}
+            />
           </div>
         </div>
+      </div>
 
-        <div className="template-panel">
-          <h3>Свойства выбранного блока</h3>
-          {selectedElement ? (
-            <div className="template-props">
+      <aside className="tpl-side right" aria-label="Свойства выделенного блока">
+        <div className="tpl-section">
+          <h3>Свойства</h3>
+
+          {selectedImage ? (
+            <div className="tpl-props">
+              <p className="tpl-hint" style={{ margin: 0 }}>
+                {selectedImage.kind === "stamp" ? "Печать организации" : selectedImage.kind === "signature" ? "Подпись" : "Изображение"} · {selectedImage.file?.name || "изображение"}
+              </p>
+              <div className="tpl-prop-grid-2">
+                <label>
+                  X (%)
+                  <input type="number" min={0} max={100} value={Math.round(selectedImage.x)} onChange={(e) => updateImage(selectedImage.id, { x: Number(e.target.value) })} />
+                </label>
+                <label>
+                  Y (%)
+                  <input type="number" min={0} max={100} value={Math.round(selectedImage.y)} onChange={(e) => updateImage(selectedImage.id, { y: Number(e.target.value) })} />
+                </label>
+              </div>
+              <div className="tpl-prop-grid-2">
+                <label>
+                  Ширина (мм)
+                  <input type="number" min={5} max={210} value={selectedImage.widthMm} onChange={(e) => updateImage(selectedImage.id, { widthMm: Number(e.target.value) })} />
+                </label>
+                <label>
+                  Высота (мм)
+                  <input type="number" min={5} max={297} value={selectedImage.heightMm} onChange={(e) => updateImage(selectedImage.id, { heightMm: Number(e.target.value) })} />
+                </label>
+              </div>
+              <label>
+                Прозрачность
+                <input type="range" min={0.2} max={1} step={0.05} value={selectedImage.opacity ?? 1} onChange={(e) => updateImage(selectedImage.id, { opacity: Number(e.target.value) })} />
+              </label>
+              <input type="file" accept="image/*" ref={imageReplaceInputRef} style={{ display: "none" }} onChange={handleReplaceImageFile} />
+              <button type="button" className="tpl-btn" onClick={() => imageReplaceInputRef.current?.click()}>
+                Заменить изображение
+              </button>
+              <button type="button" className="tpl-btn danger" onClick={() => removeImage(selectedImage.id)}>
+                Удалить изображение
+              </button>
+              <p className="tpl-hint" style={{ margin: 0 }}>
+                Изображение видно только в конструкторе. Для применения печати в PDF используйте загрузку факсимиле подписанта.
+              </p>
+            </div>
+          ) : selectedElement ? (
+            <div className="tpl-props">
               <label>
                 Текст
                 <textarea
-                  className="template-input"
                   rows={3}
                   value={selectedElement.text}
                   onChange={(event) => updateSelectedElement("text", event.target.value)}
                 />
               </label>
-              <div className="template-prop-grid">
+              {(selectedElement.text || "").includes("{") && (
+                <p className="tpl-hint" style={{ margin: 0 }}>
+                  Этот блок содержит переменную. При выпуске грамоты значение будет подставлено автоматически.
+                </p>
+              )}
+              <div className="tpl-prop-grid-2">
                 <label>
-                  Позиция X
+                  Позиция X (%)
                   <input type="number" min={0} max={100} value={Math.round(selectedElement.x)} onChange={(event) => updateSelectedElement("x", Number(event.target.value))} />
                 </label>
                 <label>
-                  Позиция Y
+                  Позиция Y (%)
                   <input type="number" min={0} max={100} value={Math.round(selectedElement.y)} onChange={(event) => updateSelectedElement("y", Number(event.target.value))} />
                 </label>
               </div>
-              <div className="template-prop-grid">
+              <div className="tpl-prop-grid-2">
                 <label>
-                  Ширина
+                  Ширина (мм)
                   <input type="number" min={5} max={210} value={selectedElement.maxWidthMm || ""} onChange={(event) => updateSelectedElement("maxWidthMm", Number(event.target.value) || null)} placeholder="авто" />
                 </label>
                 <label>
-                  Высота
+                  Высота (мм)
                   <input type="number" min={5} max={280} value={selectedElement.maxHeightMm || ""} onChange={(event) => updateSelectedElement("maxHeightMm", Number(event.target.value) || null)} placeholder="авто" />
                 </label>
               </div>
@@ -1381,47 +1980,49 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
                   ))}
                 </select>
               </label>
-              <div className="template-prop-grid">
+              <div className="tpl-prop-grid-2">
                 <label>
-                  Размер шрифта
+                  Размер
                   <input type="number" min={6} max={120} value={selectedElement.size} onChange={(event) => updateSelectedElement("size", Number(event.target.value))} />
                 </label>
                 <label>
                   Цвет
-                  <div className="template-color-row">
+                  <div className="tpl-prop-color">
                     <input type="color" value={selectedElement.color} onChange={(event) => updateSelectedElement("color", event.target.value)} />
                     <input value={selectedElement.color} onChange={(event) => updateSelectedElement("color", event.target.value)} />
                   </div>
                 </label>
               </div>
-              <div className="template-inline-toggle">
-                <button
-                  type="button"
-                  className={selectedElement.weight === "700" ? "is-active" : ""}
-                  onClick={() => updateSelectedElement("weight", selectedElement.weight === "700" ? "400" : "700")}
-                >
-                  Жирность
-                </button>
-                <button type="button" disabled title="Курсив будет добавлен после поддержки в генераторе PDF">
-                  Курсив
-                </button>
-              </div>
+              <label>
+                Начертание
+                <div className="tpl-toggle-row">
+                  <button
+                    type="button"
+                    className={selectedElement.weight === "400" ? "is-active" : ""}
+                    onClick={() => updateSelectedElement("weight", "400")}
+                  >Обычный</button>
+                  <button
+                    type="button"
+                    className={selectedElement.weight === "600" ? "is-active" : ""}
+                    onClick={() => updateSelectedElement("weight", "600")}
+                  >Полу­жирный</button>
+                  <button
+                    type="button"
+                    className={selectedElement.weight === "700" ? "is-active" : ""}
+                    onClick={() => updateSelectedElement("weight", "700")}
+                  >Жирный</button>
+                </div>
+              </label>
               <label>
                 Выравнивание
-                <div className="template-align">
-                  {[
-                    ["left", "Слева"],
-                    ["center", "Центр"],
-                    ["right", "Справа"],
-                  ].map(([value, label]) => (
+                <div className="tpl-toggle-row">
+                  {[["left", "Слева"], ["center", "Центр"], ["right", "Справа"]].map(([value, lbl]) => (
                     <button
                       key={value}
                       type="button"
                       className={selectedAlign === value ? "is-active" : ""}
                       onClick={() => updateSelectedElement("align", value)}
-                    >
-                      {label}
-                    </button>
+                    >{lbl}</button>
                   ))}
                 </div>
               </label>
@@ -1429,36 +2030,22 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
                 Межстрочный интервал
                 <input type="number" min={1} max={2} step={0.05} value={selectedElement.lineHeight || 1.25} onChange={(event) => updateSelectedElement("lineHeight", Number(event.target.value) || 1.25)} />
               </label>
-              <button type="button" className="template-tool-button" onClick={() => { pushUndo(); removeEl(selectedElement.id); }}>
+              <div className="tpl-divider" />
+              <button type="button" className="tpl-btn" onClick={() => { pushUndo(); duplicateEl(selectedElement.id); }}>
+                Дублировать блок
+              </button>
+              <button type="button" className="tpl-btn danger" onClick={() => { pushUndo(); removeEl(selectedElement.id); }}>
                 Удалить блок
               </button>
             </div>
           ) : (
-            <p style={{ margin: 0, color: "#667783", lineHeight: 1.5 }}>Выберите текстовый блок на холсте или в списке.</p>
+            <div className="tpl-empty-props">
+              Выберите элемент на холсте, чтобы изменить его параметры.
+            </div>
           )}
-          {msg && <div className="template-message"><AlertBanner type={msgType}>{msg}</AlertBanner></div>}
+          {msg && <div style={{ marginTop: 12 }}><AlertBanner type={msgType}>{msg}</AlertBanner></div>}
         </div>
       </aside>
-
-      <div className="template-canvas-area">
-        <div className="template-canvas-frame">
-          <AccuratePreview
-            bgUrl={bgUrl}
-            elements={elements}
-            signers={signers}
-            signersLayout={signersLayout}
-            margins={margins}
-            previewVariables={effectivePreviewVariables}
-            fontFaces={availableFonts}
-            selectedElementId={selectedElementId}
-            onElementSelect={setSelectedElementId}
-            onElementMove={handleElementMove}
-            onElementContextMenu={handleElementContextMenu}
-            onElementDoubleClick={handleElementDoubleClick}
-            onSignersMove={handleSignersMove}
-          />
-        </div>
-      </div>
 
       {ctxMenu && (
         <ContextMenu

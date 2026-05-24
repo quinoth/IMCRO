@@ -208,10 +208,54 @@ export default function AccuratePreview({
   onElementContextMenu, // (id, clientX, clientY) => void — правый клик
   onElementDoubleClick, // (id) => void — двойной клик → прокрутить к настройкам
   onSignersMove,       // (xMm, yMm) => void — drag блока подписантов
+  showGrid = true,
+  showSafeZone = true,
+  showRulers = true,
+  showVariableBadge = false,
+  maxWidth = 430,
+  images = [],
+  selectedImageId = null,
+  onImageSelect,
+  onImageMove,
+  onImageContextMenu,
 }) {
   const previewFrameRef = useRef(null);
   const [previewWidthPx, setPreviewWidthPx] = useState(0);
   const [draggingElementId, setDraggingElementId] = useState(null);
+  const [draggingImageId, setDraggingImageId] = useState(null);
+  const imageDragRef = useRef({ active: false, id: null, startX: 0, startY: 0, origX: 0, origY: 0 });
+
+  const handleImagePointerDown = useCallback((e, imgId, imgX, imgY) => {
+    if (e.button !== 0 || !onImageMove) return;
+    e.stopPropagation();
+    e.preventDefault();
+    onImageSelect?.(imgId);
+    imageDragRef.current = { active: true, id: imgId, startX: e.clientX, startY: e.clientY, origX: imgX, origY: imgY };
+    setDraggingImageId(imgId);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }, [onImageMove, onImageSelect]);
+
+  const handleImagePointerMove = useCallback((e) => {
+    const d = imageDragRef.current;
+    if (!d.active || !previewFrameRef.current) return;
+    const rect = previewFrameRef.current.getBoundingClientRect();
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    const newX = d.origX + (dx / rect.width) * 100;
+    const newY = d.origY + (dy / rect.height) * 100;
+    onImageMove?.(d.id, Math.max(0, Math.min(100, newX)), Math.max(0, Math.min(100, newY)));
+  }, [onImageMove]);
+
+  const handleImagePointerUp = useCallback(() => {
+    imageDragRef.current.active = false;
+    setDraggingImageId(null);
+  }, []);
+
+  const handleImageContextMenu = useCallback((e, imgId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onImageContextMenu?.(imgId, e.clientX, e.clientY);
+  }, [onImageContextMenu]);
 
   // ── Drag & Drop state ───────────────────────────────────────────────────────
   const dragRef = useRef({ active: false, elId: null, startX: 0, startY: 0, origX: 0, origY: 0 });
@@ -321,12 +365,12 @@ export default function AccuratePreview({
     <div ref={previewFrameRef} style={{
       width: "100%",
       aspectRatio: "210 / 297",
-      maxWidth: 430,
+      maxWidth: maxWidth,
       position: "relative",
       borderRadius: 8,
       overflow: "hidden",
       boxShadow: bgUrl ? "0 4px 24px rgba(0,0,0,0.18)" : "0 0 0 2px #E2E8F0",
-      background: bgUrl ? "transparent" : "#F1F5F9",
+      background: bgUrl ? "transparent" : "#ffffff",
       margin: "0 auto",
     }}>
       {fontFaceCss && <style>{fontFaceCss}</style>}
@@ -347,42 +391,101 @@ export default function AccuratePreview({
       )}
 
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}>
-        <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-          <svg width="100%" height="100%" viewBox="0 0 210 297" preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
-            <defs>
-              <pattern id="grid10mm" width="10" height="10" patternUnits="userSpaceOnUse">
-                <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(25,120,156,0.08)" strokeWidth="0.25" />
-              </pattern>
-              <pattern id="grid50mm" width="50" height="50" patternUnits="userSpaceOnUse">
-                <path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(25,120,156,0.18)" strokeWidth="0.5" />
-              </pattern>
-            </defs>
-            <rect width="210" height="297" fill="url(#grid10mm)" />
-            <rect width="210" height="297" fill="url(#grid50mm)" />
-          </svg>
-          <div style={{ position: "absolute", top: 5, left: 5, fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
-            0 мм
+        {showGrid && (
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+            <svg width="100%" height="100%" viewBox="0 0 210 297" preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
+              <defs>
+                <pattern id="grid10mm" width="10" height="10" patternUnits="userSpaceOnUse">
+                  <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(25,120,156,0.08)" strokeWidth="0.25" />
+                </pattern>
+                <pattern id="grid50mm" width="50" height="50" patternUnits="userSpaceOnUse">
+                  <path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(25,120,156,0.18)" strokeWidth="0.5" />
+                </pattern>
+              </defs>
+              <rect width="210" height="297" fill="url(#grid10mm)" />
+              <rect width="210" height="297" fill="url(#grid50mm)" />
+            </svg>
+            {showRulers && (
+              <>
+                <div style={{ position: "absolute", top: 5, left: 5, fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
+                  0 мм
+                </div>
+                <div style={{ position: "absolute", top: 5, left: "50%", transform: "translateX(-50%)", fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
+                  105 мм
+                </div>
+                <div style={{ position: "absolute", top: 5, right: 5, fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
+                  210 мм
+                </div>
+                <div style={{ position: "absolute", bottom: 5, left: 5, fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
+                  297 мм
+                </div>
+              </>
+            )}
           </div>
-          <div style={{ position: "absolute", top: 5, left: "50%", transform: "translateX(-50%)", fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
-            105 мм
-          </div>
-          <div style={{ position: "absolute", top: 5, right: 5, fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
-            210 мм
-          </div>
-          <div style={{ position: "absolute", bottom: 5, left: 5, fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
-            297 мм
-          </div>
-        </div>
+        )}
 
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
+          {/* Изображения (печати, подписи, декор) */}
+          {images.map((img) => {
+            const widthMm = Number(img.widthMm) || 40;
+            const heightMm = Number(img.heightMm) || 25;
+            const widthPct = (widthMm / PAGE_W) * 100;
+            const heightPct = (heightMm / PAGE_H) * 100;
+            const opacity = img.opacity ?? 1;
+            const isSelected = selectedImageId === img.id;
+            return (
+              <div
+                key={img.id}
+                onPointerDown={(e) => handleImagePointerDown(e, img.id, img.x, img.y)}
+                onPointerMove={handleImagePointerMove}
+                onPointerUp={handleImagePointerUp}
+                onContextMenu={(e) => handleImageContextMenu(e, img.id)}
+                style={{
+                  position: "absolute",
+                  left: `${img.x}%`,
+                  top: `${img.y}%`,
+                  width: `${widthPct}%`,
+                  height: `${heightPct}%`,
+                  transform: "translate(-50%, -50%)",
+                  opacity,
+                  cursor: onImageMove ? (draggingImageId === img.id ? "grabbing" : "grab") : "default",
+                  pointerEvents: onImageMove ? "auto" : "none",
+                  userSelect: "none",
+                  outline: isSelected ? "2.5px solid rgba(25,120,156,0.85)" : undefined,
+                  outlineOffset: isSelected ? 3 : 0,
+                  boxShadow: isSelected ? "0 0 12px rgba(25,120,156,0.28)" : undefined,
+                  borderRadius: isSelected ? 4 : undefined,
+                  zIndex: isSelected ? 9 : 0,
+                }}
+              >
+                {img.url ? (
+                  <img
+                    src={img.url}
+                    alt={img.label || "изображение"}
+                    draggable={false}
+                    style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }}
+                  />
+                ) : (
+                  <div style={{
+                    width: "100%", height: "100%", display: "grid", placeItems: "center",
+                    border: "1px dashed #9dbfca", borderRadius: 4, color: "#9dbfca",
+                    fontSize: 11, background: "rgba(237,246,248,.6)",
+                  }}>{img.label || "Изображение"}</div>
+                )}
+              </div>
+            );
+          })}
+
           {/* Рабочая зона */}
-          <div style={{
-            position: "absolute",
-            left: `${safePct.xMin}%`, right: `${100 - safePct.xMax}%`,
-            top: `${safePct.yMin}%`, bottom: `${100 - safePct.yMax}%`,
-            border: "2.5px dashed rgba(239,68,68,0.75)", borderRadius: 3,
-            pointerEvents: "none", boxSizing: "border-box",
-          }} />
+          {showSafeZone && (
+            <div style={{
+              position: "absolute",
+              left: `${safePct.xMin}%`, right: `${100 - safePct.xMax}%`,
+              top: `${safePct.yMin}%`, bottom: `${100 - safePct.yMax}%`,
+              border: "2px dashed rgba(25,120,156,0.45)", borderRadius: 3,
+              pointerEvents: "none", boxSizing: "border-box",
+            }} />
+          )}
 
           {/* Текстовые элементы с auto-shrink (точная имитация бэкенда) */}
           {elements.map((el) => {
@@ -449,7 +552,8 @@ export default function AccuratePreview({
                   // Подсвечиваем плейсхолдеры или выделенный элемент
                   outline: selectedElementId === el.id
                     ? "2.5px solid rgba(25,120,156,0.85)"
-                    : hasPlaceholder ? "2px dashed rgba(239,68,68,0.55)" : undefined,
+                    : hasPlaceholder ? "1.5px dashed rgba(25,120,156,0.55)" : undefined,
+                  background: hasPlaceholder && selectedElementId !== el.id ? "rgba(237,246,248,0.55)" : undefined,
                   outlineOffset: selectedElementId === el.id ? 3 : 2,
                   boxShadow: selectedElementId === el.id ? "0 0 12px rgba(25,120,156,0.28)" : undefined,
                   borderRadius: selectedElementId === el.id ? 4 : undefined,
