@@ -208,6 +208,13 @@ export default function AccuratePreview({
   onElementContextMenu, // (id, clientX, clientY) => void — правый клик
   onElementDoubleClick, // (id) => void — двойной клик → прокрутить к настройкам
   onSignersMove,       // (xMm, yMm) => void — drag блока подписантов
+  gridVisible = true,
+  zoom = 1,
+  maxFrameWidth = 430,
+  images = [], // дополнительные изображения (печать, подпись, логотип)
+  onImageMove,
+  onImageSelect,
+  selectedImageId,
 }) {
   const previewFrameRef = useRef(null);
   const [previewWidthPx, setPreviewWidthPx] = useState(0);
@@ -319,14 +326,14 @@ export default function AccuratePreview({
 
   return (
     <div ref={previewFrameRef} style={{
-      width: "100%",
+      width: `${Math.round(100 * zoom)}%`,
       aspectRatio: "210 / 297",
-      maxWidth: 430,
+      maxWidth: maxFrameWidth ? maxFrameWidth * zoom : undefined,
       position: "relative",
       borderRadius: 8,
       overflow: "hidden",
       boxShadow: bgUrl ? "0 4px 24px rgba(0,0,0,0.18)" : "0 0 0 2px #E2E8F0",
-      background: bgUrl ? "transparent" : "#F1F5F9",
+      background: bgUrl ? "transparent" : "#FFFFFF",
       margin: "0 auto",
     }}>
       {fontFaceCss && <style>{fontFaceCss}</style>}
@@ -347,42 +354,46 @@ export default function AccuratePreview({
       )}
 
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}>
-        <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-          <svg width="100%" height="100%" viewBox="0 0 210 297" preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
-            <defs>
-              <pattern id="grid10mm" width="10" height="10" patternUnits="userSpaceOnUse">
-                <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(25,120,156,0.08)" strokeWidth="0.25" />
-              </pattern>
-              <pattern id="grid50mm" width="50" height="50" patternUnits="userSpaceOnUse">
-                <path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(25,120,156,0.18)" strokeWidth="0.5" />
-              </pattern>
-            </defs>
-            <rect width="210" height="297" fill="url(#grid10mm)" />
-            <rect width="210" height="297" fill="url(#grid50mm)" />
-          </svg>
-          <div style={{ position: "absolute", top: 5, left: 5, fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
-            0 мм
+        {gridVisible && (
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+            <svg width="100%" height="100%" viewBox="0 0 210 297" preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
+              <defs>
+                <pattern id="grid10mm" width="10" height="10" patternUnits="userSpaceOnUse">
+                  <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(25,120,156,0.08)" strokeWidth="0.25" />
+                </pattern>
+                <pattern id="grid50mm" width="50" height="50" patternUnits="userSpaceOnUse">
+                  <path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(25,120,156,0.18)" strokeWidth="0.5" />
+                </pattern>
+              </defs>
+              <rect width="210" height="297" fill="url(#grid10mm)" />
+              <rect width="210" height="297" fill="url(#grid50mm)" />
+            </svg>
           </div>
-          <div style={{ position: "absolute", top: 5, left: "50%", transform: "translateX(-50%)", fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
-            105 мм
-          </div>
-          <div style={{ position: "absolute", top: 5, right: 5, fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
-            210 мм
-          </div>
-          <div style={{ position: "absolute", bottom: 5, left: 5, fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
-            297 мм
-          </div>
-        </div>
+        )}
 
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
           {/* Рабочая зона */}
-          <div style={{
-            position: "absolute",
-            left: `${safePct.xMin}%`, right: `${100 - safePct.xMax}%`,
-            top: `${safePct.yMin}%`, bottom: `${100 - safePct.yMax}%`,
-            border: "2.5px dashed rgba(239,68,68,0.75)", borderRadius: 3,
-            pointerEvents: "none", boxSizing: "border-box",
-          }} />
+          {gridVisible && (
+            <div style={{
+              position: "absolute",
+              left: `${safePct.xMin}%`, right: `${100 - safePct.xMax}%`,
+              top: `${safePct.yMin}%`, bottom: `${100 - safePct.yMax}%`,
+              border: "1.5px dashed rgba(25,120,156,0.45)", borderRadius: 3,
+              pointerEvents: "none", boxSizing: "border-box",
+            }} />
+          )}
+
+          {/* Дополнительные изображения (печать, подпись, логотип) */}
+          {images.map((img) => (
+            <ImageOnCanvas
+              key={img.id}
+              img={img}
+              isSelected={selectedImageId === img.id}
+              onSelect={() => onImageSelect?.(img.id)}
+              onMove={onImageMove}
+              previewFrameRef={previewFrameRef}
+            />
+          ))}
 
           {/* Текстовые элементы с auto-shrink (точная имитация бэкенда) */}
           {elements.map((el) => {
@@ -666,6 +677,55 @@ export default function AccuratePreview({
           })()}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ImageOnCanvas({ img, isSelected, onSelect, onMove, previewFrameRef }) {
+  const dragRef = useRef({ active: false, startX: 0, startY: 0, origX: 0, origY: 0 });
+  const handleDown = (e) => {
+    if (e.button !== 0 || !onMove) return;
+    e.stopPropagation();
+    e.preventDefault();
+    onSelect?.();
+    dragRef.current = { active: true, startX: e.clientX, startY: e.clientY, origX: img.x, origY: img.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const handleMove = (e) => {
+    const d = dragRef.current;
+    if (!d.active || !previewFrameRef.current) return;
+    const rect = previewFrameRef.current.getBoundingClientRect();
+    const dx = ((e.clientX - d.startX) / rect.width) * 100;
+    const dy = ((e.clientY - d.startY) / rect.height) * 100;
+    onMove?.(img.id, Math.max(0, Math.min(100, d.origX + dx)), Math.max(0, Math.min(100, d.origY + dy)));
+  };
+  const handleUp = () => { dragRef.current.active = false; };
+  return (
+    <div
+      onPointerDown={handleDown}
+      onPointerMove={handleMove}
+      onPointerUp={handleUp}
+      style={{
+        position: "absolute",
+        left: `${img.x}%`,
+        top: `${img.y}%`,
+        width: `${img.width || 25}%`,
+        transform: "translate(-50%, -50%)",
+        cursor: onMove ? "grab" : "default",
+        outline: isSelected ? "2.5px solid rgba(25,120,156,0.85)" : "1px dashed rgba(25,120,156,0.35)",
+        outlineOffset: 2,
+        borderRadius: 4,
+        opacity: img.opacity ?? 1,
+        zIndex: isSelected ? 10 : 2,
+        userSelect: "none",
+      }}
+    >
+      <img
+        src={img.url}
+        alt={img.kind === "stamp" ? "Печать" : img.kind === "signature" ? "Подпись" : "Изображение"}
+        draggable={false}
+        style={{ width: "100%", height: "auto", display: "block", pointerEvents: "none" }}
+      />
     </div>
   );
 }

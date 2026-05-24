@@ -26,6 +26,23 @@ function userName(currentUser) {
   return currentUser?.full_name || currentUser?.fullName || fio || currentUser?.username || currentUser?.email || "Администратор";
 }
 
+function userInitials(name) {
+  const cleaned = String(name || "").trim();
+  if (!cleaned) return "АД";
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+function userShortName(name) {
+  const cleaned = String(name || "").trim();
+  if (!cleaned) return "Администратор";
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return `${parts[0]} ${parts[1][0]}.`;
+  return `${parts[1]} ${parts[0][0]}.`;
+}
+
 function userRole(currentUser) {
   const role = typeof currentUser?.role === "object" ? currentUser.role?.role_name : currentUser?.role;
   const labels = {
@@ -53,6 +70,8 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
   const activeModule = modules.find((item) => item.key === activeKey) || modules[0];
   const displayTitle = title || activeModule?.label || "Админ-панель";
   const name = userName(currentUser);
+  const shortName = userShortName(name);
+  const initials = userInitials(name);
 
   useEffect(() => {
     try {
@@ -107,14 +126,49 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
         .admin-brand {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 10px;
           min-height: 54px;
-          margin-bottom: 18px;
+          margin-bottom: 22px;
           min-width: 0;
         }
         .admin-brand-text {
+          flex: 1;
           min-width: 0;
           transition: opacity .16s ease, width .16s ease;
+        }
+        .admin-brand-toggle {
+          width: 32px;
+          height: 32px;
+          display: grid;
+          place-items: center;
+          border: 1px solid var(--admin-border);
+          border-radius: 8px;
+          background: #fff;
+          color: var(--admin-primary-dark);
+          cursor: pointer;
+          flex: 0 0 auto;
+          transition: background .15s ease, border-color .15s ease;
+        }
+        .admin-brand-toggle:hover {
+          background: #edf6f8;
+          border-color: var(--admin-primary);
+        }
+        .admin-brand-toggle svg {
+          width: 16px;
+          height: 16px;
+          fill: none;
+          stroke: currentColor;
+          stroke-width: 2;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          transition: transform .18s ease;
+        }
+        .admin-shell.is-collapsed .admin-brand-toggle svg {
+          transform: rotate(180deg);
+        }
+        .admin-shell.is-collapsed .admin-brand {
+          flex-direction: column;
+          gap: 10px;
         }
         .admin-brand-mark {
           width: 42px;
@@ -132,44 +186,6 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           fill: none;
           stroke: currentColor;
           stroke-width: 2;
-        }
-        .admin-sidebar-toggle {
-          width: 100%;
-          min-height: 38px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          margin: 0 0 22px;
-          border: 1px solid var(--admin-border);
-          border-radius: 8px;
-          background: #f7fbfc;
-          color: var(--admin-primary-dark);
-          font: inherit;
-          font-size: 13px;
-          font-weight: 850;
-          cursor: pointer;
-        }
-        .admin-sidebar-toggle:hover {
-          border-color: var(--admin-primary);
-          background: #edf6f8;
-        }
-        .admin-sidebar-toggle svg {
-          width: 18px;
-          height: 18px;
-          fill: none;
-          stroke: currentColor;
-          stroke-width: 2;
-          stroke-linecap: round;
-          stroke-linejoin: round;
-          transition: transform .18s ease;
-        }
-        .admin-shell.is-collapsed .admin-sidebar-toggle svg {
-          transform: rotate(180deg);
-        }
-        .admin-sidebar-toggle span {
-          overflow: hidden;
-          white-space: nowrap;
         }
         .admin-brand strong {
           display: block;
@@ -240,7 +256,6 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           margin-bottom: 16px;
         }
         .admin-shell.is-collapsed .admin-brand-text,
-        .admin-shell.is-collapsed .admin-sidebar-toggle span,
         .admin-shell.is-collapsed .admin-nav-button > span,
         .admin-shell.is-collapsed .admin-sidebar-user div {
           width: 0;
@@ -477,7 +492,6 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           }
           .admin-brand-text,
           .admin-shell.is-collapsed .admin-brand-text,
-          .admin-shell.is-collapsed .admin-sidebar-toggle span,
           .admin-shell.is-collapsed .admin-nav-button > span,
           .admin-shell.is-collapsed .admin-sidebar-user div {
             width: auto;
@@ -526,20 +540,18 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
             <strong>ИМЦРО</strong>
             <span>Админ-панель</span>
           </div>
+          <button
+            type="button"
+            className="admin-brand-toggle"
+            onClick={() => setCollapsed((value) => !value)}
+            aria-label={collapsed ? "Развернуть меню" : "Свернуть меню"}
+            title={collapsed ? "Развернуть меню" : "Свернуть меню"}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
         </div>
-
-        <button
-          className="admin-sidebar-toggle"
-          type="button"
-          onClick={() => setCollapsed((value) => !value)}
-          aria-label={collapsed ? "Развернуть меню" : "Свернуть меню"}
-          title={collapsed ? "Развернуть меню" : "Свернуть меню"}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-          <span>{collapsed ? "Развернуть меню" : "Свернуть меню"}</span>
-        </button>
 
         <nav className="admin-nav">
           {modules.map((module) => (
@@ -557,8 +569,8 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           ))}
         </nav>
 
-        <div className="admin-sidebar-user">
-          <span className="admin-avatar">{name.slice(0, 2).toUpperCase()}</span>
+        <div className="admin-sidebar-user" title={name}>
+          <span className="admin-avatar">{initials}</span>
           <div>
             <strong>{name}</strong>
             <span>{userRole(currentUser)}</span>
@@ -585,8 +597,8 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
               </svg>
             </button>
             <div className="admin-profile-chip" title={name}>
-              <span className="admin-avatar">{name.slice(0, 2).toUpperCase()}</span>
-              <span>{name}</span>
+              <span className="admin-avatar">{initials}</span>
+              <span>{shortName}</span>
             </div>
           </div>
         </header>

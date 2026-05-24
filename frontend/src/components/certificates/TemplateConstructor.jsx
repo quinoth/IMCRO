@@ -340,8 +340,26 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
   const textareaRefs = useRef({}); // { [elId]: HTMLTextAreaElement }
 
   const bgInputRef = useRef(null);
+  const stampInputRef = useRef(null);
+  const signatureInputRef = useRef(null);
+  const imageInputRef = useRef(null);
   const bgDragCounter = useRef(0);
   const [bgDrag, setBgDrag] = useState(false);
+
+  // Состояние холста: сетка, масштаб, popover слоёв
+  const [gridVisible, setGridVisible] = useState(true);
+  const [zoom, setZoom] = useState(1);
+  const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5];
+  const [layersOpen, setLayersOpen] = useState(false);
+
+  // Пользовательские переменные (создаются вручную)
+  const [customVariables, setCustomVariables] = useState([]);
+  const [newVariableName, setNewVariableName] = useState("");
+  const [variableError, setVariableError] = useState("");
+
+  // Изображения на холсте (печать, подпись, логотип) — отдельный слой
+  const [images, setImages] = useState([]);
+  const [selectedImageId, setSelectedImageId] = useState(null);
 
   const createTrackedObjectUrl = useCallback((file) => {
     const url = URL.createObjectURL(file);
@@ -566,6 +584,72 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
       fontFamily: DEFAULT_FONT_FAMILY,
       maxWidthMm: null,
     }]);
+  };
+
+  // Пользовательские переменные
+  const handleAddCustomVariable = () => {
+    const raw = String(newVariableName || "").trim();
+    if (!raw) {
+      setVariableError("Введите название переменной.");
+      return;
+    }
+    if (!/^[А-Яа-яЁё A-Za-z0-9_-]+$/.test(raw)) {
+      setVariableError("Допустимы только буквы, цифры, пробел, дефис и подчёркивание.");
+      return;
+    }
+    if (customVariables.includes(raw) || detectedPlaceholders.includes(raw)) {
+      setVariableError("Переменная с таким названием уже существует.");
+      return;
+    }
+    setCustomVariables((prev) => [...prev, raw]);
+    setNewVariableName("");
+    setVariableError("");
+  };
+
+  const handleRemoveCustomVariable = (key) => {
+    setCustomVariables((prev) => prev.filter((v) => v !== key));
+  };
+
+  // Изображения (печать, подпись, логотип)
+  const handleAddImage = (kind, file) => {
+    if (!file || !file.type?.startsWith("image/")) return;
+    const url = createTrackedObjectUrl(file);
+    const newId = `img_${Date.now()}`;
+    const defaults = {
+      stamp: { x: 78, y: 76, width: 18 },
+      signature: { x: 72, y: 70, width: 22 },
+      image: { x: 50, y: 60, width: 25 },
+    };
+    const base = defaults[kind] || defaults.image;
+    setImages((prev) => [...prev, {
+      id: newId,
+      kind,
+      url,
+      fileName: file.name,
+      x: base.x,
+      y: base.y,
+      width: base.width,
+      opacity: 1,
+    }]);
+    setSelectedImageId(newId);
+    setSelectedElementId(null);
+  };
+
+  const handleImageMove = useCallback((id, newX, newY) => {
+    setImages((prev) => prev.map((img) => img.id === id ? { ...img, x: newX, y: newY } : img));
+  }, []);
+
+  const updateImage = (id, field, val) => {
+    setImages((prev) => prev.map((img) => img.id === id ? { ...img, [field]: val } : img));
+  };
+
+  const removeImage = (id) => {
+    setImages((prev) => {
+      const img = prev.find((i) => i.id === id);
+      if (img?.url) revokeObjectUrl(img.url);
+      return prev.filter((i) => i.id !== id);
+    });
+    if (selectedImageId === id) setSelectedImageId(null);
   };
 
   const insertGenderVariantBlock = (variantText) => {
@@ -936,13 +1020,10 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     if (!selectedElement) return;
     updateEl(selectedElement.id, field, value);
   };
-  const handleCanvasPreview = () => {
-    setMsg("Предпросмотр обновляется на холсте в реальном времени.");
-    setMsgType("info");
-  };
-  const visibleVariables = detectedPlaceholders.length
+  const baseVariables = detectedPlaceholders.length
     ? detectedPlaceholders
     : ["ФИО участника", "Название мероприятия", "Дата", "Достижение"];
+  const visibleVariables = [...new Set([...baseVariables, ...customVariables])];
 
   return (
     <section
@@ -1044,6 +1125,213 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           opacity: .55;
           cursor: not-allowed;
           box-shadow: none;
+        }
+        .template-tool-button.is-toggled {
+          background: #edf6f8;
+          border-color: var(--tpl-primary);
+          color: var(--tpl-primary-dark);
+        }
+        .template-zoom-control {
+          display: inline-flex;
+          align-items: center;
+          gap: 0;
+          height: 40px;
+          border: 1px solid var(--tpl-primary);
+          border-radius: 8px;
+          overflow: hidden;
+        }
+        .template-zoom-button {
+          width: 32px;
+          height: 100%;
+          border: 0;
+          background: #fff;
+          color: var(--tpl-primary-dark);
+          font-size: 18px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+        .template-zoom-button:hover { background: #edf6f8; }
+        .template-zoom-value {
+          min-width: 56px;
+          padding: 0 8px;
+          text-align: center;
+          font-weight: 850;
+          color: var(--tpl-primary-dark);
+          font-size: 14px;
+          background: #fff;
+          border-left: 1px solid #d6e0e6;
+          border-right: 1px solid #d6e0e6;
+          height: 100%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .template-layers-wrap {
+          position: relative;
+        }
+        .template-layers-popover {
+          position: absolute;
+          right: 0;
+          top: calc(100% + 8px);
+          width: 320px;
+          max-height: 380px;
+          background: #fff;
+          border: 1px solid var(--tpl-border);
+          border-radius: 10px;
+          box-shadow: 0 22px 50px rgba(15, 23, 42, .16);
+          display: flex;
+          flex-direction: column;
+          z-index: 60;
+        }
+        .template-layers-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 14px;
+          border-bottom: 1px solid var(--tpl-border);
+        }
+        .template-layers-head strong {
+          color: var(--tpl-primary-dark);
+          font-size: 14px;
+        }
+        .template-layers-head button {
+          border: 0;
+          background: transparent;
+          font-size: 20px;
+          color: #667783;
+          cursor: pointer;
+          line-height: 1;
+        }
+        .template-layers-body {
+          overflow-y: auto;
+          padding: 8px;
+          display: grid;
+          gap: 6px;
+        }
+        .template-layers-item {
+          display: grid;
+          grid-template-columns: 80px minmax(0, 1fr) 28px;
+          gap: 8px;
+          align-items: center;
+          border: 1px solid var(--tpl-border);
+          border-radius: 8px;
+          background: #fff;
+          padding: 8px 10px;
+          font: inherit;
+          font-size: 13px;
+          text-align: left;
+          cursor: pointer;
+        }
+        .template-layers-item.is-active {
+          border-color: var(--tpl-primary);
+          background: #edf6f8;
+        }
+        .template-layers-item:hover { background: #f4f8fa; }
+        .template-layers-kind {
+          font-size: 11px;
+          font-weight: 900;
+          color: var(--tpl-primary);
+          text-transform: uppercase;
+        }
+        .template-layers-name {
+          color: #17232b;
+          font-weight: 700;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .template-layers-delete {
+          width: 24px;
+          height: 24px;
+          border-radius: 6px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #b45c5c;
+          font-size: 16px;
+          font-weight: 900;
+          cursor: pointer;
+          background: transparent;
+        }
+        .template-layers-delete:hover { background: #fde2e2; }
+        .template-layers-empty {
+          color: #667783;
+          font-size: 13px;
+          padding: 14px;
+          text-align: center;
+        }
+        .template-variable-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 6px;
+          align-items: center;
+          border: 1px solid var(--tpl-border);
+          border-radius: 8px;
+          background: #fff;
+          padding: 6px 10px;
+        }
+        .template-variable-row code {
+          font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+          font-size: 13px;
+          font-weight: 850;
+          color: var(--tpl-primary-dark);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .template-variable-row button {
+          border: 0;
+          background: transparent;
+          color: var(--tpl-primary-dark);
+          font-weight: 850;
+          font-size: 12px;
+          cursor: pointer;
+          padding: 4px 8px;
+          border-radius: 6px;
+        }
+        .template-variable-row button:hover {
+          background: #edf6f8;
+        }
+        .template-variable-row button.is-danger {
+          color: #b45c5c;
+        }
+        .template-variable-row button.is-danger:hover {
+          background: #fde2e2;
+        }
+        .template-add-variable {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 8px;
+          margin-top: 10px;
+        }
+        .template-add-variable input {
+          min-height: 38px;
+          border: 1px solid #d6e0e6;
+          border-radius: 8px;
+          padding: 0 12px;
+          font: inherit;
+          font-size: 13px;
+        }
+        .template-add-variable button {
+          min-height: 38px;
+          border: 1px solid var(--tpl-primary);
+          background: var(--tpl-primary);
+          color: #fff;
+          border-radius: 8px;
+          font: inherit;
+          font-weight: 850;
+          padding: 0 12px;
+          cursor: pointer;
+        }
+        .template-add-variable button:hover {
+          background: var(--tpl-primary-dark);
+          border-color: var(--tpl-primary-dark);
+        }
+        .template-variable-error {
+          margin-top: 6px;
+          color: #b45c5c;
+          font-size: 12px;
+          font-weight: 700;
         }
         .template-side {
           min-height: 0;
@@ -1198,18 +1486,17 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           min-width: 0;
           min-height: 0;
           overflow: auto;
-          background-color: #f5f8fa;
-          background-image: radial-gradient(#8fb3bf 1px, transparent 1px);
-          background-size: 22px 22px;
-          padding: 46px;
+          background-color: #eef2f4;
+          padding: 36px 24px;
+          display: flex;
+          align-items: flex-start;
+          justify-content: center;
         }
         .template-canvas-frame {
-          width: clamp(420px, 68vh, 760px);
+          width: clamp(420px, 60vw, 720px);
           margin: 0 auto;
-          border: 1px solid #cdd8df;
-          background: #fff;
-          box-shadow: 0 24px 58px rgba(15, 23, 42, .14);
-          padding: 24px;
+          background: transparent;
+          padding: 8px;
         }
         .template-message {
           margin-top: 12px;
@@ -1271,14 +1558,102 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           <button type="button" className="template-tool-button icon" onClick={redo} disabled={redoStack.length === 0} title="Повторить" aria-label="Повторить">
             ↷
           </button>
-          <button type="button" className="template-tool-button">Сетка</button>
-          <button type="button" className="template-tool-button">Слои</button>
-          <button type="button" className="template-tool-button" aria-label="Масштаб">
-            85%
+          <div className="template-zoom-control" role="group" aria-label="Масштаб">
+            <button
+              type="button"
+              className="template-zoom-button"
+              onClick={() => {
+                const idx = ZOOM_STEPS.findIndex((v) => v >= zoom);
+                const prev = idx > 0 ? ZOOM_STEPS[idx - 1] : ZOOM_STEPS[0];
+                setZoom(prev);
+              }}
+              aria-label="Уменьшить масштаб"
+            >−</button>
+            <span className="template-zoom-value" aria-live="polite">{Math.round(zoom * 100)}%</span>
+            <button
+              type="button"
+              className="template-zoom-button"
+              onClick={() => {
+                const idx = ZOOM_STEPS.findIndex((v) => v > zoom);
+                const next = idx >= 0 ? ZOOM_STEPS[idx] : ZOOM_STEPS[ZOOM_STEPS.length - 1];
+                setZoom(next);
+              }}
+              aria-label="Увеличить масштаб"
+            >+</button>
+          </div>
+          <button
+            type="button"
+            className={`template-tool-button${gridVisible ? " is-toggled" : ""}`}
+            onClick={() => setGridVisible((v) => !v)}
+            title={gridVisible ? "Скрыть сетку" : "Показать сетку"}
+            aria-pressed={gridVisible}
+          >
+            Сетка
           </button>
-          <button type="button" className="template-tool-button" onClick={handleCanvasPreview}>
-            Предпросмотр
-          </button>
+          <div className="template-layers-wrap">
+            <button
+              type="button"
+              className={`template-tool-button${layersOpen ? " is-toggled" : ""}`}
+              onClick={() => setLayersOpen((v) => !v)}
+              aria-expanded={layersOpen}
+              title="Список слоёв"
+            >
+              Слои
+            </button>
+            {layersOpen && (
+              <div className="template-layers-popover" role="dialog" aria-label="Слои на холсте">
+                <div className="template-layers-head">
+                  <strong>Слои на холсте</strong>
+                  <button type="button" onClick={() => setLayersOpen(false)} aria-label="Закрыть">×</button>
+                </div>
+                <div className="template-layers-body">
+                  {[...elements].slice().reverse().map((el) => (
+                    <button
+                      key={`el-${el.id}`}
+                      type="button"
+                      className={`template-layers-item${selectedElementId === el.id ? " is-active" : ""}`}
+                      onClick={() => { setSelectedElementId(el.id); setSelectedImageId(null); }}
+                    >
+                      <span className="template-layers-kind">{el.text?.includes("{") ? "Переменная" : "Текст"}</span>
+                      <span className="template-layers-name">{el.text?.length > 28 ? `${el.text.slice(0, 28)}…` : el.text}</span>
+                      <span
+                        className="template-layers-delete"
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); pushUndo(); removeEl(el.id); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pushUndo(); removeEl(el.id); } }}
+                        aria-label="Удалить блок"
+                      >×</span>
+                    </button>
+                  ))}
+                  {images.map((img) => (
+                    <button
+                      key={`img-${img.id}`}
+                      type="button"
+                      className={`template-layers-item${selectedImageId === img.id ? " is-active" : ""}`}
+                      onClick={() => { setSelectedImageId(img.id); setSelectedElementId(null); }}
+                    >
+                      <span className="template-layers-kind">
+                        {img.kind === "stamp" ? "Печать" : img.kind === "signature" ? "Подпись" : "Изображение"}
+                      </span>
+                      <span className="template-layers-name">{img.fileName || "файл"}</span>
+                      <span
+                        className="template-layers-delete"
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); removeImage(img.id); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); removeImage(img.id); } }}
+                        aria-label="Удалить изображение"
+                      >×</span>
+                    </button>
+                  ))}
+                  {elements.length === 0 && images.length === 0 && (
+                    <div className="template-layers-empty">На холсте пока нет слоёв.</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           <button type="button" className="template-tool-button primary" onClick={handleSave} disabled={saving}>
             {saving ? "Сохранение..." : "Сохранить шаблон"}
           </button>
@@ -1286,8 +1661,45 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
       </div>
 
       <aside className="template-side">
+        <input
+          ref={stampInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/svg+xml,image/webp"
+          style={{ display: "none" }}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) { pushUndo(); handleAddImage("stamp", file); }
+            event.target.value = "";
+          }}
+        />
+        <input
+          ref={signatureInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/svg+xml,image/webp"
+          style={{ display: "none" }}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) { pushUndo(); handleAddImage("signature", file); }
+            event.target.value = "";
+          }}
+        />
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) { pushUndo(); handleAddImage("image", file); }
+            event.target.value = "";
+          }}
+        />
+
         <div className="template-panel">
-          <h3>Переменные шаблона</h3>
+          <h3>Переменные</h3>
+          <p style={{ margin: "0 0 10px", color: "#667783", fontSize: 12, lineHeight: 1.5 }}>
+            Нажмите на переменную, чтобы вставить её на холст. Значения будут подставлены при выпуске грамоты.
+          </p>
           <div className="template-variable-list">
             {visibleVariables.map((key) => (
               <button
@@ -1295,27 +1707,62 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
                 type="button"
                 className="template-variable-chip"
                 onClick={() => addPresetBlock(key)}
-                title={`Вставить переменную {${key}}`}
+                title={`Вставить переменную {${key}} на холст`}
               >
                 {`{${key}}`}
               </button>
             ))}
           </div>
+          {customVariables.length > 0 && (
+            <div style={{ display: "grid", gap: 6, marginTop: 12 }}>
+              {customVariables.map((key) => (
+                <div key={key} className="template-variable-row">
+                  <code>{`{${key}}`}</code>
+                  <span style={{ display: "inline-flex", gap: 4 }}>
+                    <button type="button" onClick={() => { pushUndo(); insertVariableBlock(key); }} title="Вставить на холст">
+                      Вставить
+                    </button>
+                    <button type="button" className="is-danger" onClick={() => handleRemoveCustomVariable(key)} title="Удалить переменную">
+                      ×
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="template-add-variable">
+            <input
+              value={newVariableName}
+              onChange={(event) => { setNewVariableName(event.target.value); setVariableError(""); }}
+              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); handleAddCustomVariable(); } }}
+              placeholder="Например: Класс, Школа, Должность"
+              aria-label="Название новой переменной"
+            />
+            <button type="button" onClick={handleAddCustomVariable}>+ Добавить переменную</button>
+          </div>
+          {variableError && <div className="template-variable-error">{variableError}</div>}
+        </div>
+
+        <div className="template-panel">
+          <h3>Элементы</h3>
           <div className="template-action-grid">
             <button type="button" className="template-tool-button" onClick={() => addDecorBlock("Новый текст", { y: 46, size: 20 })}>
-              Добавить текстовый блок
+              ＋ Добавить текст
             </button>
             <button type="button" className="template-tool-button" onClick={() => addPresetBlock("ФИО участника")}>
-              Вставить переменную
+              ＋ Вставить переменную
             </button>
-            <button type="button" className="template-tool-button" onClick={() => addDecorBlock("Подпись", { y: 74, size: 12 })}>
-              Добавить подпись
+            <button type="button" className="template-tool-button" onClick={() => stampInputRef.current?.click()}>
+              ＋ Загрузить печать
             </button>
-            <button type="button" className="template-tool-button" onClick={() => addDecorBlock("Место для печати", { y: 70, size: 11, color: "#8fb3bf" })}>
-              Добавить печать
+            <button type="button" className="template-tool-button" onClick={() => signatureInputRef.current?.click()}>
+              ＋ Загрузить подпись
+            </button>
+            <button type="button" className="template-tool-button" onClick={() => imageInputRef.current?.click()}>
+              ＋ Добавить изображение
             </button>
             <button type="button" className="template-tool-button" onClick={() => bgInputRef.current?.click()}>
-              Загрузить фон
+              ＋ Загрузить фон
             </button>
           </div>
         </div>
@@ -1323,24 +1770,152 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         <div className="template-panel">
           <h3>Блоки на холсте</h3>
           <div className="template-block-list">
-            {elements.map((element) => (
-              <button
-                key={element.id}
-                type="button"
-                className={`template-block-button${selectedElementId === element.id ? " is-active" : ""}`}
-                onClick={() => setSelectedElementId(element.id)}
+            {elements.map((element) => {
+              const isVar = element.text?.includes("{");
+              return (
+                <div
+                  key={element.id}
+                  className={`template-block-button${selectedElementId === element.id ? " is-active" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { setSelectedElementId(element.id); setSelectedImageId(null); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") { setSelectedElementId(element.id); setSelectedImageId(null); } }}
+                  style={{ cursor: "pointer" }}
+                >
+                  <span style={{ display: "grid", gap: 2, minWidth: 0 }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      {isVar && (
+                        <span style={{
+                          fontSize: 10,
+                          fontWeight: 900,
+                          color: "var(--tpl-primary)",
+                          textTransform: "uppercase",
+                        }}>Переменная</span>
+                      )}
+                    </span>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{element.text}</span>
+                  </span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <small>{Math.round(element.size)} pt</small>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); pushUndo(); removeEl(element.id); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); pushUndo(); removeEl(element.id); } }}
+                      title="Удалить блок"
+                      aria-label="Удалить блок"
+                      style={{
+                        width: 24,
+                        height: 24,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: 6,
+                        color: "#b45c5c",
+                        fontSize: 16,
+                        fontWeight: 900,
+                        cursor: "pointer",
+                      }}
+                    >×</span>
+                  </span>
+                </div>
+              );
+            })}
+            {images.map((img) => (
+              <div
+                key={img.id}
+                className={`template-block-button${selectedImageId === img.id ? " is-active" : ""}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => { setSelectedImageId(img.id); setSelectedElementId(null); }}
+                onKeyDown={(e) => { if (e.key === "Enter") { setSelectedImageId(img.id); setSelectedElementId(null); } }}
+                style={{ cursor: "pointer" }}
               >
-                <span>{element.text}</span>
-                <small>{Math.round(element.size)} pt</small>
-              </button>
+                <span style={{ display: "grid", gap: 2, minWidth: 0 }}>
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: 900,
+                    color: "var(--tpl-primary)",
+                    textTransform: "uppercase",
+                  }}>{img.kind === "stamp" ? "Печать" : img.kind === "signature" ? "Подпись" : "Изображение"}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{img.fileName || "файл"}</span>
+                </span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); removeImage(img.id); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); removeImage(img.id); } }}
+                  title="Удалить"
+                  aria-label="Удалить"
+                  style={{
+                    width: 24,
+                    height: 24,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 6,
+                    color: "#b45c5c",
+                    fontSize: 16,
+                    fontWeight: 900,
+                    cursor: "pointer",
+                  }}
+                >×</span>
+              </div>
             ))}
             <button type="button" className="template-block-button template-add" onClick={() => { pushUndo(); addElement(); }}>
-              Добавить блок
+              ＋ Добавить пустой блок
             </button>
           </div>
         </div>
 
-        <div className="template-panel">
+        {selectedImageId && (() => {
+          const img = images.find((i) => i.id === selectedImageId);
+          if (!img) return null;
+          const kindLabel = img.kind === "stamp" ? "печати" : img.kind === "signature" ? "подписи" : "изображения";
+          const replaceRef = img.kind === "stamp" ? stampInputRef : img.kind === "signature" ? signatureInputRef : imageInputRef;
+          return (
+            <div className="template-panel">
+              <h3>Свойства {kindLabel}</h3>
+              <div className="template-props">
+                <label>
+                  Файл
+                  <input value={img.fileName || ""} readOnly />
+                </label>
+                <div className="template-prop-grid">
+                  <label>
+                    Позиция X (%)
+                    <input type="number" min={0} max={100} value={Math.round(img.x)} onChange={(e) => updateImage(img.id, "x", Number(e.target.value) || 0)} />
+                  </label>
+                  <label>
+                    Позиция Y (%)
+                    <input type="number" min={0} max={100} value={Math.round(img.y)} onChange={(e) => updateImage(img.id, "y", Number(e.target.value) || 0)} />
+                  </label>
+                </div>
+                <label>
+                  Ширина (%)
+                  <input type="number" min={2} max={100} value={Math.round(img.width)} onChange={(e) => updateImage(img.id, "width", Number(e.target.value) || 10)} />
+                </label>
+                <label>
+                  Прозрачность
+                  <input type="range" min={0.1} max={1} step={0.05} value={img.opacity ?? 1} onChange={(e) => updateImage(img.id, "opacity", Number(e.target.value))} />
+                </label>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <button type="button" className="template-tool-button" onClick={() => replaceRef?.current?.click()}>
+                    Заменить файл
+                  </button>
+                  <button type="button" className="template-tool-button" style={{ borderColor: "#b45c5c", color: "#b45c5c" }} onClick={() => removeImage(img.id)}>
+                    Удалить
+                  </button>
+                </div>
+                <p style={{ margin: 0, color: "#667783", fontSize: 12, lineHeight: 1.5 }}>
+                  Изображения отображаются на холсте в реальном времени. Они не сохраняются на сервере — используйте их для предварительной настройки макета.
+                </p>
+              </div>
+            </div>
+          );
+        })()}
+
+        <div className="template-panel" style={{ display: selectedImageId ? "none" : undefined }}>
           <h3>Свойства выбранного блока</h3>
           {selectedElement ? (
             <div className="template-props">
@@ -1441,7 +2016,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
       </aside>
 
       <div className="template-canvas-area">
-        <div className="template-canvas-frame">
+        <div className="template-canvas-frame" style={{ width: "fit-content", maxWidth: "100%" }}>
           <AccuratePreview
             bgUrl={bgUrl}
             elements={elements}
@@ -1451,11 +2026,18 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
             previewVariables={effectivePreviewVariables}
             fontFaces={availableFonts}
             selectedElementId={selectedElementId}
-            onElementSelect={setSelectedElementId}
+            onElementSelect={(id) => { setSelectedElementId(id); setSelectedImageId(null); }}
             onElementMove={handleElementMove}
             onElementContextMenu={handleElementContextMenu}
             onElementDoubleClick={handleElementDoubleClick}
             onSignersMove={handleSignersMove}
+            gridVisible={gridVisible}
+            zoom={zoom}
+            maxFrameWidth={560}
+            images={images}
+            selectedImageId={selectedImageId}
+            onImageSelect={(id) => { setSelectedImageId(id); setSelectedElementId(null); }}
+            onImageMove={handleImageMove}
           />
         </div>
       </div>
