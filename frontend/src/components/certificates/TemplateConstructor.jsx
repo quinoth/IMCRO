@@ -34,7 +34,17 @@ const BUILTIN_FONTS = [
   { font_family: "Playfair Display", font_url: null },
   { font_family: "Oswald",           font_url: null },
 ];
-const QUICK_VARIABLES = ["ФИО", "Класс", "Школа", "Предмет", "Дата", "Мероприятие", "Награда"];
+const QUICK_VARIABLES = ["ФИО", "Мероприятие"];
+const SUGGESTED_EXTRA_VARIABLES = ["Дата", "Класс", "Школа", "Должность", "Награда", "Номер приказа", "ФИО руководителя"];
+const GRAMMAR_CASES = [
+  { value: "", label: "как введено" },
+  { value: "именительный", label: "именительный (кто, что)" },
+  { value: "родительный", label: "родительный (кого, чего)" },
+  { value: "дательный", label: "дательный (кому, чему)" },
+  { value: "винительный", label: "винительный (кого, что)" },
+  { value: "творительный", label: "творительный (кем, чем)" },
+  { value: "предложный", label: "предложный (о ком, о чём)" },
+];
 const QUICK_GENDER_VARIANTS = [
   { label: "ученику / ученице", value: "{род:ученику|ученице}" },
   { label: "награждён / награждена", value: "{род:награждён|награждена}" },
@@ -297,23 +307,16 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     font_family: DEFAULT_FONT_FAMILY, position_color: "", name_color: "",
   });
 
-  // Текстовые элементы
+  // Текстовые элементы (без зашитого блока подписантов — он добавляется отдельной кнопкой)
   const [elements, setElements] = useState([
     { id: 1, text: "ГРАМОТА", x: 50, y: 17, size: 28, color: "#004f75", weight: "700", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
     { id: 2, text: "НАГРАЖДАЕТСЯ", x: 50, y: 28, size: 34, color: "#17232b", weight: "700", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
-    { id: 3, text: "{ФИО участника}", x: 50, y: 40, size: 34, color: "#19789c", weight: "700", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
-    { id: 4, text: "{Название мероприятия}", x: 50, y: 52, size: 18, color: "#17232b", weight: "600", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
-    { id: 5, text: "{Дата}", x: 33, y: 78, size: 12, color: "#17232b", weight: "400", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
-    { id: 6, text: "Директор ИМЦРО", x: 66, y: 78, size: 12, color: "#17232b", weight: "400", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
-    { id: 7, text: "Печать организации", x: 66, y: 72, size: 10, color: "#9dbfca", weight: "600", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
+    { id: 3, text: "{ФИО}", x: 50, y: 40, size: 34, color: "#19789c", weight: "700", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
+    { id: 4, text: "{Мероприятие}", x: 50, y: 52, size: 18, color: "#17232b", weight: "600", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
   ]);
 
-  // Подписанты
-  const [signers, setSigners] = useState([{
-    id: "s1", position: "Директор ИМЦРО", fullName: "Печать организации",
-    facFile: null, facPreview: null,
-    offsetY: 0, facOffsetX: 0, facOffsetY: 0, facScale: 1,
-  }]);
+  // Подписанты — по умолчанию ни одного; добавляются кнопкой
+  const [signers, setSigners] = useState([]);
 
   const objectUrlsRef = useRef([]);
   const [saving, setSaving] = useState(false);
@@ -362,6 +365,16 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
   const [showGrid, setShowGrid] = useState(true);
   const [zoom, setZoom] = useState(100);
   const [layersOpen, setLayersOpen] = useState(false);
+
+  // Режим редактирования (видны переменные) или просмотра (тестовые данные)
+  const [editorMode, setEditorMode] = useState("edit"); // "edit" | "preview"
+
+  // Грязный флаг для предупреждения и индикатора автосохранения
+  const [isDirty, setIsDirty] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState(null);
+
+  // Буфер обмена для копирования
+  const clipboardRef = useRef(null);
 
   const createTrackedObjectUrl = useCallback((file) => {
     const url = URL.createObjectURL(file);
@@ -504,10 +517,9 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         facOffsetX: s.facsimile_offset_x_mm,
         facOffsetY: s.facsimile_offset_y_mm,
         facScale: s.facsimile_scale,
-      })) : [{
-        id: "s1", position: "Директор", fullName: "",
-        facFile: null, facPreview: null, offsetY: 0, facOffsetX: 0, facOffsetY: 0, facScale: 1,
-      }]);
+      })) : []);
+      setImages([]);
+      setSelectedImageId(null);
 
       setMsg(null);
     } catch (e) {
@@ -525,14 +537,15 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     setElements([
       { id: 1, text: "ГРАМОТА", x: 50, y: 17, size: 28, color: "#004f75", weight: "700", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
       { id: 2, text: "НАГРАЖДАЕТСЯ", x: 50, y: 28, size: 34, color: "#17232b", weight: "700", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
-      { id: 3, text: "{ФИО участника}", x: 50, y: 40, size: 34, color: "#19789c", weight: "700", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
-      { id: 4, text: "{Название мероприятия}", x: 50, y: 52, size: 18, color: "#17232b", weight: "600", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
-      { id: 5, text: "{Дата}", x: 33, y: 78, size: 12, color: "#17232b", weight: "400", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
-      { id: 6, text: "Директор ИМЦРО", x: 66, y: 78, size: 12, color: "#17232b", weight: "400", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
-      { id: 7, text: "Печать организации", x: 66, y: 72, size: 10, color: "#9dbfca", weight: "600", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
+      { id: 3, text: "{ФИО}", x: 50, y: 40, size: 34, color: "#19789c", weight: "700", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
+      { id: 4, text: "{Мероприятие}", x: 50, y: 52, size: 18, color: "#17232b", weight: "600", fontFamily: DEFAULT_FONT_FAMILY, align: "center" },
     ]);
     setPreviewVariables(DEFAULT_PREVIEW_VARIABLES);
-    setSigners([{ id: "s1", position: "Директор ИМЦРО", fullName: "Печать организации", facFile: null, facPreview: null, offsetY: 0, facOffsetX: 0, facOffsetY: 0, facScale: 1 }]);
+    setSigners([]);
+    setImages([]);
+    setUserVariables([]);
+    setSelectedImageId(null);
+    setSelectedElementId(null);
     setMsg(null);
   };
 
@@ -715,10 +728,19 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
   useHotkeys({
     "ctrl+z": () => undo(),
     "ctrl+shift+z": () => redo(),
+    "ctrl+y": () => redo(),
     "ctrl+s": () => { handleSave(); },
-    "delete": () => { if (selectedElementId) { pushUndo(); removeEl(selectedElementId); } },
+    "delete": () => {
+      if (selectedElementId) { pushUndo(); removeEl(selectedElementId); }
+      else if (selectedElementId == null && typeof window !== "undefined" && window.__tpl_selImg) { /* noop */ }
+    },
+    "backspace": () => {
+      if (selectedElementId) { pushUndo(); removeEl(selectedElementId); }
+    },
     "ctrl+d": () => { if (selectedElementId) { pushUndo(); duplicateEl(selectedElementId); } },
-    "escape": () => { setSelectedElementId(null); setCtxMenu(null); setPickerOpenId(null); },
+    "ctrl+c": () => { if (selectedElementId || selectedImageId) copyElement(); },
+    "ctrl+v": () => { if (clipboardRef.current) pasteElement(); },
+    "escape": () => { setSelectedElementId(null); setSelectedImageId(null); setCtxMenu(null); setPickerOpenId(null); setLayersOpen(false); },
   });
 
   // Закрываем пикер по клику вне — bubble-phase на document (capture вызывал гонку с onClick кнопок)
@@ -734,21 +756,45 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     };
   }, [pickerOpenId]);
 
-  // ── Автосохранение (localStorage backup, каждые 15с) ─────────────────────────
+  // ── Грязный флаг + автосохранение черновика в localStorage ────────────────
+  const skipDirtyRef = useRef(true);
+  useEffect(() => {
+    if (skipDirtyRef.current) { skipDirtyRef.current = false; return; }
+    setIsDirty(true);
+    setAutoSaveStatus("dirty");
+  }, [name, elements, signers, margins, signersLayout, bgUrl, images, userVariables]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const key = `cert-constructor-autosave:${editingId || "new"}`;
     clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
       try {
-        const snapshot = JSON.stringify(stripObjectUrls({ name, elements, signers, margins, signersLayout, bgUrl }));
+        setAutoSaveStatus("saving");
+        const snapshot = JSON.stringify(stripObjectUrls({
+          name, elements, signers, margins, signersLayout, bgUrl,
+          userVariables, images: images.map((img) => ({ ...img, file: undefined, url: undefined })),
+        }));
         window.localStorage.setItem(key, snapshot);
-        setAutoSaveStatus("saved");
-        setTimeout(() => setAutoSaveStatus(""), 2000);
-      } catch { /* ignore */ }
-    }, 15000);
+        setAutoSaveStatus("autosaved");
+        setLastSavedAt(new Date());
+      } catch { setAutoSaveStatus("error"); }
+    }, 12000);
     return () => clearTimeout(autoSaveTimerRef.current);
-  }, [name, elements, signers, margins, signersLayout, bgUrl, editingId]);
+  }, [name, elements, signers, margins, signersLayout, bgUrl, images, userVariables, editingId]);
+
+  // Предупреждение при выходе со страницы с несохранёнными изменениями
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handler = (e) => {
+      if (!isDirty) return undefined;
+      e.preventDefault();
+      e.returnValue = "У вас есть несохранённые изменения. Покинуть страницу?";
+      return e.returnValue;
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
 
   // ── Подписанты ────────────────────────────────────────────────────────────
   const addSigner = () => {
@@ -883,15 +929,101 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
   }, [createTrackedObjectUrl]);
 
   // ── Слои ───────────────────────────────────────────────────────────────────
-  const moveElementZ = useCallback((id, direction) => {
-    setElements((prev) => {
+  // Порядок в массиве = z-order. Последний элемент сверху.
+  const moveLayer = useCallback((kind, id, direction) => {
+    const setter = kind === "image" ? setImages : setElements;
+    setter((prev) => {
       const idx = prev.findIndex((e) => e.id === id);
       if (idx === -1) return prev;
       const next = [...prev];
-      const target = direction === "up" ? idx + 1 : idx - 1;
-      if (target < 0 || target >= next.length) return prev;
-      [next[idx], next[target]] = [next[target], next[idx]];
+      let target;
+      if (direction === "up") target = Math.min(prev.length - 1, idx + 1);
+      else if (direction === "down") target = Math.max(0, idx - 1);
+      else if (direction === "front") target = prev.length - 1;
+      else if (direction === "back") target = 0;
+      else return prev;
+      if (target === idx) return prev;
+      const [item] = next.splice(idx, 1);
+      next.splice(target, 0, item);
       return next;
+    });
+  }, []);
+
+  const moveElementZ = useCallback((id, direction) => {
+    moveLayer("element", id, direction);
+  }, [moveLayer]);
+
+  const toggleHidden = useCallback((kind, id) => {
+    const setter = kind === "image" ? setImages : setElements;
+    setter((prev) => prev.map((item) => item.id === id ? { ...item, hidden: !item.hidden } : item));
+  }, []);
+
+  const toggleLocked = useCallback((kind, id) => {
+    const setter = kind === "image" ? setImages : setElements;
+    setter((prev) => prev.map((item) => item.id === id ? { ...item, locked: !item.locked } : item));
+  }, []);
+
+  const centerElementH = useCallback((id) => {
+    setElements((prev) => prev.map((e) => e.id === id ? { ...e, x: 50, align: "center" } : e));
+  }, []);
+  const centerElementV = useCallback((id) => {
+    setElements((prev) => prev.map((e) => e.id === id ? { ...e, y: 50 } : e));
+  }, []);
+
+  const handleInlineEdit = useCallback((id, newText) => {
+    pushUndo();
+    setElements((prev) => prev.map((e) => e.id === id ? { ...e, text: newText } : e));
+  }, [pushUndo]);
+
+  const handleElementResize = useCallback((id, kind, widthMm, heightMm) => {
+    if (kind === "image") {
+      setImages((prev) => prev.map((img) => img.id === id ? { ...img, widthMm, heightMm } : img));
+    } else {
+      setElements((prev) => prev.map((e) => e.id === id ? { ...e, maxWidthMm: widthMm, maxHeightMm: heightMm } : e));
+    }
+  }, []);
+
+  const copyElement = useCallback(() => {
+    if (selectedElementId) {
+      const el = elements.find((e) => e.id === selectedElementId);
+      if (el) clipboardRef.current = { kind: "element", data: el };
+    } else if (selectedImageId) {
+      const img = images.find((i) => i.id === selectedImageId);
+      if (img) clipboardRef.current = { kind: "image", data: img };
+    }
+  }, [selectedElementId, selectedImageId, elements, images]);
+
+  const pasteElement = useCallback(() => {
+    const buf = clipboardRef.current;
+    if (!buf) return;
+    pushUndo();
+    if (buf.kind === "element") {
+      const newId = Math.max(0, ...elements.map((e) => e.id)) + 1;
+      const cp = { ...buf.data, id: newId, x: Math.min(95, (buf.data.x || 50) + 3), y: Math.min(95, (buf.data.y || 50) + 3) };
+      setElements((prev) => [...prev, cp]);
+      setSelectedElementId(newId);
+      setSelectedImageId(null);
+    } else {
+      const newId = `img_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+      const cp = { ...buf.data, id: newId, x: Math.min(95, (buf.data.x || 50) + 3), y: Math.min(95, (buf.data.y || 50) + 3) };
+      setImages((prev) => [...prev, cp]);
+      setSelectedImageId(newId);
+      setSelectedElementId(null);
+    }
+  }, [elements, pushUndo]);
+
+  // Подписанты — отдельный элемент конструктора
+  const addSignerSlot = useCallback(() => {
+    setSigners((prev) => {
+      if (prev.length >= 4) return prev;
+      const offset = prev.length * 12;
+      return [...prev, {
+        id: `s_${Date.now()}_${prev.length}`,
+        position: "Должность",
+        fullName: "Фамилия И.О.",
+        facFile: null, facPreview: null,
+        offsetY: offset, facOffsetX: 0, facOffsetY: 0, facScale: 1,
+      }];
     });
   }, []);
 
@@ -988,6 +1120,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           setMode("edit"); setEditingId(created.template.id);
           writeStoredPreviewVariables(created.template.id, detectedPlaceholders, previewVariables);
           setMsg("Шаблон создан и сохранён!"); setMsgType("success");
+          setIsDirty(false); setAutoSaveStatus("saved"); setLastSavedAt(new Date());
           onTemplatesSaved?.();
           return;
         }
@@ -1000,6 +1133,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         writeStoredPreviewVariables(editingId, detectedPlaceholders, previewVariables);
       }
       setMsg(mode === "edit" ? "Шаблон обновлён!" : "Шаблон сохранён!"); setMsgType("success");
+      setIsDirty(false); setAutoSaveStatus("saved"); setLastSavedAt(new Date());
       onTemplatesSaved?.();
     } catch (e) {
       setMsg(e.message || "Ошибка сохранения"); setMsgType("error");
@@ -1231,6 +1365,42 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         .tpl-icon-btn:disabled { color: #b2bec5; cursor: not-allowed; }
         .tpl-icon-btn.is-active { border-color: var(--tpl-primary); background: var(--tpl-primary); color: #fff; }
         .tpl-icon-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .tpl-mode-toggle {
+          display: inline-flex;
+          align-items: center;
+          border: 1px solid var(--tpl-border);
+          border-radius: 8px;
+          background: #f4f7f9;
+          padding: 2px;
+        }
+        .tpl-mode-toggle button {
+          min-height: 28px;
+          padding: 0 10px;
+          border: 0;
+          background: transparent;
+          color: var(--tpl-text);
+          font: inherit;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+          border-radius: 6px;
+        }
+        .tpl-mode-toggle button.is-active {
+          background: var(--tpl-primary);
+          color: #fff;
+        }
+        .tpl-save-status {
+          font-size: 12px;
+          font-weight: 800;
+          color: var(--tpl-muted);
+          padding: 0 6px;
+          white-space: nowrap;
+        }
+        .tpl-save-status--saved { color: #047857; }
+        .tpl-save-status--autosaved { color: #19789c; }
+        .tpl-save-status--saving { color: var(--tpl-primary-dark); }
+        .tpl-save-status--dirty { color: #b45309; }
+        .tpl-save-status--error { color: #b91c1c; }
         .tpl-btn {
           min-height: 34px;
           padding: 0 12px;
@@ -1539,8 +1709,8 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           position: absolute;
           top: 56px;
           right: 24px;
-          width: 280px;
-          max-height: 360px;
+          width: 380px;
+          max-height: 460px;
           background: #fff;
           border: 1px solid var(--tpl-border);
           border-radius: 10px;
@@ -1558,10 +1728,10 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         }
         .tpl-layer-row {
           display: grid;
-          grid-template-columns: minmax(0, 1fr) auto auto auto;
-          gap: 4px;
+          grid-template-columns: minmax(0, 1fr) auto auto auto auto auto auto auto;
+          gap: 2px;
           align-items: center;
-          padding: 6px 8px;
+          padding: 5px 6px;
           border: 1px solid var(--tpl-border-soft);
           border-radius: 6px;
           margin-bottom: 4px;
@@ -1666,6 +1836,20 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           >
             <svg viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5-9-5ZM3 13l9 5 9-5M3 18l9 5 9-5"/></svg>
           </button>
+          <div className="tpl-mode-toggle" role="group" aria-label="Режим конструктора">
+            <button
+              type="button"
+              className={editorMode === "edit" ? "is-active" : ""}
+              onClick={() => setEditorMode("edit")}
+              title="В этом режиме видны переменные {ФИО} и подсказки"
+            >Редактирование</button>
+            <button
+              type="button"
+              className={editorMode === "preview" ? "is-active" : ""}
+              onClick={() => setEditorMode("preview")}
+              title="В этом режиме подставляются тестовые значения переменных"
+            >Просмотр</button>
+          </div>
         </div>
 
         <div className="tpl-toolbar-group">
@@ -1682,6 +1866,17 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
               setBgUrl(createTrackedObjectUrl(file));
             }}
           />
+          <span className={`tpl-save-status tpl-save-status--${autoSaveStatus || (isDirty ? "dirty" : "idle")}`}>
+            {(() => {
+              if (saving) return "Сохраняется…";
+              if (autoSaveStatus === "saving") return "Сохраняется…";
+              if (autoSaveStatus === "saved") return lastSavedAt ? `Сохранено ${lastSavedAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}` : "Сохранено";
+              if (autoSaveStatus === "autosaved") return lastSavedAt ? `Черновик ${lastSavedAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}` : "Черновик сохранён";
+              if (autoSaveStatus === "error") return "Ошибка сохранения";
+              if (isDirty) return "Есть несохранённые изменения";
+              return "Изменений нет";
+            })()}
+          </span>
           <button type="button" className="tpl-btn secondary" onClick={() => bgInputRef.current?.click()}>
             Загрузить фон
           </button>
@@ -1698,37 +1893,62 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
 
       {layersOpen && (
         <div className="tpl-layers-popover" role="dialog" aria-label="Слои">
-          <h4>Слои на холсте</h4>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h4 style={{ margin: 0 }}>Слои на холсте</h4>
+            <button type="button" className="tpl-icon-btn" style={{ width: 26, height: 26 }} onClick={() => setLayersOpen(false)} aria-label="Закрыть">×</button>
+          </div>
+          <p style={{ margin: "8px 0 10px", color: "#667783", fontSize: 11, lineHeight: 1.4 }}>
+            Сверху списка — верхние слои. Они перекрывают нижние на холсте и в PDF.
+          </p>
           {elements.length === 0 && images.length === 0 && (
             <p style={{ margin: 0, color: "#667783", fontSize: 12 }}>Добавьте элементы на холст, чтобы они появились здесь.</p>
           )}
-          {elements.map((el) => {
+          {[...elements].reverse().map((el) => {
             const isVar = (el.text || "").includes("{");
+            const isLocked = !!el.locked;
+            const isHidden = !!el.hidden;
             return (
               <div
                 key={`el-${el.id}`}
                 className={`tpl-layer-row${selectedElementId === el.id ? " is-active" : ""}`}
                 onClick={() => handleSelectElement(el.id)}
+                style={isHidden ? { opacity: 0.5 } : undefined}
               >
-                <span>{isVar ? "🔤 " : "📝 "}{el.text}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ color: isVar ? "#19789c" : "#667783", fontSize: 11, fontWeight: 900 }}>{isVar ? "▣" : "T"}</span>
+                  {el.text}
+                </span>
+                <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); moveElementZ(el.id, "front"); }} title="На передний план" style={{ fontSize: 11 }}>⤒</button>
                 <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); moveElementZ(el.id, "up"); }} title="Выше">▲</button>
                 <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); moveElementZ(el.id, "down"); }} title="Ниже">▼</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); moveElementZ(el.id, "back"); }} title="На задний план" style={{ fontSize: 11 }}>⤓</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); toggleHidden("element", el.id); }} title={isHidden ? "Показать" : "Скрыть"} style={{ color: isHidden ? "#b91c1c" : undefined }}>{isHidden ? "🚫" : "👁"}</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); toggleLocked("element", el.id); }} title={isLocked ? "Разблокировать" : "Заблокировать"} style={{ color: isLocked ? "#b45309" : undefined }}>{isLocked ? "🔒" : "🔓"}</button>
                 <button type="button" className="delete-btn" onClick={(e) => { e.stopPropagation(); pushUndo(); removeEl(el.id); }} title="Удалить">×</button>
               </div>
             );
           })}
-          {images.map((img) => (
-            <div
-              key={`img-${img.id}`}
-              className={`tpl-layer-row${selectedImageId === img.id ? " is-active" : ""}`}
-              onClick={() => handleSelectImage(img.id)}
-            >
-              <span>🖼 {img.label || img.kind}</span>
-              <button type="button" onClick={(e) => e.stopPropagation()} title="Изображение" style={{ visibility: "hidden" }}>▲</button>
-              <button type="button" onClick={(e) => e.stopPropagation()} title="Изображение" style={{ visibility: "hidden" }}>▼</button>
-              <button type="button" className="delete-btn" onClick={(e) => { e.stopPropagation(); removeImage(img.id); }} title="Удалить">×</button>
-            </div>
-          ))}
+          {[...images].reverse().map((img) => {
+            const isLocked = !!img.locked;
+            const isHidden = !!img.hidden;
+            return (
+              <div
+                key={`img-${img.id}`}
+                className={`tpl-layer-row${selectedImageId === img.id ? " is-active" : ""}`}
+                onClick={() => handleSelectImage(img.id)}
+                style={isHidden ? { opacity: 0.5 } : undefined}
+              >
+                <span>🖼 {img.label || img.kind}</span>
+                <button type="button" onClick={(e) => { e.stopPropagation(); moveLayer("image", img.id, "front"); }} title="На передний план" style={{ fontSize: 11 }}>⤒</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); moveLayer("image", img.id, "up"); }} title="Выше">▲</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); moveLayer("image", img.id, "down"); }} title="Ниже">▼</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); moveLayer("image", img.id, "back"); }} title="На задний план" style={{ fontSize: 11 }}>⤓</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); toggleHidden("image", img.id); }} title={isHidden ? "Показать" : "Скрыть"} style={{ color: isHidden ? "#b91c1c" : undefined }}>{isHidden ? "🚫" : "👁"}</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); toggleLocked("image", img.id); }} title={isLocked ? "Разблокировать" : "Заблокировать"} style={{ color: isLocked ? "#b45309" : undefined }}>{isLocked ? "🔒" : "🔓"}</button>
+                <button type="button" className="delete-btn" onClick={(e) => { e.stopPropagation(); removeImage(img.id); }} title="Удалить">×</button>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -1787,7 +2007,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
               <svg viewBox="0 0 24 24"><path d="M4 6h16M9 6v14M14 6v14M4 18h6M14 18h6"/></svg>
               Добавить текст
             </button>
-            <button type="button" className="tpl-element-btn" onClick={() => { pushUndo(); insertVariableBlock("ФИО участника"); }}>
+            <button type="button" className="tpl-element-btn" onClick={() => { pushUndo(); insertVariableBlock("ФИО"); }}>
               <svg viewBox="0 0 24 24"><path d="M5 8h14M5 12h14M5 16h8"/></svg>
               Вставить переменную
             </button>
@@ -1810,8 +2030,82 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
               <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 14l6-4 5 4 4-3 3 3"/></svg>
               Загрузить фон
             </button>
+            <button
+              type="button"
+              className="tpl-element-btn"
+              onClick={() => { pushUndo(); addSignerSlot(); }}
+              disabled={signers.length >= 4}
+              title={signers.length >= 4 ? "Максимум 4 подписанта" : "Добавить подписанта"}
+            >
+              <svg viewBox="0 0 24 24"><path d="M4 19c2-3 5-4 8-4s6 1 8 4M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/></svg>
+              Добавить подписанта {signers.length > 0 ? `(${signers.length}/4)` : ""}
+            </button>
           </div>
         </div>
+
+        {editorMode === "preview" && (
+          <div className="tpl-section">
+            <h3>Тестовые значения переменных</h3>
+            <p className="tpl-hint">Используются только для просмотра в конструкторе. На PDF не влияют.</p>
+            <div className="tpl-props">
+              {(detectedPlaceholders.length ? detectedPlaceholders : ["ФИО", "Мероприятие"]).map((key) => (
+                <label key={key}>
+                  {key}
+                  <input
+                    value={previewVariables[key] ?? ""}
+                    onChange={(event) => setPreviewVariables((prev) => ({ ...prev, [key]: event.target.value }))}
+                    placeholder={DEFAULT_PREVIEW_VARIABLES[key] || `Тестовое значение для «${key}»`}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {signers.length > 0 && (
+          <div className="tpl-section">
+            <h3>Подписанты ({signers.length}/4)</h3>
+            <p className="tpl-hint">Должность, ФИО и факсимиле каждого подписанта попадают в PDF.</p>
+            <div className="tpl-props">
+              {signers.map((s, i) => (
+                <div key={s.id} style={{ border: "1px solid var(--tpl-border-soft)", borderRadius: 8, padding: 10, display: "grid", gap: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <strong style={{ color: "var(--tpl-primary-dark)", fontSize: 12, fontWeight: 900 }}>Подписант №{i + 1}</strong>
+                    <button type="button" className="tpl-block-delete" onClick={() => setSigners((prev) => prev.filter((x) => x.id !== s.id))} title="Удалить подписанта" aria-label="Удалить подписанта">×</button>
+                  </div>
+                  <label>
+                    Должность
+                    <input value={s.position} onChange={(e) => setSigners((prev) => prev.map((x) => x.id === s.id ? { ...x, position: e.target.value } : x))} />
+                  </label>
+                  <label>
+                    ФИО
+                    <input value={s.fullName} onChange={(e) => setSigners((prev) => prev.map((x) => x.id === s.id ? { ...x, fullName: e.target.value } : x))} />
+                  </label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      id={`fac-${s.id}`}
+                      style={{ display: "none" }}
+                      onChange={(e) => handleFacsimile(s.id, e)}
+                    />
+                    <button type="button" className="tpl-btn" onClick={() => document.getElementById(`fac-${s.id}`)?.click()} style={{ flex: 1 }}>
+                      {s.facPreview ? "Заменить факсимиле" : "Загрузить факсимиле"}
+                    </button>
+                    {s.facPreview && (
+                      <button type="button" className="tpl-btn danger" onClick={() => clearFacsimile(s.id)} title="Удалить факсимиле">×</button>
+                    )}
+                  </div>
+                  {s.facPreview && (
+                    <div style={{ display: "flex", justifyContent: "center", padding: 6, background: "#f4f7f9", borderRadius: 6 }}>
+                      <img src={s.facPreview} alt="факсимиле" style={{ maxWidth: 120, maxHeight: 48, objectFit: "contain" }} />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="tpl-section">
           <h3>Блоки на холсте ({elements.length + images.length})</h3>
@@ -1879,10 +2173,14 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
               onElementMove={handleElementMove}
               onElementContextMenu={handleElementContextMenu}
               onElementDoubleClick={handleElementDoubleClick}
+              onElementInlineEdit={handleInlineEdit}
+              onElementResize={handleElementResize}
               onSignersMove={handleSignersMove}
-              showGrid={showGrid}
-              showSafeZone={showGrid}
-              showRulers={showGrid}
+              showGrid={editorMode === "edit" && showGrid}
+              showSafeZone={editorMode === "edit" && showGrid}
+              showRulers={editorMode === "edit" && showGrid}
+              showLiteralVariables={editorMode === "edit"}
+              hideSigners={signers.length === 0}
               maxWidth={9999}
               images={images}
               selectedImageId={selectedImageId}
@@ -1927,8 +2225,24 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
                 <input type="range" min={0.2} max={1} step={0.05} value={selectedImage.opacity ?? 1} onChange={(e) => updateImage(selectedImage.id, { opacity: Number(e.target.value) })} />
               </label>
               <input type="file" accept="image/*" ref={imageReplaceInputRef} style={{ display: "none" }} onChange={handleReplaceImageFile} />
-              <button type="button" className="tpl-btn" onClick={() => imageReplaceInputRef.current?.click()}>
-                Заменить изображение
+              <div className="tpl-prop-grid-2">
+                <button type="button" className="tpl-btn" onClick={() => imageReplaceInputRef.current?.click()}>
+                  Заменить
+                </button>
+                <button type="button" className="tpl-btn" onClick={() => toggleLocked("image", selectedImage.id)}>
+                  {selectedImage.locked ? "Разблокировать" : "Заблокировать"}
+                </button>
+              </div>
+              <div className="tpl-prop-grid-2">
+                <button type="button" className="tpl-btn" onClick={() => toggleHidden("image", selectedImage.id)}>
+                  {selectedImage.hidden ? "Показать" : "Скрыть"}
+                </button>
+                <button type="button" className="tpl-btn" onClick={() => moveLayer("image", selectedImage.id, "front")}>
+                  На передний план
+                </button>
+              </div>
+              <button type="button" className="tpl-btn" onClick={() => moveLayer("image", selectedImage.id, "back")}>
+                На задний план
               </button>
               <button type="button" className="tpl-btn danger" onClick={() => removeImage(selectedImage.id)}>
                 Удалить изображение
@@ -2014,6 +2328,28 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
                 </div>
               </label>
               <label>
+                Стиль
+                <div className="tpl-toggle-row">
+                  <button
+                    type="button"
+                    className={selectedElement.italic ? "is-active" : ""}
+                    onClick={() => updateSelectedElement("italic", !selectedElement.italic)}
+                    title="Курсив"
+                  ><i>I</i></button>
+                  <button
+                    type="button"
+                    className={selectedElement.underline ? "is-active" : ""}
+                    onClick={() => updateSelectedElement("underline", !selectedElement.underline)}
+                    title="Подчёркивание"
+                  ><u>U</u></button>
+                  <button
+                    type="button"
+                    onClick={() => { updateSelectedElement("italic", false); updateSelectedElement("underline", false); }}
+                    title="Сбросить стиль"
+                  >—</button>
+                </div>
+              </label>
+              <label>
                 Выравнивание
                 <div className="tpl-toggle-row">
                   {[["left", "Слева"], ["center", "Центр"], ["right", "Справа"]].map(([value, lbl]) => (
@@ -2026,11 +2362,55 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
                   ))}
                 </div>
               </label>
+              <div className="tpl-prop-grid-2">
+                <button type="button" className="tpl-btn" onClick={() => { pushUndo(); centerElementH(selectedElement.id); }} title="Поставить по центру по горизонтали">
+                  ↔ По центру X
+                </button>
+                <button type="button" className="tpl-btn" onClick={() => { pushUndo(); centerElementV(selectedElement.id); }} title="Поставить по центру по вертикали">
+                  ↕ По центру Y
+                </button>
+              </div>
               <label>
                 Межстрочный интервал
                 <input type="number" min={1} max={2} step={0.05} value={selectedElement.lineHeight || 1.25} onChange={(event) => updateSelectedElement("lineHeight", Number(event.target.value) || 1.25)} />
               </label>
+              {(selectedElement.text || "").includes("{") && (
+                <label>
+                  Падеж переменной
+                  <select
+                    value={(() => {
+                      const m = (selectedElement.text || "").match(/\{[^}]*\|\s*([^}]+)\}/);
+                      return m ? m[1].trim() : "";
+                    })()}
+                    onChange={(e) => {
+                      const cs = e.target.value;
+                      const newText = (selectedElement.text || "").replace(/\{([^}|]+)(?:\s*\|[^}]*)?\}/g, (_, name) => (cs ? `{${name.trim()} | ${cs}}` : `{${name.trim()}}`));
+                      updateSelectedElement("text", newText);
+                    }}
+                  >
+                    {GRAMMAR_CASES.map((c) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <div className="tpl-divider" />
+              <div className="tpl-prop-grid-2">
+                <button type="button" className="tpl-btn" onClick={() => { pushUndo(); toggleHidden("element", selectedElement.id); }}>
+                  {selectedElement.hidden ? "Показать" : "Скрыть"}
+                </button>
+                <button type="button" className="tpl-btn" onClick={() => { pushUndo(); toggleLocked("element", selectedElement.id); }}>
+                  {selectedElement.locked ? "Разблокировать" : "Заблокировать"}
+                </button>
+              </div>
+              <div className="tpl-prop-grid-2">
+                <button type="button" className="tpl-btn" onClick={() => { pushUndo(); moveElementZ(selectedElement.id, "front"); }}>
+                  На передний план
+                </button>
+                <button type="button" className="tpl-btn" onClick={() => { pushUndo(); moveElementZ(selectedElement.id, "back"); }}>
+                  На задний план
+                </button>
+              </div>
               <button type="button" className="tpl-btn" onClick={() => { pushUndo(); duplicateEl(selectedElement.id); }}>
                 Дублировать блок
               </button>
