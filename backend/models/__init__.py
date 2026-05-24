@@ -1,0 +1,221 @@
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, JSON, String
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
+from database import Base
+from models.tpmpk import (
+    TPMPKAppointment,
+    TPMPKAuditLog,
+    TPMPKScheduleTemplate,
+    TPMPKSlotLock,
+    TPMPKUser,
+    TPMPKWorkingDay,
+)
+
+
+def _user_display_name(user):
+    if user is None:
+        return None
+
+    full_name = getattr(user, "full_name", None) or getattr(user, "fullName", None)
+    if full_name:
+        return full_name
+
+    fio = " ".join(
+        part for part in [
+            getattr(user, "last_name", None) or getattr(user, "lastName", None),
+            getattr(user, "first_name", None) or getattr(user, "firstName", None),
+            getattr(user, "middle_name", None) or getattr(user, "middleName", None),
+        ]
+        if part
+    )
+    if fio:
+        return fio
+
+    return "Редакция ИМЦРО"
+
+
+class UserRole(Base):
+    __tablename__ = "user_role"
+    id = Column(Integer, primary_key=True, index=True)
+    role_name = Column(String(50), unique=True, nullable=False)
+    permissions = Column(JSON, nullable=False, default=dict)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    username = Column(String(100), nullable=True)
+    last_name = Column(String(100), nullable=True)
+    first_name = Column(String(100), nullable=True)
+    middle_name = Column(String(100), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    role_id = Column(Integer, ForeignKey("user_role.id"), nullable=True)
+    allowed_methodika_subjects = Column(JSON, nullable=False, default=list)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    role = relationship("UserRole")
+
+
+class Article(Base):
+    __tablename__ = "article"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft', 'published', 'archive')",
+            name="article_status_chk",
+        ),
+        CheckConstraint(
+            "publishing_scope IN ('imcro_only', 'dom_uchitelya_only', 'both')",
+            name="article_publishing_scope_chk",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(300), nullable=False)
+    slug = Column(String(160), unique=True, nullable=False, index=True)
+    status = Column(String(20), nullable=False, default="draft", index=True)
+    excerpt = Column(String(800), nullable=True)
+    image = Column(String(500), nullable=True)
+    lead = Column(String(800), nullable=True)
+    body = Column(String, nullable=False, default="")
+    cover_image_url = Column(String(500), nullable=True)
+    is_pinned = Column(Boolean, nullable=False, default=False, index=True)
+    duplicate_to_main = Column(Boolean, nullable=False, default=False, index=True)
+    duplicate_to_events = Column(Boolean, nullable=False, default=False, index=True)
+    blocks = Column(JSON, nullable=False, default=list)
+    attachments = Column(JSON, nullable=False, default=list)
+    categories = Column(JSON, nullable=False, default=list)
+    tags = Column(JSON, nullable=False, default=list)
+    publishing_scope = Column(String(20), nullable=False, default="both", index=True)
+    methodika_subject = Column(String(120), nullable=True, index=True)
+    dom_uchitelya_section = Column(String(120), nullable=True, index=True)
+    noko_section = Column(String(120), nullable=True, index=True)
+    hub_kind = Column(String(64), nullable=True, index=True)
+    hub_path = Column(String(160), nullable=True, index=True)
+    author_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    published_at = Column(DateTime(timezone=True), nullable=True)
+
+    author = relationship("User", foreign_keys=[author_id])
+
+    @property
+    def author_name(self):
+        return _user_display_name(self.author)
+
+    @property
+    def author_full_name(self):
+        return _user_display_name(self.author)
+
+    @property
+    def author_last_name(self):
+        return getattr(self.author, "last_name", None) if self.author is not None else None
+
+    @property
+    def author_first_name(self):
+        return getattr(self.author, "first_name", None) if self.author is not None else None
+
+    @property
+    def author_middle_name(self):
+        return getattr(self.author, "middle_name", None) if self.author is not None else None
+
+    @property
+    def author_key(self):
+        return f"id-{self.author_id}" if self.author_id else None
+
+
+class CertificateTemplate(Base):
+    __tablename__ = "certificate_templates"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), nullable=False)
+    background_url = Column(String(500), nullable=True)
+    signers_y_mm = Column(Float, default=248.0)
+    signers_block_x_mm = Column(Float, default=105.0)
+    signers_row_height_mm = Column(Float, default=32.0)
+    signers_band_width_mm = Column(Float, default=168.0)
+    signers_font_size = Column(Float, default=10.0)
+    signers_text_color = Column(String(16), default="#1e293b")
+    signers_position_color = Column(String(16), nullable=True)
+    signers_name_color = Column(String(16), nullable=True)
+    signers_font_weight = Column(String(8), default="400")
+    signers_font_family = Column(String(120), default="DejaVu")
+    margin_left_mm = Column(Float, default=12.0)
+    margin_right_mm = Column(Float, default=12.0)
+    margin_top_mm = Column(Float, default=12.0)
+    margin_bottom_mm = Column(Float, default=12.0)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class TemplateTextElement(Base):
+    __tablename__ = "template_text_elements"
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(Integer, ForeignKey("certificate_templates.id"), nullable=False)
+    text = Column(String(500), nullable=False)
+    is_variable = Column(Boolean, default=False)
+    x_mm = Column(Float, nullable=False)
+    y_mm = Column(Float, nullable=False)
+    font_size = Column(Integer, default=24)
+    align = Column(String(10), default="center")
+    color = Column(String(16), default="#0F172A")
+    font_weight = Column(String(8), default="400")
+    font_family = Column(String(120), default="DejaVu")
+    max_width_mm = Column(Float, nullable=True)
+    max_height_mm = Column(Float, nullable=True)
+
+
+class GeneratedCertificate(Base):
+    __tablename__ = "generated_certificates"
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(Integer, ForeignKey("certificate_templates.id"), nullable=False)
+    recipient_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    event_name = Column(String(300), nullable=True)
+    file_url = Column(String(500), nullable=False)
+    generated_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    generated_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Appointment(Base):
+    __tablename__ = "appointments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String(200), nullable=False)
+    appointment_date = Column(String(10), nullable=False)
+    appointment_time = Column(String(5), nullable=False)
+    comment = Column(String(500), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class TemplateSigner(Base):
+    __tablename__ = "template_signers"
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(Integer, ForeignKey("certificate_templates.id"), nullable=False)
+    order = Column(Integer, default=1)
+    position = Column(String(100), nullable=False)
+    full_name = Column(String(200), nullable=False)
+    facsimile_url = Column(String(500), nullable=True)
+    offset_y_mm = Column(Float, default=0.0)
+    facsimile_offset_x_mm = Column(Float, default=0.0)
+    facsimile_offset_y_mm = Column(Float, default=0.0)
+    facsimile_scale = Column(Float, default=1.0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+__all__ = [
+    "Appointment",
+    "Article",
+    "CertificateTemplate",
+    "GeneratedCertificate",
+    "TemplateSigner",
+    "TemplateTextElement",
+    "TPMPKAppointment",
+    "TPMPKAuditLog",
+    "TPMPKScheduleTemplate",
+    "TPMPKSlotLock",
+    "TPMPKUser",
+    "TPMPKWorkingDay",
+    "User",
+    "UserRole",
+]

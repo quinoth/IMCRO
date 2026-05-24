@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+.venv/
+.venv-*/
+venv/
+env/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE
+.vscode/
+.idea/
+.claude/
+*.swp
+
+# Runtime caches and extracted indexes
+ocr_cache/
+chroma_gigachat/
+s3_extracted/
+cache/
+logs/
+
+# Logs and state
+*.log
+update_state.json
+uvicorn.*.log
+
+# Local databases and backups
+dev.db
+*.db
+*.sqlite
+*.sqlite3
+backups/
+*.dump
+
+# Generated uploads and runtime media
+media/
+uploads/
+static/articles/attachments/
+static/certificates/backgrounds/
+static/certificates/facsimiles/
+static/certificates/generated/
+static/fonts/custom/
+
+# OS
+.DS_Store
+Thumbs.db

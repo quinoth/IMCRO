@@ -1,0 +1,25 @@
+# Docker backend dependencies
+
+fastapi
+uvicorn[standard]
+
+sqlalchemy
+psycopg2-binary
+alembic
+
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+bcrypt
+
+pydantic
+pydantic[email]
+
+reportlab
+Pillow
+pandas
+openpyxl
+pytrovich
+
+python-dotenv
+httpx
