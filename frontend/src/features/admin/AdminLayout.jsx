@@ -26,6 +26,34 @@ function userName(currentUser) {
   return currentUser?.full_name || currentUser?.fullName || fio || currentUser?.username || currentUser?.email || "Администратор";
 }
 
+function shortUserName(currentUser, fullName) {
+  const last = currentUser?.lastName || "";
+  const first = currentUser?.firstName || "";
+  if (last && first) {
+    return `${last} ${first.charAt(0).toUpperCase()}.`;
+  }
+  if (last) return last;
+  if (first) return first;
+  const parts = String(fullName || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0]} ${parts[1].charAt(0).toUpperCase()}.`;
+  }
+  return parts[0] || fullName || "";
+}
+
+function userInitials(currentUser, fullName) {
+  const last = currentUser?.lastName || "";
+  const first = currentUser?.firstName || "";
+  if (last || first) {
+    return `${(first.charAt(0) || "").toUpperCase()}${(last.charAt(0) || "").toUpperCase()}` || (fullName || "А").slice(0, 2).toUpperCase();
+  }
+  const parts = String(fullName || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[1].charAt(0).toUpperCase()}${parts[0].charAt(0).toUpperCase()}`;
+  }
+  return String(fullName || "А").slice(0, 2).toUpperCase();
+}
+
 function userRole(currentUser) {
   const role = typeof currentUser?.role === "object" ? currentUser.role?.role_name : currentUser?.role;
   const labels = {
@@ -53,6 +81,8 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
   const activeModule = modules.find((item) => item.key === activeKey) || modules[0];
   const displayTitle = title || activeModule?.label || "Админ-панель";
   const name = userName(currentUser);
+  const shortName = shortUserName(currentUser, name);
+  const initials = userInitials(currentUser, name);
 
   useEffect(() => {
     try {
@@ -107,13 +137,14 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
         .admin-brand {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 10px;
           min-height: 54px;
           margin-bottom: 18px;
           min-width: 0;
         }
         .admin-brand-text {
           min-width: 0;
+          flex: 1;
           transition: opacity .16s ease, width .16s ease;
         }
         .admin-brand-mark {
@@ -134,29 +165,27 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           stroke-width: 2;
         }
         .admin-sidebar-toggle {
-          width: 100%;
-          min-height: 38px;
-          display: flex;
+          width: 32px;
+          height: 32px;
+          display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 8px;
-          margin: 0 0 22px;
           border: 1px solid var(--admin-border);
           border-radius: 8px;
-          background: #f7fbfc;
+          background: #fff;
           color: var(--admin-primary-dark);
-          font: inherit;
-          font-size: 13px;
-          font-weight: 850;
           cursor: pointer;
+          flex: 0 0 auto;
+          padding: 0;
+          transition: background .14s ease, border-color .14s ease;
         }
         .admin-sidebar-toggle:hover {
           border-color: var(--admin-primary);
           background: #edf6f8;
         }
         .admin-sidebar-toggle svg {
-          width: 18px;
-          height: 18px;
+          width: 16px;
+          height: 16px;
           fill: none;
           stroke: currentColor;
           stroke-width: 2;
@@ -166,10 +195,6 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
         }
         .admin-shell.is-collapsed .admin-sidebar-toggle svg {
           transform: rotate(180deg);
-        }
-        .admin-sidebar-toggle span {
-          overflow: hidden;
-          white-space: nowrap;
         }
         .admin-brand strong {
           display: block;
@@ -240,7 +265,6 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           margin-bottom: 16px;
         }
         .admin-shell.is-collapsed .admin-brand-text,
-        .admin-shell.is-collapsed .admin-sidebar-toggle span,
         .admin-shell.is-collapsed .admin-nav-button > span,
         .admin-shell.is-collapsed .admin-sidebar-user div {
           width: 0;
@@ -477,7 +501,6 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           }
           .admin-brand-text,
           .admin-shell.is-collapsed .admin-brand-text,
-          .admin-shell.is-collapsed .admin-sidebar-toggle span,
           .admin-shell.is-collapsed .admin-nav-button > span,
           .admin-shell.is-collapsed .admin-sidebar-user div {
             width: auto;
@@ -526,20 +549,18 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
             <strong>ИМЦРО</strong>
             <span>Админ-панель</span>
           </div>
+          <button
+            className="admin-sidebar-toggle"
+            type="button"
+            onClick={() => setCollapsed((value) => !value)}
+            aria-label={collapsed ? "Развернуть меню" : "Свернуть меню"}
+            title={collapsed ? "Развернуть меню" : "Свернуть меню"}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
         </div>
-
-        <button
-          className="admin-sidebar-toggle"
-          type="button"
-          onClick={() => setCollapsed((value) => !value)}
-          aria-label={collapsed ? "Развернуть меню" : "Свернуть меню"}
-          title={collapsed ? "Развернуть меню" : "Свернуть меню"}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-          <span>{collapsed ? "Развернуть меню" : "Свернуть меню"}</span>
-        </button>
 
         <nav className="admin-nav">
           {modules.map((module) => (
@@ -557,8 +578,8 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           ))}
         </nav>
 
-        <div className="admin-sidebar-user">
-          <span className="admin-avatar">{name.slice(0, 2).toUpperCase()}</span>
+        <div className="admin-sidebar-user" title={name}>
+          <span className="admin-avatar">{initials}</span>
           <div>
             <strong>{name}</strong>
             <span>{userRole(currentUser)}</span>
@@ -584,9 +605,9 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
                 <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
               </svg>
             </button>
-            <div className="admin-profile-chip" title={name}>
-              <span className="admin-avatar">{name.slice(0, 2).toUpperCase()}</span>
-              <span>{name}</span>
+            <div className="admin-profile-chip" title={`${name} • ${userRole(currentUser)}`}>
+              <span className="admin-avatar">{initials}</span>
+              <span>{shortName}</span>
             </div>
           </div>
         </header>

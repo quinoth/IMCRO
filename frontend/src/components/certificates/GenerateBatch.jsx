@@ -555,6 +555,12 @@ export default function GenerateBatch({ templates }) {
 
         {parseError && <AlertBanner type="error">{parseError}</AlertBanner>}
 
+        {preview && !parseError && preview.missingColumns.length > 0 && (
+          <AlertBanner type="error">
+            В Excel не найдены столбцы: {preview.missingColumns.join(", ")}. Переименуйте столбцы в Excel или укажите значения ниже.
+          </AlertBanner>
+        )}
+
         {preview && !parseError && (
           <div className="batch-data-summary">
             <strong>Найдено строк: {preview.rowCount}</strong>

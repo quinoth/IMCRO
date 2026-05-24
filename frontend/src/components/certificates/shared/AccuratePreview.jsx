@@ -208,10 +208,112 @@ export default function AccuratePreview({
   onElementContextMenu, // (id, clientX, clientY) => void — правый клик
   onElementDoubleClick, // (id) => void — двойной клик → прокрутить к настройкам
   onSignersMove,       // (xMm, yMm) => void — drag блока подписантов
+  showGrid = true,
+  showSafeZone = true,
+  showRulers = true,
+  showVariableBadge = false,
+  maxWidth = 430,
+  images = [],
+  selectedImageId = null,
+  onImageSelect,
+  onImageMove,
+  onImageContextMenu,
+  showLiteralVariables = false, // если true — рендерим текст с {переменными} без подстановки
+  onElementInlineEdit, // (id, newText) => void
+  onElementResize, // (id, widthMm, heightMm) => void
+  hideSigners = false,
 }) {
   const previewFrameRef = useRef(null);
   const [previewWidthPx, setPreviewWidthPx] = useState(0);
   const [draggingElementId, setDraggingElementId] = useState(null);
+  const [draggingImageId, setDraggingImageId] = useState(null);
+  const [inlineEditingId, setInlineEditingId] = useState(null);
+  const [inlineEditValue, setInlineEditValue] = useState("");
+  const inlineEditRef = useRef(null);
+  const imageDragRef = useRef({ active: false, id: null, startX: 0, startY: 0, origX: 0, origY: 0 });
+  const resizeRef = useRef({ active: false, id: null, kind: null, handle: null, startX: 0, startY: 0, origWidthMm: 0, origHeightMm: 0 });
+
+  const commitInlineEdit = useCallback(() => {
+    if (inlineEditingId == null) return;
+    onElementInlineEdit?.(inlineEditingId, inlineEditValue);
+    setInlineEditingId(null);
+  }, [inlineEditingId, inlineEditValue, onElementInlineEdit]);
+
+  const startInlineEdit = useCallback((id, text) => {
+    if (!onElementInlineEdit) return;
+    setInlineEditValue(text || "");
+    setInlineEditingId(id);
+    requestAnimationFrame(() => {
+      if (inlineEditRef.current) {
+        inlineEditRef.current.focus();
+        inlineEditRef.current.select();
+      }
+    });
+  }, [onElementInlineEdit]);
+
+  const handleResizeStart = useCallback((e, kind, id, handle, origWidthMm, origHeightMm) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    resizeRef.current = {
+      active: true, id, kind, handle,
+      startX: e.clientX, startY: e.clientY,
+      origWidthMm: origWidthMm || 0,
+      origHeightMm: origHeightMm || 0,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }, []);
+
+  const handleResizeMove = useCallback((e) => {
+    const r = resizeRef.current;
+    if (!r.active || !previewFrameRef.current) return;
+    const rect = previewFrameRef.current.getBoundingClientRect();
+    const dxMm = ((e.clientX - r.startX) / rect.width) * PAGE_W;
+    const dyMm = ((e.clientY - r.startY) / rect.height) * PAGE_H;
+    const sign = r.handle.includes("l") ? -1 : 1;
+    const newW = Math.max(8, Math.round(r.origWidthMm + dxMm * sign));
+    const newH = Math.max(6, Math.round((r.origHeightMm || 20) + dyMm * (r.handle.includes("t") ? -1 : 1)));
+    if (r.kind === "image" && onImageMove) {
+      // images: use onElementResize callback for both
+    }
+    onElementResize?.(r.id, r.kind, newW, newH);
+  }, [onElementResize, onImageMove]);
+
+  const handleResizeEnd = useCallback(() => {
+    resizeRef.current.active = false;
+  }, []);
+
+  const handleImagePointerDown = useCallback((e, imgId, imgX, imgY) => {
+    if (e.button !== 0 || !onImageMove) return;
+    e.stopPropagation();
+    e.preventDefault();
+    onImageSelect?.(imgId);
+    imageDragRef.current = { active: true, id: imgId, startX: e.clientX, startY: e.clientY, origX: imgX, origY: imgY };
+    setDraggingImageId(imgId);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }, [onImageMove, onImageSelect]);
+
+  const handleImagePointerMove = useCallback((e) => {
+    const d = imageDragRef.current;
+    if (!d.active || !previewFrameRef.current) return;
+    const rect = previewFrameRef.current.getBoundingClientRect();
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    const newX = d.origX + (dx / rect.width) * 100;
+    const newY = d.origY + (dy / rect.height) * 100;
+    onImageMove?.(d.id, Math.max(0, Math.min(100, newX)), Math.max(0, Math.min(100, newY)));
+  }, [onImageMove]);
+
+  const handleImagePointerUp = useCallback(() => {
+    imageDragRef.current.active = false;
+    setDraggingImageId(null);
+  }, []);
+
+  const handleImageContextMenu = useCallback((e, imgId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onImageContextMenu?.(imgId, e.clientX, e.clientY);
+  }, [onImageContextMenu]);
 
   // ── Drag & Drop state ───────────────────────────────────────────────────────
   const dragRef = useRef({ active: false, elId: null, startX: 0, startY: 0, origX: 0, origY: 0 });
@@ -321,12 +423,12 @@ export default function AccuratePreview({
     <div ref={previewFrameRef} style={{
       width: "100%",
       aspectRatio: "210 / 297",
-      maxWidth: 430,
+      maxWidth: maxWidth,
       position: "relative",
       borderRadius: 8,
       overflow: "hidden",
       boxShadow: bgUrl ? "0 4px 24px rgba(0,0,0,0.18)" : "0 0 0 2px #E2E8F0",
-      background: bgUrl ? "transparent" : "#F1F5F9",
+      background: bgUrl ? "transparent" : "#ffffff",
       margin: "0 auto",
     }}>
       {fontFaceCss && <style>{fontFaceCss}</style>}
@@ -347,45 +449,117 @@ export default function AccuratePreview({
       )}
 
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}>
-        <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-          <svg width="100%" height="100%" viewBox="0 0 210 297" preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
-            <defs>
-              <pattern id="grid10mm" width="10" height="10" patternUnits="userSpaceOnUse">
-                <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(25,120,156,0.08)" strokeWidth="0.25" />
-              </pattern>
-              <pattern id="grid50mm" width="50" height="50" patternUnits="userSpaceOnUse">
-                <path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(25,120,156,0.18)" strokeWidth="0.5" />
-              </pattern>
-            </defs>
-            <rect width="210" height="297" fill="url(#grid10mm)" />
-            <rect width="210" height="297" fill="url(#grid50mm)" />
-          </svg>
-          <div style={{ position: "absolute", top: 5, left: 5, fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
-            0 мм
+        {showGrid && (
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+            <svg width="100%" height="100%" viewBox="0 0 210 297" preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
+              <defs>
+                <pattern id="grid10mm" width="10" height="10" patternUnits="userSpaceOnUse">
+                  <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(25,120,156,0.08)" strokeWidth="0.25" />
+                </pattern>
+                <pattern id="grid50mm" width="50" height="50" patternUnits="userSpaceOnUse">
+                  <path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(25,120,156,0.18)" strokeWidth="0.5" />
+                </pattern>
+              </defs>
+              <rect width="210" height="297" fill="url(#grid10mm)" />
+              <rect width="210" height="297" fill="url(#grid50mm)" />
+            </svg>
+            {showRulers && (
+              <>
+                <div style={{ position: "absolute", top: 5, left: 5, fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
+                  0 мм
+                </div>
+                <div style={{ position: "absolute", top: 5, left: "50%", transform: "translateX(-50%)", fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
+                  105 мм
+                </div>
+                <div style={{ position: "absolute", top: 5, right: 5, fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
+                  210 мм
+                </div>
+                <div style={{ position: "absolute", bottom: 5, left: 5, fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
+                  297 мм
+                </div>
+              </>
+            )}
           </div>
-          <div style={{ position: "absolute", top: 5, left: "50%", transform: "translateX(-50%)", fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
-            105 мм
-          </div>
-          <div style={{ position: "absolute", top: 5, right: 5, fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
-            210 мм
-          </div>
-          <div style={{ position: "absolute", bottom: 5, left: 5, fontSize: "8px", color: "rgba(25,120,156,0.6)", fontWeight: "600" }}>
-            297 мм
-          </div>
-        </div>
+        )}
 
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
+          {/* Изображения (печати, подписи, декор) */}
+          {images.filter((img) => !img.hidden).map((img, imgIdx) => {
+            const widthMm = Number(img.widthMm) || 40;
+            const heightMm = Number(img.heightMm) || 25;
+            const widthPct = (widthMm / PAGE_W) * 100;
+            const heightPct = (heightMm / PAGE_H) * 100;
+            const opacity = img.opacity ?? 1;
+            const isSelected = selectedImageId === img.id;
+            const isLocked = !!img.locked;
+            const dragAllowed = onImageMove && !isLocked;
+            return (
+              <div
+                key={img.id}
+                onPointerDown={dragAllowed ? (e) => handleImagePointerDown(e, img.id, img.x, img.y) : undefined}
+                onPointerMove={dragAllowed ? handleImagePointerMove : undefined}
+                onPointerUp={dragAllowed ? handleImagePointerUp : undefined}
+                onClick={!dragAllowed ? () => onImageSelect?.(img.id) : undefined}
+                onContextMenu={(e) => handleImageContextMenu(e, img.id)}
+                style={{
+                  position: "absolute",
+                  left: `${img.x}%`,
+                  top: `${img.y}%`,
+                  width: `${widthPct}%`,
+                  height: `${heightPct}%`,
+                  transform: "translate(-50%, -50%)",
+                  opacity,
+                  cursor: dragAllowed ? (draggingImageId === img.id ? "grabbing" : "grab") : (isLocked ? "not-allowed" : "default"),
+                  pointerEvents: (onImageMove || onImageSelect) ? "auto" : "none",
+                  userSelect: "none",
+                  outline: isSelected
+                    ? "2.5px solid rgba(25,120,156,0.85)"
+                    : isLocked ? "1px dashed rgba(102,119,131,0.4)" : undefined,
+                  outlineOffset: isSelected ? 3 : 0,
+                  boxShadow: isSelected ? "0 0 12px rgba(25,120,156,0.28)" : undefined,
+                  borderRadius: isSelected ? 4 : undefined,
+                  zIndex: typeof img.zIndex === "number" ? img.zIndex : imgIdx + 1,
+                }}
+              >
+                {img.url ? (
+                  <img
+                    src={img.url}
+                    alt={img.label || "изображение"}
+                    draggable={false}
+                    style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }}
+                  />
+                ) : (
+                  <div style={{
+                    width: "100%", height: "100%", display: "grid", placeItems: "center",
+                    border: "1px dashed #9dbfca", borderRadius: 4, color: "#9dbfca",
+                    fontSize: 11, background: "rgba(237,246,248,.6)",
+                  }}>{img.label || "Изображение"}</div>
+                )}
+                {isSelected && onElementResize && !isLocked && (
+                  <>
+                    <span onPointerDown={(e) => handleResizeStart(e, "image", img.id, "br", widthMm, heightMm)} onPointerMove={handleResizeMove} onPointerUp={handleResizeEnd}
+                      style={{ position: "absolute", right: -6, bottom: -6, width: 12, height: 12, background: "#19789c", border: "2px solid #fff", borderRadius: 2, cursor: "nwse-resize", zIndex: 999 }} />
+                    <span onPointerDown={(e) => handleResizeStart(e, "image", img.id, "tr", widthMm, heightMm)} onPointerMove={handleResizeMove} onPointerUp={handleResizeEnd}
+                      style={{ position: "absolute", right: -6, top: -6, width: 12, height: 12, background: "#19789c", border: "2px solid #fff", borderRadius: 2, cursor: "nesw-resize", zIndex: 999 }} />
+                  </>
+                )}
+              </div>
+            );
+          })}
+
           {/* Рабочая зона */}
-          <div style={{
-            position: "absolute",
-            left: `${safePct.xMin}%`, right: `${100 - safePct.xMax}%`,
-            top: `${safePct.yMin}%`, bottom: `${100 - safePct.yMax}%`,
-            border: "2.5px dashed rgba(239,68,68,0.75)", borderRadius: 3,
-            pointerEvents: "none", boxSizing: "border-box",
-          }} />
+          {showSafeZone && (
+            <div style={{
+              position: "absolute",
+              left: `${safePct.xMin}%`, right: `${100 - safePct.xMax}%`,
+              top: `${safePct.yMin}%`, bottom: `${100 - safePct.yMax}%`,
+              border: "2px dashed rgba(25,120,156,0.45)", borderRadius: 3,
+              pointerEvents: "none", boxSizing: "border-box",
+            }} />
+          )}
 
           {/* Текстовые элементы с auto-shrink (точная имитация бэкенда) */}
-          {elements.map((el) => {
+          {elements.filter((el) => !el.hidden).map((el, elIdx) => {
             const align = el.align || smartAlign(el.x, safePct.xMin, safePct.xMax);
             const xMm = (el.x / 100) * PAGE_W;
             const defaultMaxWidthMm = align === "center"
@@ -397,9 +571,13 @@ export default function AccuratePreview({
             const scaledBase = el.size * PT_TO_CSS_PX * previewScale;
             const maxWPx = maxWidthMm * MM_TO_CSS_PX * previewScale;
 
-            // Подставляем переменные для реалистичного превью
-            const resolvedText = applyPreviewVariables(el.text, previewVariables);
-            const hasPlaceholder = el.text.includes("{");
+            // В режиме редактирования показываем переменные как есть
+            const resolvedText = showLiteralVariables
+              ? (el.text || "")
+              : applyPreviewVariables(el.text, previewVariables);
+            const hasPlaceholder = (el.text || "").includes("{");
+            const isLocked = !!el.locked;
+            const dragAllowed = onElementMove && !isLocked;
 
             // Вычисляем авто-подгоночный размер с учётом переноса строк
             // (точная имитация бэкендного auto_fit_text)
@@ -420,14 +598,24 @@ export default function AccuratePreview({
               el.fontFamily || DEFAULT_FONT_FAMILY,
             );
 
+            const isEditing = inlineEditingId === el.id;
+            const isSelected = selectedElementId === el.id;
             return (
               <div
                 key={el.id}
                 data-element-id={el.id}
-                onPointerDown={(e) => handlePointerDown(e, el.id, el.x, el.y)}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onDoubleClick={(e) => { e.stopPropagation(); onElementDoubleClick?.(el.id); }}
+                onPointerDown={dragAllowed && !isEditing ? (e) => handlePointerDown(e, el.id, el.x, el.y) : undefined}
+                onPointerMove={dragAllowed && !isEditing ? handlePointerMove : undefined}
+                onPointerUp={dragAllowed && !isEditing ? handlePointerUp : undefined}
+                onClick={(!dragAllowed && !isEditing) ? () => onElementSelect?.(el.id) : undefined}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  if (onElementInlineEdit && !isLocked) {
+                    startInlineEdit(el.id, el.text || "");
+                  } else {
+                    onElementDoubleClick?.(el.id);
+                  }
+                }}
                 onContextMenu={(e) => handleContextMenu(e, el.id)}
                 style={{
                   position: "absolute",
@@ -436,34 +624,76 @@ export default function AccuratePreview({
                   fontSize: `${displaySize}px`,
                   color: el.color,
                   fontWeight: el.weight,
+                  fontStyle: el.italic ? "italic" : "normal",
+                  textDecoration: el.underline ? "underline" : "none",
                   fontFamily: fontStack(el.fontFamily),
                   width: `${maxWPx}px`,
                   textAlign: align,
-                  pointerEvents: onElementMove ? "auto" : "none",
-                  cursor: onElementMove ? (draggingElementId === el.id ? "grabbing" : "grab") : "default",
+                  pointerEvents: (onElementMove || onElementSelect || onElementInlineEdit) ? "auto" : "none",
+                  cursor: isLocked ? "not-allowed" : (dragAllowed ? (draggingElementId === el.id ? "grabbing" : "grab") : "default"),
                   lineHeight: el.lineHeight || 1.25,
                   padding: "0 1px",
                   whiteSpace: "pre-wrap",
                   overflowWrap: "anywhere",
                   userSelect: "none",
                   // Подсвечиваем плейсхолдеры или выделенный элемент
-                  outline: selectedElementId === el.id
+                  outline: isSelected
                     ? "2.5px solid rgba(25,120,156,0.85)"
-                    : hasPlaceholder ? "2px dashed rgba(239,68,68,0.55)" : undefined,
-                  outlineOffset: selectedElementId === el.id ? 3 : 2,
-                  boxShadow: selectedElementId === el.id ? "0 0 12px rgba(25,120,156,0.28)" : undefined,
-                  borderRadius: selectedElementId === el.id ? 4 : undefined,
+                    : hasPlaceholder ? "1.5px dashed rgba(25,120,156,0.55)" : (isLocked ? "1px dashed rgba(102,119,131,0.4)" : undefined),
+                  background: hasPlaceholder && !isSelected ? "rgba(237,246,248,0.55)" : undefined,
+                  outlineOffset: isSelected ? 3 : 2,
+                  boxShadow: isSelected ? "0 0 12px rgba(25,120,156,0.28)" : undefined,
+                  borderRadius: isSelected ? 4 : undefined,
                   transition: "outline 150ms, box-shadow 150ms",
-                  zIndex: selectedElementId === el.id ? 10 : 1,
+                  zIndex: typeof el.zIndex === "number" ? el.zIndex : (isSelected ? 100 : elIdx + 20),
                 }}
               >
-                {displayLines.join("\n")}
+                {isEditing ? (
+                  <textarea
+                    ref={inlineEditRef}
+                    value={inlineEditValue}
+                    onChange={(e) => setInlineEditValue(e.target.value)}
+                    onBlur={commitInlineEdit}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitInlineEdit(); }
+                      if (e.key === "Escape") { setInlineEditingId(null); }
+                    }}
+                    style={{
+                      width: "100%", minHeight: "1.4em",
+                      background: "rgba(255,255,255,0.95)",
+                      border: "1px solid #19789c",
+                      color: el.color,
+                      fontWeight: el.weight,
+                      fontStyle: el.italic ? "italic" : "normal",
+                      textDecoration: el.underline ? "underline" : "none",
+                      fontFamily: fontStack(el.fontFamily),
+                      fontSize: "inherit",
+                      lineHeight: el.lineHeight || 1.25,
+                      textAlign: align,
+                      borderRadius: 3,
+                      outline: "none",
+                      resize: "none",
+                      padding: "1px 3px",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                ) : (
+                  displayLines.join("\n")
+                )}
+                {isSelected && onElementResize && !isLocked && !isEditing && (
+                  <>
+                    <span onPointerDown={(e) => handleResizeStart(e, "element", el.id, "br", maxWidthMm, el.maxHeightMm || 20)} onPointerMove={handleResizeMove} onPointerUp={handleResizeEnd}
+                      style={{ position: "absolute", right: -7, bottom: -7, width: 12, height: 12, background: "#19789c", border: "2px solid #fff", borderRadius: 2, cursor: "nwse-resize", zIndex: 999 }} />
+                    <span onPointerDown={(e) => handleResizeStart(e, "element", el.id, "tr", maxWidthMm, el.maxHeightMm || 20)} onPointerMove={handleResizeMove} onPointerUp={handleResizeEnd}
+                      style={{ position: "absolute", right: -7, top: -7, width: 12, height: 12, background: "#19789c", border: "2px solid #fff", borderRadius: 2, cursor: "nesw-resize", zIndex: 999 }} />
+                  </>
+                )}
               </div>
             );
           })}
 
           {/* Блок подписантов — точное воспроизведение логики draw_signers_block из pdf_generator.py */}
-          {signers.map((s, i) => {
+          {!hideSigners && signers.map((s, i) => {
             // ── Геометрия строки (мм → %) ─────────────────────────────────
             const yMm = signersLayout.y_mm + i * signersLayout.row_h_mm + (Number(s.offsetY) || 0);
             const topPct = (yMm / PAGE_H) * 100;
@@ -633,7 +863,7 @@ export default function AccuratePreview({
           })}
 
           {/* Легенда блока подписантов (показывается если есть подписанты) */}
-          {signers.length > 0 && (() => {
+          {!hideSigners && signers.length > 0 && (() => {
             const topPct = (signersLayout.y_mm / PAGE_H) * 100;
             const leftPct = ((signersLayout.x_mm - signersLayout.band_mm / 2) / PAGE_W) * 100;
             const widthPct = (signersLayout.band_mm / PAGE_W) * 100;
