@@ -26,6 +26,12 @@ export default function AuthPage({ onLogin }) {
     return Math.min(score, 4);
   };
 
+  const getPasswordStrengthColor = (score) => {
+    if (score <= 1) return "rgba(31, 80, 115, 0.34)";
+    if (score === 2) return "#477799";
+    return "#1F5073";
+  };
+
   const passScore = getPasswordStrength(regForm.password);
 
   const handleLogin = async (event) => {
@@ -317,8 +323,8 @@ export default function AuthPage({ onLogin }) {
                                   key={index}
                                   style={{
                                     background: index <= passScore
-                                      ? passScore <= 1 ? "#EF4444" : passScore === 2 ? "#F59E0B" : "#10B981"
-                                      : "#E2E8F0",
+                                      ? getPasswordStrengthColor(passScore)
+                                      : "rgba(31, 80, 115, 0.16)",
                                   }}
                                 />
                               ))}

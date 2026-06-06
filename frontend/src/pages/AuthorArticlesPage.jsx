@@ -1,7 +1,8 @@
-import { Link, useLocation, useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import Header from "../features/nav/Header.jsx";
 import Footer from "../components/Footer.jsx";
 import NewsCard from "../features/news/NewsCard.jsx";
+import Breadcrumbs from "../components/Breadcrumbs.jsx";
 
 function guessAuthorName(authorKey, items, fallback) {
   if (fallback) return fallback;
@@ -23,29 +24,91 @@ export default function AuthorArticlesPage({
   const authorNews = allNews.filter((item) => item.authorKey === authorKey);
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "linear-gradient(180deg,#fbfdff 0%,#f4f7fb 52%,#eef4fb 100%)" }}>
+    <div className="author-page">
+      <style>{`
+        .author-page {
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          color: var(--imcro-color-text);
+          background: var(--imcro-color-bg);
+          font-family: Manrope, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        .author-main { flex: 1; }
+        .author-shell {
+          width: min(var(--imcro-container-max, 1280px), calc(100% - 32px));
+          margin: 0 auto;
+          padding: 34px 0 64px;
+        }
+        .author-hero,
+        .author-empty {
+          border: 1px solid var(--imcro-color-border);
+          border-radius: var(--imcro-radius-card);
+          background: var(--imcro-color-surface);
+          box-shadow: var(--imcro-shadow-card);
+        }
+        .author-hero {
+          padding: 22px;
+          margin-bottom: 18px;
+        }
+        .author-kicker {
+          width: fit-content;
+          padding: 7px 11px;
+          border-radius: 999px;
+          background: rgba(31,80,115,0.08);
+          color: var(--imcro-color-primary);
+          font-size: 12px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: .04em;
+          margin-bottom: 12px;
+        }
+        .author-hero h1 {
+          margin: 0 0 10px;
+          color: var(--imcro-color-text);
+          font-size: clamp(30px, 9vw, 60px);
+          line-height: 1;
+        }
+        .author-hero p,
+        .author-empty {
+          color: var(--imcro-color-text-muted);
+          font-size: 16px;
+          line-height: 1.6;
+          font-weight: 650;
+        }
+        .author-grid {
+          display: grid;
+          gap: var(--imcro-gutter);
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+        }
+        .author-empty {
+          padding: 18px;
+          margin-top: 18px;
+        }
+        @media (min-width: 720px) {
+          .author-shell {
+            width: min(var(--imcro-container-max, 1280px), calc(100% - 96px));
+            padding-top: 46px;
+          }
+          .author-hero { padding: 34px; }
+        }
+      `}</style>
       <Header currentUser={currentUser} onGoAuth={onGoAuth} onGoAdmin={onGoAdmin} onGoProfile={onGoProfile} />
-      <main style={{ flex: 1, paddingTop: 72 }}>
-        <div style={{ width: "min(1180px, calc(100% - 28px))", margin: "0 auto", padding: "28px 0 64px" }}>
-          <nav style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18, color: "#64748b", fontSize: 14, fontWeight: 800 }}>
-            <Link to="/" style={{ color: "#1e3a8a", textDecoration: "none" }}>Главная</Link>
-            <span>/</span>
-            <Link to="/novosti/" style={{ color: "#1e3a8a", textDecoration: "none" }}>Новости</Link>
-            <span>/</span>
-            <span>{authorName}</span>
-          </nav>
-          <section style={{ border: "1px solid #dbe6f5", borderRadius: 8, background: "#fff", boxShadow: "0 18px 50px rgba(15,23,42,.06)", padding: 20, marginBottom: 18 }}>
-            <div style={{ width: "fit-content", padding: "7px 11px", borderRadius: 999, background: "#ecfdf5", color: "#047857", fontSize: 12, fontWeight: 900, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 12 }}>Автор</div>
-            <h1 style={{ margin: "0 0 10px", fontSize: "clamp(30px, 9vw, 60px)", lineHeight: 1 }}>{authorName}</h1>
-            <p style={{ margin: 0, color: "#475569", fontSize: 16, lineHeight: 1.62, fontWeight: 650 }}>Все публикации автора на сайте.</p>
+      <main className="author-main">
+        <div className="author-shell">
+          <Breadcrumbs items={[{ label: "Главная", to: "/" }, { label: "Новости", to: "/novosti/" }, { label: authorName }]} />
+          <section className="author-hero">
+            <div className="author-kicker">Автор</div>
+            <h1>{authorName}</h1>
+            <p>Все публикации автора на сайте.</p>
           </section>
-          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+          <div className="author-grid">
             {authorNews.map((item) => (
               <NewsCard key={item.id} news={item} onClick={() => onOpenArticle?.(item)} />
             ))}
           </div>
           {!authorNews.length && (
-            <div style={{ border: "1px solid #dbe6f5", borderRadius: 8, background: "#fff", color: "#475569", padding: 18, fontWeight: 750, lineHeight: 1.55, marginTop: 18 }}>
+            <div className="author-empty">
               У этого автора пока нет опубликованных материалов.
             </div>
           )}

@@ -24,8 +24,8 @@ const POPULAR_SECTIONS = [
   { title: "Главная", href: "/", text: "Новости и события" },
   { title: "Сведения об ОО", href: "/sveden/", text: "Основная информация" },
   { title: "ТПМПК", href: "/tpmpk/", text: "Комиссия и запись" },
-  { title: "Дом учителя", href: "/", text: "Городские мероприятия" },
-  { title: "Методическое пространство", href: "/", text: "Материалы для педагогов" },
+  { title: "Дом учителя", href: "/dom-uchitelya/", text: "Городские мероприятия" },
+  { title: "Методическое пространство", href: "/metodicheskoe-prostranstvo/", text: "Материалы для педагогов" },
   { title: "Контакты", href: "/tpmpk/kontakty/", text: "Адрес и телефон" },
 ];
 
@@ -105,10 +105,9 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
           min-height: 100vh;
           display: flex;
           flex-direction: column;
-          color: #0f172a;
-          background:
-            radial-gradient(circle at 85% 8%, rgba(124, 58, 237, 0.07), transparent 28%),
-            linear-gradient(180deg, #fbfdff 0%, #f4f8fd 56%, #eef4fb 100%);
+          color: var(--imcro-color-text);
+          background: var(--imcro-color-bg);
+          font-family: Manrope, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
 
         .smart404-main {
@@ -116,16 +115,16 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
         }
 
         .smart404-shell {
-          width: min(1120px, calc(100% - 28px));
+          width: min(var(--imcro-container-max, 1280px), calc(100% - 32px));
           margin: 0 auto;
           padding: 34px 0 72px;
         }
 
         .smart404-hero {
-          border: 1px solid #dbe6f5;
-          border-radius: 8px;
-          background: rgba(255, 255, 255, 0.94);
-          box-shadow: 0 24px 70px rgba(15, 23, 42, 0.08);
+          border: 1px solid var(--imcro-color-border);
+          border-radius: var(--imcro-radius-card);
+          background: var(--imcro-color-surface);
+          box-shadow: var(--imcro-shadow-card);
           padding: 22px;
           display: grid;
           gap: 22px;
@@ -136,7 +135,7 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
           padding: 7px 11px;
           border-radius: 999px;
           background: rgba(31, 80, 115, 0.08);
-          color: #1F5073;
+          color: var(--imcro-color-primary);
           font-size: 12px;
           font-weight: 950;
           letter-spacing: 0.05em;
@@ -145,7 +144,7 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
 
         .smart404-title {
           max-width: 760px;
-          color: #0f172a;
+          color: var(--imcro-color-text);
           font-size: clamp(34px, 7vw, 60px);
           line-height: 1;
           letter-spacing: 0;
@@ -154,7 +153,7 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
 
         .smart404-lead {
           max-width: 760px;
-          color: #475569;
+          color: var(--imcro-color-text-muted);
           font-size: 17px;
           line-height: 1.58;
           font-weight: 650;
@@ -174,24 +173,24 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
         .smart404-search input {
           width: 100%;
           min-height: 56px;
-          border: 1px solid #d7e2f2;
-          border-radius: 8px;
+          border: 1px solid var(--imcro-color-border);
+          border-radius: var(--imcro-radius-button);
           background: #fff;
-          color: #0f172a;
+          color: var(--imcro-color-text);
           padding: 0 15px;
           font: 800 16px/1.2 inherit;
           outline: none;
         }
 
         .smart404-search input:focus {
-          border-color: #1F5073;
+          border-color: var(--imcro-color-primary);
           box-shadow: 0 0 0 4px rgba(31, 80, 115, 0.12);
         }
 
         .smart404-button,
         .smart404-home {
           min-height: 54px;
-          border-radius: 8px;
+          border-radius: var(--imcro-radius-button);
           border: 0;
           padding: 0 18px;
           display: inline-flex;
@@ -199,11 +198,11 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
           justify-content: center;
           text-align: center;
           color: #fff;
-          background: #1F5073;
+          background: var(--imcro-color-primary);
           font-weight: 950;
           text-decoration: none;
           cursor: pointer;
-          box-shadow: 0 16px 34px rgba(30, 58, 138, 0.18);
+          box-shadow: 0 16px 34px rgba(31, 80, 115, 0.18);
         }
 
         .smart404-button:disabled {
@@ -218,7 +217,7 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
         }
 
         .smart404-section-title {
-          color: #0f172a;
+          color: var(--imcro-color-text);
           font-size: 22px;
           line-height: 1.15;
           margin: 10px 0 0;
@@ -226,8 +225,8 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
 
         .smart404-card,
         .smart404-popular-card {
-          border: 1px solid #dbe6f5;
-          border-radius: 8px;
+          border: 1px solid var(--imcro-color-border);
+          border-radius: var(--imcro-radius-card);
           background: #fff;
           color: inherit;
           text-decoration: none;
@@ -240,20 +239,20 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
         .smart404-card:hover,
         .smart404-popular-card:hover {
           transform: translateY(-2px);
-          border-color: #1F5073;
-          box-shadow: 0 18px 38px rgba(30, 58, 138, 0.09);
+          border-color: var(--imcro-color-primary);
+          box-shadow: 0 18px 38px rgba(31, 80, 115, 0.09);
         }
 
         .smart404-card strong,
         .smart404-popular-card strong {
-          color: #1e3a8a;
+          color: var(--imcro-color-primary);
           font-size: 17px;
           line-height: 1.25;
         }
 
         .smart404-card span,
         .smart404-popular-card span {
-          color: #64748b;
+          color: var(--imcro-color-text-muted);
           font-size: 14px;
           line-height: 1.45;
           font-weight: 650;
@@ -265,10 +264,10 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
         }
 
         .smart404-error {
-          border: 1px solid #fed7aa;
-          border-radius: 8px;
-          background: #fff7ed;
-          color: #9a3412;
+          border: 1px solid var(--imcro-color-border);
+          border-radius: var(--imcro-radius-button);
+          background: rgba(31,80,115,0.08);
+          color: var(--imcro-color-primary);
           padding: 13px 14px;
           font-weight: 800;
           line-height: 1.45;
@@ -288,7 +287,7 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
 
         @media (min-width: 720px) {
           .smart404-shell {
-            width: min(1120px, calc(100% - 44px));
+            width: min(var(--imcro-container-max, 1280px), calc(100% - 96px));
             padding-top: 48px;
           }
 

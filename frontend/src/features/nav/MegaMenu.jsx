@@ -281,7 +281,7 @@ export default function MegaMenu({ open, onClose, currentUser }) {
         }
 
         .mega-container {
-          width: min(1280px, calc(100% - 32px));
+          width: min(1180px, calc(100% - 32px));
           margin: 0 auto;
           display: grid;
           gap: 14px;

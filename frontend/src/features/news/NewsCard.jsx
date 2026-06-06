@@ -23,9 +23,9 @@ export default function NewsCard({ news, horizontal = false, onClick, onAuthorCl
       onMouseLeave={() => setHov(false)}
       style={{
         background: "#fff", borderRadius: 16, overflow: "hidden", cursor: "pointer",
-        border: "1px solid #F1F5F9", display: "flex", 
+        border: "1px solid rgba(31,80,115,0.16)", display: "flex", 
         flexDirection: horizontal ? "row" : "column",
-        boxShadow: hov ? "0 12px 36px rgba(0,0,0,0.1)" : "0 2px 8px rgba(0,0,0,0.04)",
+        boxShadow: hov ? "0 12px 30px rgba(0,0,0,0.15)" : "0 4px 20px rgba(0,0,0,0.08)",
         transform: hov ? "translateY(-3px)" : "translateY(0)",
         transition: "box-shadow 0.25s, transform 0.25s",
         height: "100%"
@@ -42,7 +42,7 @@ export default function NewsCard({ news, horizontal = false, onClick, onAuthorCl
           place-items: center;
           border-radius: 999px;
           color: #fff;
-          background: rgba(15, 23, 42, .76);
+          background: rgba(31, 80, 115, .84);
           border: 1px solid rgba(255,255,255,.55);
           box-shadow: 0 10px 22px rgba(15,23,42,.25);
           backdrop-filter: blur(10px);
@@ -50,7 +50,7 @@ export default function NewsCard({ news, horizontal = false, onClick, onAuthorCl
         }
         .news-pin svg { width: 18px; height: 18px; fill: currentColor; }
       `}</style>
-      <div style={{ height: horizontal ? "auto" : 178, width: horizontal ? "40%" : "100%", overflow: "hidden", flexShrink: 0, position: "relative", background: "#E2E8F0" }}>
+      <div style={{ height: horizontal ? "auto" : 178, width: horizontal ? "40%" : "100%", overflow: "hidden", flexShrink: 0, position: "relative", background: "rgba(31,80,115,0.08)" }}>
         <img src={news.image} alt={news.title} style={{
           width: "100%", height: "100%", objectFit: "cover", display: "block",
           transform: hov ? "scale(1.06)" : "scale(1)",
@@ -76,7 +76,7 @@ export default function NewsCard({ news, horizontal = false, onClick, onAuthorCl
               event.stopPropagation();
               onAuthorClick?.(news);
             }}
-            style={{ marginTop: 10, border: 0, background: "transparent", color: "#1D4ED8", font: "700 12px/1.4 inherit", padding: 0, cursor: "pointer", textAlign: "left" }}
+            style={{ marginTop: 10, border: 0, background: "transparent", color: "#1F5073", font: "700 12px/1.4 inherit", padding: 0, cursor: "pointer", textAlign: "left" }}
           >
             {news.author}
           </button>

@@ -372,6 +372,11 @@ body.mky-a11y-mode[data-a11y-hide-images="true"] video {
 }
 
 .imcro-public-page .app-breadcrumbs,
+.article-page .app-breadcrumbs,
+.author-page .app-breadcrumbs,
+.domu-page .app-breadcrumbs,
+.hub-page .app-breadcrumbs,
+.smart404-page .app-breadcrumbs,
 .sv-page .app-breadcrumbs,
 .ti-page .app-breadcrumbs,
 .tz-page .app-breadcrumbs,
@@ -380,6 +385,11 @@ body.mky-a11y-mode[data-a11y-hide-images="true"] video {
 }
 
 .imcro-public-page .app-breadcrumbs a,
+.article-page .app-breadcrumbs a,
+.author-page .app-breadcrumbs a,
+.domu-page .app-breadcrumbs a,
+.hub-page .app-breadcrumbs a,
+.smart404-page .app-breadcrumbs a,
 .sv-page .app-breadcrumbs a,
 .ti-page .app-breadcrumbs a,
 .tz-page .app-breadcrumbs a,
@@ -388,6 +398,11 @@ body.mky-a11y-mode[data-a11y-hide-images="true"] video {
 }
 
 .imcro-public-page .app-breadcrumbs a:hover,
+.article-page .app-breadcrumbs a:hover,
+.author-page .app-breadcrumbs a:hover,
+.domu-page .app-breadcrumbs a:hover,
+.hub-page .app-breadcrumbs a:hover,
+.smart404-page .app-breadcrumbs a:hover,
 .sv-page .app-breadcrumbs a:hover,
 .ti-page .app-breadcrumbs a:hover,
 .tz-page .app-breadcrumbs a:hover,
@@ -398,6 +413,11 @@ body.mky-a11y-mode[data-a11y-hide-images="true"] video {
 }
 
 .imcro-public-page .app-breadcrumbs [aria-current="page"],
+.article-page .app-breadcrumbs [aria-current="page"],
+.author-page .app-breadcrumbs [aria-current="page"],
+.domu-page .app-breadcrumbs [aria-current="page"],
+.hub-page .app-breadcrumbs [aria-current="page"],
+.smart404-page .app-breadcrumbs [aria-current="page"],
 .sv-page .app-breadcrumbs [aria-current="page"],
 .ti-page .app-breadcrumbs [aria-current="page"],
 .tz-page .app-breadcrumbs [aria-current="page"],
@@ -406,6 +426,11 @@ body.mky-a11y-mode[data-a11y-hide-images="true"] video {
 }
 
 .imcro-public-page .app-breadcrumbs-separator,
+.article-page .app-breadcrumbs-separator,
+.author-page .app-breadcrumbs-separator,
+.domu-page .app-breadcrumbs-separator,
+.hub-page .app-breadcrumbs-separator,
+.smart404-page .app-breadcrumbs-separator,
 .sv-page .app-breadcrumbs-separator,
 .ti-page .app-breadcrumbs-separator,
 .tz-page .app-breadcrumbs-separator,

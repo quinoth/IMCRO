@@ -81,39 +81,56 @@ function DomuShell({ currentUser, onGoAuth, onGoAdmin, onGoProfile, children }) 
 function DomuStyles() {
   return (
     <style>{`
-      .domu-page { min-height: 100vh; display: flex; flex-direction: column; color: #0f172a; background: linear-gradient(180deg, #fbfdff 0%, #f4f7fb 52%, #eef4fb 100%); }
+      .domu-page {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        color: var(--imcro-color-text);
+        background: var(--imcro-color-bg);
+        font-family: Manrope, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
       .domu-main { flex: 1; }
-      .domu-shell { width: min(var(--app-page-max, 1180px), calc(100% - 28px)); margin: 0 auto; padding: 34px 0 70px; }
-      .domu-hero { overflow: hidden; border: 1px solid #dbe6f5; border-radius: 8px; background: #fff; box-shadow: 0 24px 70px rgba(15,23,42,.08); }
+      .domu-shell { width: min(var(--imcro-container-max, 1280px), calc(100% - 32px)); margin: 0 auto; padding: 34px 0 70px; }
+      .domu-hero,
+      .domu-content,
+      .domu-card {
+        border: 1px solid var(--imcro-color-border);
+        border-radius: var(--imcro-radius-card);
+        background: var(--imcro-color-surface);
+        box-shadow: var(--imcro-shadow-card);
+      }
+      .domu-hero { overflow: hidden; }
       .domu-hero-grid { display: grid; gap: 0; }
       .domu-hero-copy { padding: 30px 20px; display: grid; gap: 18px; align-content: center; }
-      .domu-eyebrow { width: fit-content; padding: 7px 11px; border-radius: 999px; background: #ecfdf5; color: #047857; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; }
+      .domu-eyebrow { width: fit-content; padding: 7px 11px; border-radius: 999px; background: rgba(31,80,115,0.08); color: var(--imcro-color-primary); font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; }
       .domu-hero h1 { font-size: clamp(38px, 10vw, 78px); line-height: .95; letter-spacing: 0; margin: 0; }
-      .domu-hero p, .domu-lead { color: #475569; font-size: 16px; line-height: 1.62; font-weight: 650; }
+      .domu-hero p, .domu-lead { color: var(--imcro-color-text-muted); font-size: 16px; line-height: 1.62; font-weight: 650; }
       .domu-hero img { width: 100%; min-height: 260px; height: 100%; object-fit: cover; display: block; }
       .domu-contact-grid, .domu-grid, .domu-news-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); justify-content: stretch; gap: 14px; width: 100%; }
-      .domu-card { border: 1px solid #dbe6f5; border-radius: 8px; background: rgba(255,255,255,.94); padding: 18px; box-shadow: 0 16px 36px rgba(15,23,42,.06); }
-      .domu-contact span { display: block; color: #64748b; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 7px; }
+      .domu-card { padding: 18px; }
+      .domu-contact span { display: block; color: var(--imcro-color-text-muted); font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 7px; }
       .domu-contact strong { font-size: 17px; line-height: 1.35; }
       .domu-section-head { margin: 40px 0 16px; display: flex; align-items: end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-      .domu-section-head h2 { margin: 0; font-size: clamp(26px, 5vw, 42px); line-height: 1.08; }
+      .domu-section-head h2 { margin: 0; color: var(--imcro-color-surface); font-size: clamp(26px, 5vw, 42px); line-height: 1.08; }
+      .domu-section-head p { flex-basis: 100%; max-width: 760px; margin: -6px 0 0; color: rgba(255,255,255,0.84); font-size: 16px; line-height: 1.55; font-weight: 650; }
       .domu-link { min-height: 150px; color: inherit; text-decoration: none; display: grid; align-content: space-between; transition: transform .16s ease, border-color .16s ease; }
-      .domu-link:hover { transform: translateY(-2px); border-color: #86efac; }
+      .domu-link:hover { transform: translateY(-2px); border-color: var(--imcro-color-primary); box-shadow: var(--imcro-shadow-card-hover); }
       .domu-link h3 { margin: 0 0 8px; font-size: 20px; line-height: 1.18; }
-      .domu-link p { margin: 0; color: #64748b; font-size: 14px; line-height: 1.45; font-weight: 700; }
-      .domu-open { margin-top: 18px; width: fit-content; min-height: 38px; padding: 0 13px; border-radius: 8px; display: inline-flex; align-items: center; color: #047857; background: #ecfdf5; font-size: 13px; font-weight: 950; }
-      .domu-content { display: grid; gap: 18px; }
+      .domu-link p { margin: 0; color: var(--imcro-color-text-muted); font-size: 14px; line-height: 1.45; font-weight: 700; }
+      .domu-open { margin-top: 18px; width: fit-content; min-height: 38px; padding: 0 13px; border-radius: var(--imcro-radius-button); display: inline-flex; align-items: center; color: #fff; background: var(--imcro-color-primary); font-size: 13px; font-weight: 950; text-decoration: none; }
+      .domu-content { display: grid; gap: 18px; padding: 22px; }
       .domu-content h1 { font-size: clamp(32px, 8vw, 62px); line-height: 1; margin: 0; }
       .domu-list { margin: 0; padding: 0; display: grid; gap: 10px; list-style: none; }
-      .domu-list li { padding: 14px 16px; border: 1px solid #dbe6f5; border-radius: 8px; background: #fff; color: #334155; font-weight: 750; }
-      .domu-empty { border: 1px solid #dbe6f5; border-radius: 8px; background: #fff; color: #475569; padding: 20px; font-weight: 750; line-height: 1.55; }
+      .domu-list li { padding: 14px 16px; border: 1px solid var(--imcro-color-border); border-radius: 8px; background: #fff; color: var(--imcro-color-text); font-weight: 750; }
+      .domu-empty { border: 1px solid var(--imcro-color-border); border-radius: var(--imcro-radius-card); background: #fff; color: var(--imcro-color-text-muted); padding: 20px; font-weight: 750; line-height: 1.55; box-shadow: var(--imcro-shadow-card); }
       @media (min-width: 720px) {
-        .domu-shell { width: min(var(--app-page-max, 1180px), calc(100% - 44px)); padding-top: 46px; }
+        .domu-shell { width: min(var(--imcro-container-max, 1280px), calc(100% - 96px)); padding-top: 46px; }
         .domu-hero-grid { grid-template-columns: minmax(0, 1.02fr) minmax(320px, .8fr); }
         .domu-hero-copy { padding: 54px; min-height: 520px; }
+        .domu-content { padding: 34px; }
       }
       @media (max-width: 520px) {
-        .domu-shell { width: min(100% - 24px, var(--app-page-max, 1180px)); }
+        .domu-shell { width: min(100% - 24px, var(--imcro-container-max, 1280px)); }
       }
     `}</style>
   );
@@ -208,9 +225,11 @@ export function DomUchitelyaNewsPage(props) {
     <DomuShell {...props}>
       <div className="domu-shell">
         <Breadcrumbs items={[{ label: "Главная", to: "/" }, { label: "Дом учителя", to: "/dom-uchitelya/" }, { label: "Новости" }]} />
-        <div className="domu-section-head" style={{ marginTop: 0 }}>
-          <h2>Новости Дома учителя</h2>
-        </div>
+        <section className="domu-content" style={{ marginBottom: 22 }}>
+          <span className="domu-eyebrow">Новости</span>
+          <h1>Новости Дома учителя</h1>
+          <p className="domu-lead">Актуальные новости, анонсы и материалы Дома учителя.</p>
+        </section>
         <div className="domu-news-grid">
           {news.map(item => <NewsCard key={item.id} news={item} onClick={() => props.onOpenArticle?.(item)} onAuthorClick={props.onOpenAuthor} />)}
         </div>
@@ -228,9 +247,11 @@ export function CommonNewsPage(props) {
     <DomuShell {...props}>
       <div className="domu-shell">
         <Breadcrumbs items={[{ label: "Главная", to: "/" }, { label: "Новости" }]} />
-        <div className="domu-section-head" style={{ marginTop: 0 }}>
-          <h2>Новости</h2>
-        </div>
+        <section className="domu-content" style={{ marginBottom: 22 }}>
+          <span className="domu-eyebrow">Новости</span>
+          <h1>Новости</h1>
+          <p className="domu-lead">Актуальные новости, объявления и материалы МКУ ИМЦРО.</p>
+        </section>
         <div className="domu-news-grid">
           {news.map(item => <NewsCard key={item.id} news={item} onClick={() => props.onOpenArticle?.(item)} onAuthorClick={props.onOpenAuthor} />)}
         </div>

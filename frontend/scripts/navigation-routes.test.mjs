@@ -42,6 +42,7 @@ const knownRoutes = new Set([
   "/profile/",
   "/novosti/",
   "/sveden/",
+  "/svedeniya/",
   "/dom-uchitelya/",
   "/dom-uchitelya/novosti/",
   "/metodika/",
@@ -145,7 +146,7 @@ assert.ok(megaMenuSource.includes("mega-group-tabs"), "mega menu renders group c
 assert.ok(megaMenuSource.includes("ACTION_LINKS"), "mega menu keeps the dedicated quick actions data");
 assert.ok(megaMenuSource.includes("mega-action-panel"), "mega menu renders the dedicated quick actions panel");
 assert.ok(megaMenuSource.includes("mega-action-links"), "mega menu keeps quick action buttons in a separate compact row");
-assert.ok(megaMenuSource.includes("width: min(1280px, calc(100% - 32px))"), "mega menu is constrained as a wide navigation panel");
+assert.ok(megaMenuSource.includes("width: min(1180px, calc(100% - 32px))"), "mega menu is constrained as a compact wide navigation panel");
 assert.ok(megaMenuSource.includes("background: rgba(71, 119, 153, 0.92)"), "mega menu uses a blue overlay based on the public palette");
 assert.ok(!megaMenuSource.includes("rgba(71, 119, 153, 0.96)"), "mega menu panel does not blend into the blue page background");
 assert.ok(megaMenuSource.includes("background: transparent"), "mega menu outer container lets the separate white panels sit on the overlay");

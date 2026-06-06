@@ -72,23 +72,24 @@ function ScrollToTop() {
   return null;
 }
 
+const PUBLIC_CATEGORY_STYLE = { categoryColor: "#1F5073", categoryBg: "rgba(31,80,115,0.08)" };
 const CATEGORY_STYLE = {
-  "Мероприятия": { categoryColor: "#fff", categoryBg: "rgba(255,255,255,0.18)" },
-  "Курсы": { categoryColor: "#1F5073", categoryBg: "rgba(31,80,115,0.08)" },
-  "Достижения": { categoryColor: "#059669", categoryBg: "#ECFDF5" },
-  "Новости": { categoryColor: "#D97706", categoryBg: "#FFFBEB" },
-  "Проекты": { categoryColor: "#2563EB", categoryBg: "#EFF6FF" },
-  "Семинары": { categoryColor: "#D97706", categoryBg: "#FFFBEB" },
-  "События": { categoryColor: "#059669", categoryBg: "#ECFDF5" },
+  "Мероприятия": PUBLIC_CATEGORY_STYLE,
+  "Курсы": PUBLIC_CATEGORY_STYLE,
+  "Достижения": PUBLIC_CATEGORY_STYLE,
+  "Новости": PUBLIC_CATEGORY_STYLE,
+  "Проекты": PUBLIC_CATEGORY_STYLE,
+  "Семинары": PUBLIC_CATEGORY_STYLE,
+  "События": PUBLIC_CATEGORY_STYLE,
 };
 
-CATEGORY_STYLE["Новости"] = CATEGORY_STYLE["Новости"] || { categoryColor: "#D97706", categoryBg: "#FFFBEB" };
-CATEGORY_STYLE["Дом учителя"] = { categoryColor: "#047857", categoryBg: "#ECFDF5" };
-CATEGORY_STYLE["Методическое пространство"] = { categoryColor: "#1D4ED8", categoryBg: "#EFF6FF" };
-CATEGORY_STYLE["НОКО"] = { categoryColor: "#1F5073", categoryBg: "rgba(31,80,115,0.08)" };
-CATEGORY_STYLE["Олимпиады и конкурсы"] = { categoryColor: "#B45309", categoryBg: "#FEF3C7" };
-CATEGORY_STYLE["Деятельность"] = { categoryColor: "#0369A1", categoryBg: "#E0F2FE" };
-CATEGORY_STYLE["Архив"] = { categoryColor: "#374151", categoryBg: "#F3F4F6" };
+CATEGORY_STYLE["Новости"] = CATEGORY_STYLE["Новости"] || PUBLIC_CATEGORY_STYLE;
+CATEGORY_STYLE["Дом учителя"] = PUBLIC_CATEGORY_STYLE;
+CATEGORY_STYLE["Методическое пространство"] = PUBLIC_CATEGORY_STYLE;
+CATEGORY_STYLE["НОКО"] = PUBLIC_CATEGORY_STYLE;
+CATEGORY_STYLE["Олимпиады и конкурсы"] = PUBLIC_CATEGORY_STYLE;
+CATEGORY_STYLE["Деятельность"] = PUBLIC_CATEGORY_STYLE;
+CATEGORY_STYLE["Архив"] = PUBLIC_CATEGORY_STYLE;
 
 const DEFAULT_CATEGORIES = [
   { id: 1, name: "Мероприятия" },
@@ -418,6 +419,22 @@ function AppRoutes() {
     window.scrollTo({ top: 0 });
   }, [navigate]);
 
+  function SvedeniyaAliasRedirect() {
+    const targetPath = location.pathname.replace(/^\/svedeniya\/?/, "/sveden/");
+    return <Navigate to={`${targetPath}${location.search}${location.hash}`} replace />;
+  }
+
+  function ArticleNotFoundPage() {
+    return (
+      <Smart404
+        currentUser={currentUser}
+        onGoAuth={(tab) => navigate(`/auth?tab=${tab || "login"}`)}
+        onGoAdmin={goAdmin}
+        onGoProfile={() => navigate("/profile")}
+      />
+    );
+  }
+
   function ArticleRoute() {
     const { id } = useParams();
     const stateArticle = location.state?.article;
@@ -428,11 +445,11 @@ function AppRoutes() {
       || (stateKey && (String(item.slug || item.id) === stateKey || String(item.id) === String(stateArticle.articleId || stateArticle.id)))
     );
     const article = freshArticle || stateArticle;
-    if (!article) return <Navigate to="/" replace />;
+    if (!article) return <ArticleNotFoundPage />;
     return (
       <ArticlePage
         article={article}
-        onBack={() => navigate("/")}
+        onBack={() => navigate("/novosti/")}
         currentUser={currentUser}
         onGoAuth={(tab) => navigate(`/auth?tab=${tab || "login"}`)}
         onGoAdmin={goAdmin}
@@ -691,6 +708,7 @@ function AppRoutes() {
             />
           }
         />
+        <Route path="/svedeniya/*" element={<SvedeniyaAliasRedirect />} />
         <Route path="/tpmpk/dokumenty/" element={<DokumentyPage {...tpmpkPublicProps} />} />
         <Route path="/tpmpk/blanki/" element={<BlankiPage {...tpmpkPublicProps} />} />
         <Route path="/tpmpk/grafik/" element={<GrafikPage {...tpmpkPublicProps} />} />

@@ -30,6 +30,7 @@ function PinnedBadge() {
 export default function ArticlePage({
   article,
   currentUser,
+  onBack,
   onGoAuth,
   onGoAdmin,
   onGoProfile,
@@ -45,8 +46,61 @@ export default function ArticlePage({
   ].filter(Boolean);
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#F8FAFC", fontFamily: "'PT Sans', system-ui, sans-serif" }}>
+    <div className="article-page">
       <style>{`
+        .article-page {
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          color: var(--imcro-color-text);
+          background: var(--imcro-color-bg);
+          font-family: Manrope, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        .article-main { flex: 1; }
+        .article-shell {
+          width: min(980px, calc(100% - 32px));
+          margin: 0 auto;
+          padding: 34px 0 64px;
+        }
+        .article-media {
+          width: 100%;
+          overflow: hidden;
+          position: relative;
+          margin-bottom: 18px;
+          border: 1px solid var(--imcro-color-border);
+          border-radius: var(--imcro-radius-card);
+          background: rgba(31,80,115,0.08);
+          box-shadow: var(--imcro-shadow-card);
+        }
+        .article-media img {
+          width: 100%;
+          max-height: 460px;
+          object-fit: cover;
+          display: block;
+        }
+        .article-card {
+          border: 1px solid var(--imcro-color-border);
+          border-radius: var(--imcro-radius-card);
+          background: var(--imcro-color-surface);
+          padding: 22px;
+          box-shadow: var(--imcro-shadow-card);
+        }
+        .article-back {
+          min-height: 42px;
+          margin-top: 22px;
+          border: 1px solid var(--imcro-color-border);
+          border-radius: var(--imcro-radius-button);
+          padding: 0 16px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
+          background: var(--imcro-color-primary);
+          font: inherit;
+          font-size: 14px;
+          font-weight: 800;
+          cursor: pointer;
+        }
         .article-md { line-height: 1.8; color: #334155; overflow-wrap: anywhere; }
         .article-md > * + * { margin-top: 14px; }
         .article-md h1, .article-md h2, .article-md h3 { color: #0F172A; line-height: 1.25; }
@@ -54,7 +108,7 @@ export default function ArticlePage({
         .article-md img { max-width: 100%; border-radius: 12px; }
         .article-md figure { margin: 22px 0; }
         .article-md figcaption { margin-top: 8px; color: #64748B; font-size: 13px; text-align: center; }
-        .article-md blockquote { border-left: 4px solid #19789c; background: #edf6f8; color: #004f75; padding: 14px 16px; border-radius: 0 8px 8px 0; margin: 18px 0; }
+        .article-md blockquote { border-left: 4px solid var(--imcro-color-primary); background: rgba(31,80,115,0.08); color: var(--imcro-color-primary); padding: 14px 16px; border-radius: 0 8px 8px 0; margin: 18px 0; }
         .article-md table { width: 100%; border-collapse: collapse; margin: 16px 0; }
         .article-md td, .article-md th { border: 1px solid #CBD5E1; padding: 8px 10px; }
         .article-md [data-font-size-span="true"] { line-height: 1.2; }
@@ -68,27 +122,31 @@ export default function ArticlePage({
           place-items: center;
           border-radius: 999px;
           color: #fff;
-          background: rgba(15, 23, 42, .78);
+          background: rgba(31, 80, 115, .84);
           border: 1px solid rgba(255,255,255,.5);
           box-shadow: 0 12px 30px rgba(15,23,42,.28);
           backdrop-filter: blur(10px);
         }
         .article-pin svg { width: 22px; height: 22px; fill: currentColor; }
+        @media (min-width: 720px) {
+          .article-shell { width: min(980px, calc(100% - 96px)); padding-top: 46px; }
+          .article-card { padding: 30px; }
+        }
       `}</style>
       <Header currentUser={currentUser} onGoAuth={onGoAuth} onGoAdmin={onGoAdmin} onGoProfile={onGoProfile} />
 
-      <main style={{ flex: 1 }}>
-        <div style={{ maxWidth: 980, margin: "0 auto", padding: "34px 20px 64px" }}>
+      <main className="article-main">
+        <div className="article-shell">
           <Breadcrumbs items={breadcrumbs} />
 
           {heroImage && (
-            <div style={{ width: "100%", borderRadius: 14, overflow: "hidden", marginBottom: 18, border: "1px solid #E2E8F0", boxShadow: "0 16px 44px rgba(15,23,42,.12)", position: "relative", background: "#E2E8F0" }}>
-              <img src={heroImage} alt={article.title} style={{ width: "100%", maxHeight: 460, objectFit: "cover", display: "block" }} />
+            <div className="article-media">
+              <img src={heroImage} alt={article.title} />
               {article.is_pinned && <PinnedBadge />}
             </div>
           )}
 
-          <section style={{ border: "1px solid #E2E8F0", borderRadius: 8, background: "#fff", padding: 22 }}>
+          <section className="article-card">
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
               {article.category && <Badge label={article.category} color={article.categoryColor} bg={article.categoryBg} />}
               <span style={{ fontSize: 13, color: "#94A3B8" }}>{getDate(article)}</span>
@@ -96,7 +154,7 @@ export default function ArticlePage({
                 <button
                   type="button"
                   onClick={() => onOpenAuthor?.(article)}
-                  style={{ border: 0, background: "transparent", color: "#1D4ED8", font: "700 13px/1.4 inherit", padding: 0, cursor: "pointer" }}
+                  style={{ border: 0, background: "transparent", color: "#1F5073", font: "700 13px/1.4 inherit", padding: 0, cursor: "pointer" }}
                 >
                   {article.author}
                 </button>
@@ -116,11 +174,16 @@ export default function ArticlePage({
               <section style={{ marginTop: 26, paddingTop: 16, borderTop: "1px solid #E2E8F0", display: "grid", gap: 10 }}>
                 <strong style={{ color: "#0F172A" }}>Файлы к статье</strong>
                 {article.attachments.map((file, index) => (
-                  <a key={`${file.url || file.name}-${index}`} href={file.url} target="_blank" rel="noreferrer" style={{ color: "#1D4ED8", fontWeight: 700, overflowWrap: "anywhere" }}>
+                  <a key={`${file.url || file.name}-${index}`} href={file.url} target="_blank" rel="noreferrer" style={{ color: "#1F5073", fontWeight: 700, overflowWrap: "anywhere" }}>
                     {file.name || "Документ"}{file.type ? ` · ${file.type}` : ""}
                   </a>
                 ))}
               </section>
+            )}
+            {onBack && (
+              <button className="article-back" type="button" onClick={onBack}>
+                Вернуться назад
+              </button>
             )}
           </section>
         </div>
