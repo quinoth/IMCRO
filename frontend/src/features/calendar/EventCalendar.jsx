@@ -12,7 +12,7 @@ const TAG_COLORS = {
   КОНКУРС:    { bg: "#EFF6FF", color: "#1D4ED8" },
   ОЛИМПИАДА:  { bg: "#ECFDF5", color: "#059669" },
   СЕМИНАР:    { bg: "#FFFBEB", color: "#D97706" },
-  СОБЫТИЕ:    { bg: "#F5F3FF", color: "#7C3AED" },
+  СОБЫТИЕ:    { bg: "rgba(31,80,115,0.08)", color: "#1F5073" },
 };
 
 export default function EventCalendar() {

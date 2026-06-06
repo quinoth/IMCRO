@@ -11,7 +11,7 @@ import MegaMenu from "./MegaMenu.jsx";
 
 const MAIN_NAV_ITEMS = [
   { label: "Главная", href: "/" },
-  { label: "Об организации", href: "/sveden/" },
+  { label: "Сведения об образовательной организации", href: "/sveden/" },
   { label: "ТПМПК", href: "/tpmpk/" },
   { label: "Новости", href: "/novosti/" },
   { label: "Безопасность", href: "/sveden/ovz/" },
@@ -109,8 +109,7 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
     navigate(path);
   }
 
-  function onSearchSubmit(event) {
-    event.preventDefault();
+  function executeSearch() {
     const normalized = searchQuery.trim().toLowerCase();
     if (!normalized) return;
 
@@ -129,6 +128,17 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
     }
   }
 
+  function onSearchSubmit(event) {
+    event.preventDefault();
+    executeSearch();
+  }
+
+  function onSearchKeyDown(event) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    executeSearch();
+  }
+
   return (
     <>
       <style>{`
@@ -136,7 +146,7 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
           position: fixed;
           inset: 0 0 auto;
           z-index: 240;
-          border-bottom: 1px solid rgba(0, 79, 117, 0.12);
+          border-bottom: 1px solid rgba(31, 80, 115, 0.16);
           background: rgba(255, 255, 255, 0.94);
           backdrop-filter: blur(18px);
           box-shadow: var(--header-shadow);
@@ -144,7 +154,7 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
         }
 
         .site-header-shell *:focus-visible {
-          outline: 3px solid #1e3a8a;
+          outline: 3px solid #1F5073;
           outline-offset: 2px;
         }
 
@@ -153,11 +163,11 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
           margin: 0 auto;
           height: 84px;
           min-width: 0;
-          padding: 0 28px;
+          padding: 0 18px;
           display: grid;
-          grid-template-columns: auto minmax(0, 1fr) auto;
+          grid-template-columns: minmax(188px, 240px) minmax(0, 1fr) auto;
           align-items: center;
-          column-gap: 22px;
+          column-gap: 12px;
         }
 
         .header-logo-slot {
@@ -168,9 +178,9 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
         }
 
         .header-logo-slot img {
-          width: clamp(230px, 20vw, 318px) !important;
+          width: clamp(188px, 16vw, 240px) !important;
           height: auto !important;
-          max-height: 58px;
+          max-height: 54px;
         }
 
         .header-main-area {
@@ -188,8 +198,8 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 8px;
-          overflow: hidden;
+          gap: 4px;
+          overflow: visible;
           transition: opacity 0.16s ease, transform 0.2s ease, visibility 0.16s ease;
         }
 
@@ -207,9 +217,9 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
           border: 1px solid transparent;
           border-radius: 8px;
           background: transparent;
-          color: #203243;
-          padding: 0 14px;
-          font: 800 13px/1.1 inherit;
+          color: #1F5073;
+          padding: 0 8px;
+          font: 800 12px/1.1 inherit;
           letter-spacing: 0;
           white-space: nowrap;
           cursor: pointer;
@@ -234,16 +244,16 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
         }
 
         .header-nav-link:hover {
-          color: #005e7d;
-          background: rgba(25, 120, 156, 0.08);
-          border-color: rgba(25, 120, 156, 0.18);
+          color: #1F5073;
+          background: rgba(31, 80, 115, 0.08);
+          border-color: rgba(31, 80, 115, 0.16);
           transform: translateY(-1px);
         }
 
         .header-nav-link.is-active {
-          color: #004f75;
-          background: rgba(227, 242, 248, 0.9);
-          border-color: rgba(25, 120, 156, 0.24);
+          color: #1F5073;
+          background: rgba(31, 80, 115, 0.1);
+          border-color: rgba(31, 80, 115, 0.22);
           box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.74);
         }
 
@@ -260,10 +270,10 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
           align-items: center;
           gap: 10px;
           padding: 0 10px 0 14px;
-          border: 1px solid rgba(25, 120, 156, 0.34);
+          border: 1px solid rgba(31, 80, 115, 0.34);
           border-radius: 8px;
           background: #fff;
-          box-shadow: 0 16px 36px rgba(0, 79, 117, 0.14);
+          box-shadow: 0 16px 36px rgba(31, 80, 115, 0.14);
           opacity: 0;
           visibility: hidden;
           pointer-events: none;
@@ -280,7 +290,7 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
         }
 
         .header-search-panel svg {
-          color: #005e7d;
+          color: #1F5073;
           flex: 0 0 auto;
         }
 
@@ -291,25 +301,26 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
           border: 0;
           outline: 0;
           background: transparent;
-          color: #1f3043;
+          color: #1F5073;
           font: 700 14px/1 inherit;
         }
 
         .header-search-input::placeholder {
-          color: #7b8ca0;
+          color: rgba(31, 80, 115, 0.68);
         }
 
+        .header-search-submit,
         .header-search-close,
         .header-icon-btn,
         .header-search-btn,
         .header-menu-btn {
-          width: 44px;
-          height: 44px;
-          flex: 0 0 44px;
-          border: 1px solid rgba(0, 79, 117, 0.16);
+          width: 40px;
+          height: 40px;
+          flex: 0 0 40px;
+          border: 1px solid rgba(31, 80, 115, 0.16);
           border-radius: 8px;
           background: #fff;
-          color: #314456;
+          color: #1F5073;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -317,11 +328,16 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
           transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
         }
 
+        .header-search-submit,
         .header-search-close {
           width: 32px;
           height: 32px;
           flex-basis: 32px;
-          background: #e3f2f8;
+          background: #ffffff;
+        }
+
+        .header-search-submit {
+          color: #1F5073;
         }
 
         .header-search-btn svg,
@@ -335,15 +351,16 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
         .header-icon-btn.active,
         .header-search-btn.active,
         .header-menu-btn:hover,
+        .header-search-submit:hover,
         .header-search-close:hover {
-          border-color: rgba(25, 120, 156, 0.42);
-          background: #f4f9fc;
-          color: #005e7d;
+          border-color: rgba(31, 80, 115, 0.34);
+          background: rgba(31, 80, 115, 0.08);
+          color: #1F5073;
           transform: translateY(-1px);
         }
 
         .header-search-btn.active {
-          box-shadow: 0 0 0 3px rgba(25, 120, 156, 0.14);
+          box-shadow: 0 0 0 3px rgba(31, 80, 115, 0.14);
         }
 
         .header-actions {
@@ -352,7 +369,7 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
           display: flex;
           align-items: center;
           justify-content: flex-end;
-          gap: 10px;
+          gap: 6px;
         }
 
         .header-a11y-wrap {
@@ -464,16 +481,16 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
         .header-profile-btn,
         .header-auth-btn,
         .header-register-btn {
-          height: 44px;
-          border: 1px solid rgba(0, 79, 117, 0.16);
+          height: 40px;
+          border: 1px solid rgba(31, 80, 115, 0.16);
           border-radius: 8px;
           background: #fff;
-          color: #26364a;
+          color: #1F5073;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
-          padding: 0 15px;
+          padding: 0 12px;
           font: 800 13px/1 inherit;
           white-space: nowrap;
           cursor: pointer;
@@ -481,27 +498,27 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
         }
 
         .header-register-btn {
-          border-color: #005e7d;
-          background: #005e7d;
+          border-color: #1F5073;
+          background: #1F5073;
           color: #fff;
-          box-shadow: 0 10px 24px rgba(0, 79, 117, 0.18);
+          box-shadow: 0 10px 24px rgba(31, 80, 115, 0.18);
         }
 
         .header-admin-btn:hover,
         .header-tpmpk-btn:hover,
         .header-profile-btn:hover,
         .header-auth-btn:hover {
-          border-color: rgba(25, 120, 156, 0.42);
-          background: #f4f9fc;
-          color: #005e7d;
+          border-color: rgba(31, 80, 115, 0.34);
+          background: rgba(31, 80, 115, 0.08);
+          color: #1F5073;
           transform: translateY(-1px);
         }
 
         .header-register-btn:hover {
-          background: #004f75;
-          border-color: #004f75;
+          background: #1F5073;
+          border-color: #1F5073;
           transform: translateY(-1px);
-          box-shadow: 0 14px 28px rgba(0, 79, 117, 0.22);
+          box-shadow: 0 14px 28px rgba(31, 80, 115, 0.22);
         }
 
         .header-avatar {
@@ -511,7 +528,7 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          background: linear-gradient(135deg, #005e7d, #19789c);
+          background: #1F5073;
           color: #fff;
           font-size: 11px;
           font-weight: 900;
@@ -540,19 +557,19 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
           }
 
           .header-nav-link {
-            font-size: 12.4px;
-            padding: 0 10px;
+            font-size: 11.5px;
+            padding: 0 6px;
           }
         }
 
         @media (max-width: 1320px) {
           .header-nav {
-            gap: 6px;
+            gap: 3px;
           }
 
           .header-nav-link {
-            font-size: 12px;
-            padding: 0 8px;
+            font-size: 11.1px;
+            padding: 0 5px;
           }
         }
 
@@ -568,12 +585,17 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
           }
         }
 
-        @media (max-width: 1180px) {
+        @media (max-width: 1279px) {
           .header-nav {
             display: none;
           }
 
+          .header-logo-slot {
+            grid-column: 1;
+          }
+
           .header-main-area {
+            grid-column: 1 / -1;
             height: 0;
             position: absolute;
             left: 20px;
@@ -581,6 +603,10 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
             top: 84px;
             z-index: 1;
             display: block;
+          }
+
+          .header-actions {
+            grid-column: 3;
           }
 
           .header-search-panel {
@@ -608,6 +634,7 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
           .site-header-inner {
             padding: 0 12px;
             column-gap: 8px;
+            grid-template-columns: minmax(136px, 1fr) 0 auto;
           }
 
           .header-logo-slot img {
@@ -638,22 +665,55 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
           .header-profile-btn {
             width: 40px;
             height: 40px;
+            min-width: 40px;
+            min-height: 40px;
             flex-basis: 40px;
+            padding: 0;
+            box-sizing: border-box;
+          }
+
+          .header-auth-icon,
+          .header-menu-btn svg,
+          .header-search-btn svg,
+          .header-icon-btn svg {
+            flex: 0 0 auto;
+          }
+        }
+
+        @media (max-width: 520px) {
+          .site-header-inner {
+            padding: 0 8px;
+            column-gap: 5px;
+            grid-template-columns: minmax(112px, 1fr) 0 auto;
+          }
+
+          .header-actions {
+            min-width: max-content;
+            gap: 4px;
+            overflow: visible;
+          }
+
+          .header-logo-slot img {
+            width: clamp(118px, 30vw, 150px) !important;
+            max-height: 40px;
           }
         }
 
         @media (max-width: 420px) {
           .site-header-inner {
-            padding: 0 8px;
-            column-gap: 6px;
+            padding: 0 6px;
+            column-gap: 4px;
+            grid-template-columns: minmax(96px, 1fr) 0 auto;
           }
 
           .header-actions {
-            gap: 5px;
+            min-width: max-content;
+            gap: 4px;
+            overflow: visible;
           }
 
           .header-logo-slot img {
-            width: clamp(146px, 42vw, 174px) !important;
+            width: clamp(104px, 29vw, 122px) !important;
             max-height: 40px;
           }
 
@@ -669,14 +729,15 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
           .header-auth-btn,
           .header-register-btn,
           .header-profile-btn {
-            width: 34px;
-            height: 34px;
-            flex-basis: 34px;
+            width: 44px;
+            height: 44px;
+            min-width: 44px;
+            min-height: 44px;
+            flex: 0 0 44px;
+            padding: 0;
+            box-sizing: border-box;
           }
 
-          .header-icon-btn {
-            display: none;
-          }
         }
       `}</style>
 
@@ -718,7 +779,16 @@ export default function Header({ onGoAuth, onGoAdmin, onGoProfile, currentUser }
                 placeholder="Поиск по сайту"
                 aria-label="Поиск по сайту"
                 onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={onSearchKeyDown}
               />
+              <button
+                className="header-search-submit"
+                type="submit"
+                title="Найти"
+                aria-label="Найти"
+              >
+                <SearchIcon />
+              </button>
               <button
                 className="header-search-close"
                 type="button"

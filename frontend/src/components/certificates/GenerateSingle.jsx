@@ -3,7 +3,7 @@ import { API_BASE } from "../../constants/index.js";
 import { getApiErrorMessage } from "../../utils/apiError.js";
 import { authHeaders } from "../../utils/authHeaders.js";
 import AlertBanner from "./shared/AlertBanner.jsx";
-import CertificateSheetPreview from "./shared/CertificateSheetPreview.jsx";
+import TemplateLivePreview from "./shared/TemplateLivePreview.jsx";
 
 const FALLBACK_VARIABLES = ["ФИО участника", "Название мероприятия", "Дата", "Достижение"];
 
@@ -122,7 +122,6 @@ export default function GenerateSingle({ templates }) {
     };
   }, [templateId]);
 
-  const selectedTemplate = templates.find((template) => String(template.id) === String(templateId));
   const missingVariables = useMemo(
     () => templateVariables.filter((key) => !String(variables[key] || "").trim()),
     [templateVariables, variables],
@@ -425,10 +424,10 @@ export default function GenerateSingle({ templates }) {
           <h3>Предпросмотр грамоты</h3>
           {fileUrl && <span className="single-ready">PDF готов</span>}
         </div>
-        <CertificateSheetPreview
+        <TemplateLivePreview
+          templateId={templateId}
           values={addCommonAliases(variables)}
-          templateName={selectedTemplate?.name}
-          empty={!templateVariables.length}
+          empty={!templateId}
         />
       </aside>
     </section>

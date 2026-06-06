@@ -1,8 +1,16 @@
-/** Базовый URL бэкенда (можно задать VITE_API_URL в .env) */
+/** Базовый URL бэкенда.
+ *
+ * В production-сборке (Docker + Nginx) переменная VITE_API_URL должна быть
+ * пустой или не задана — тогда API_BASE = "" и все запросы идут на тот же
+ * origin через Nginx, который проксирует их на backend:8000.
+ *
+ * Для локальной разработки (npm run dev) задайте в .env файле:
+ *   VITE_API_URL=http://localhost:8000
+ */
 export const API_BASE =
   typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL
     ? import.meta.env.VITE_API_URL.replace(/\/$/, "")
-    : "http://127.0.0.1:8000";
+    : "";
 
 export const NAV = [
   {

@@ -118,13 +118,13 @@ function accessSummary(permissions) {
   return enabled.length ? enabled.join(", ") : "Нет доступных разделов";
 }
 
-function permissionClass(level) {
+function _permissionClass(level) {
   if (level === "edit") return "edit";
   if (level === "view") return "view";
   return "none";
 }
 
-function permissionLabel(level) {
+function _permissionLabel(level) {
   return PERMISSION_OPTIONS.find((option) => option.value === level)?.label || "Запрещено";
 }
 
@@ -156,6 +156,7 @@ export default function UsersRolesModule({ currentUser }) {
   const [sortBy, setSortBy] = useState("fio");
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
+  const [openDropdown, setOpenDropdown] = useState(null); // key модуля с открытым dd
 
   const isAdmin = roleName(currentUser) === "admin";
   const sortedUsers = useMemo(
@@ -194,7 +195,7 @@ export default function UsersRolesModule({ currentUser }) {
   const savedPermissionsKey = useMemo(() => permissionsKey(selectedRolePermissions), [selectedRolePermissions]);
   const draftPermissionsKey = useMemo(() => permissionsKey(permissionDraft), [permissionDraft]);
   const permissionsDirty = savedPermissionsKey !== draftPermissionsKey;
-  const selectedRoleDetails = roleDetails(selectedRole);
+  const _selectedRoleDetails = roleDetails(selectedRole);
   const selectedRoleUsers = users.filter((user) => roleName(user) === selectedRole).length;
   const demoActivityRows = useMemo(() => ([
     { id: "demo-role", time: "Сегодня, 10:12", user: "Марина Кузнецова", action: "Изменение роли пользователя", section: "Пользователи", status: "Успешно" },
@@ -255,6 +256,13 @@ export default function UsersRolesModule({ currentUser }) {
   useEffect(() => {
     setPage(1);
   }, [pageSize, roleFilter, statusFilter, sortBy, userSearch]);
+
+  useEffect(() => {
+    if (!openDropdown) return;
+    const close = () => setOpenDropdown(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [openDropdown]);
 
   function pushActivity(action, subject, section = "Пользователи") {
     const now = new Date();
@@ -402,6 +410,10 @@ export default function UsersRolesModule({ currentUser }) {
           from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes urDdIn {
+          from { opacity: 0; transform: translateY(-6px) scale(.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
         .ur-admin {
           --ur-blue: #19789c;
           --ur-blue-dark: #004f75;
@@ -410,14 +422,14 @@ export default function UsersRolesModule({ currentUser }) {
           --ur-line: #e8eef8;
           --ur-muted: #5b6577;
           --ur-ink: #132033;
+          --ur-radius-lg: 18px;
+          --ur-radius-md: 12px;
+          --ur-radius-sm: 8px;
           color: var(--ur-ink);
-          margin: -8px 0 0;
+          margin: 0;
           min-width: 0;
         }
-        .ur-admin * {
-          box-sizing: border-box;
-          letter-spacing: 0;
-        }
+        .ur-admin * { box-sizing: border-box; letter-spacing: 0; }
         .ur-page-head {
           display: flex;
           justify-content: space-between;
@@ -426,549 +438,193 @@ export default function UsersRolesModule({ currentUser }) {
           margin-bottom: 18px;
           animation: urFadeIn 0.24s ease both;
         }
-        .ur-page-head h2 {
-          margin: 0 0 6px;
-          font-size: 28px;
-          line-height: 1.08;
-          font-weight: 900;
-        }
-        .ur-page-head p {
-          margin: 0;
-          color: var(--ur-muted);
-          font-size: 15px;
-          font-weight: 650;
-          line-height: 1.5;
-          overflow-wrap: anywhere;
-        }
+        .ur-page-head h2 { margin: 0 0 5px; font-size: 26px; line-height: 1.1; font-weight: 900; }
+        .ur-page-head p { margin: 0; color: var(--ur-muted); font-size: 14px; font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
         .ur-layout {
           display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(320px, 370px);
+          grid-template-columns: minmax(0, 1fr) minmax(300px, 350px);
           gap: 16px;
           align-items: start;
         }
         .ur-card {
           overflow: hidden;
           border: 1px solid var(--ur-border);
-          border-radius: 8px;
-          background: rgba(255, 255, 255, 0.97);
-          box-shadow: 0 18px 48px rgba(25, 78, 160, 0.08);
+          border-radius: var(--ur-radius-lg);
+          background: rgba(255,255,255,.97);
+          box-shadow: 0 12px 36px rgba(25,78,160,.07);
           animation: urFadeIn 0.26s ease both;
         }
         .ur-card-head {
-          min-height: 64px;
-          padding: 15px 16px;
+          min-height: 58px;
+          padding: 13px 16px;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 12px;
           border-bottom: 1px solid var(--ur-line);
         }
-        .ur-card-head h3 {
-          margin: 0;
-          font-size: 18px;
-          line-height: 1.2;
-          font-weight: 900;
-          overflow-wrap: anywhere;
-        }
+        .ur-card-head h3 { margin: 0; font-size: 16px; line-height: 1.2; font-weight: 900; overflow-wrap: anywhere; }
         .ur-button,
         .ur-action-link,
         .ur-role-button,
         .ur-segment-button {
           font-family: inherit;
-          transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+          transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease, color .18s ease;
         }
         .ur-button {
-          min-height: 40px;
-          border-radius: 8px;
+          min-height: 38px;
+          border-radius: var(--ur-radius-sm);
           border: 1px solid transparent;
-          padding: 0 15px;
+          padding: 0 14px;
           cursor: pointer;
           font-size: 13px;
           line-height: 1.1;
           font-weight: 850;
           white-space: normal;
         }
-        .ur-button.primary {
-          color: #fff;
-          background: var(--ur-blue);
-          box-shadow: 0 12px 24px rgba(25, 120, 156, 0.22);
-        }
-        .ur-button.secondary {
-          color: var(--ur-blue);
-          background: #f7faff;
-          border-color: #cddcff;
-        }
-        .ur-button.ghost {
-          color: #475569;
-          background: #fff;
-          border-color: #dbe3f0;
-        }
-        .ur-button:hover:not(:disabled),
-        .ur-action-link:hover:not(:disabled),
-        .ur-role-button:hover:not(:disabled) {
-          transform: translateY(-1px);
-        }
-        .ur-button.primary:hover:not(:disabled) {
-          background: var(--ur-blue-dark);
-          box-shadow: 0 15px 28px rgba(25, 120, 156, 0.27);
-        }
-        .ur-button:disabled,
-        .ur-action-link:disabled,
-        .ur-segment-button:disabled {
-          opacity: 0.58;
-          cursor: not-allowed;
-          transform: none;
-          box-shadow: none;
-        }
-        .ur-refresh {
-          flex: 0 0 auto;
-        }
-        .ur-alert {
-          margin-bottom: 14px;
-          border-radius: 8px;
-          padding: 12px 14px;
-          font-weight: 750;
-          line-height: 1.45;
-          overflow-wrap: anywhere;
-          animation: urFadeIn 0.2s ease both;
-        }
+        .ur-button.primary { color: #fff; background: var(--ur-blue); box-shadow: 0 10px 22px rgba(25,120,156,.22); }
+        .ur-button.secondary { color: var(--ur-blue); background: #f7faff; border-color: #cddcff; }
+        .ur-button.ghost { color: #475569; background: #fff; border-color: #dbe3f0; }
+        .ur-button:hover:not(:disabled), .ur-action-link:hover:not(:disabled), .ur-role-button:hover:not(:disabled) { transform: translateY(-1px); }
+        .ur-button.primary:hover:not(:disabled) { background: var(--ur-blue-dark); box-shadow: 0 14px 26px rgba(25,120,156,.27); }
+        .ur-button.success { color: #fff; background: #059669; box-shadow: 0 8px 18px rgba(5,150,105,.22); }
+        .ur-button:disabled, .ur-action-link:disabled, .ur-segment-button:disabled { opacity: .58; cursor: not-allowed; transform: none; box-shadow: none; }
+        .ur-refresh { flex: 0 0 auto; }
+        .ur-alert { margin-bottom: 12px; border-radius: var(--ur-radius-md); padding: 11px 14px; font-weight: 750; line-height: 1.45; overflow-wrap: anywhere; animation: urFadeIn .2s ease both; }
         .ur-alert.error { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; }
         .ur-alert.success { background: #ecfdf5; border: 1px solid #bbf7d0; color: #047857; }
-        .ur-table-wrap {
-          min-height: 420px;
-          overflow-x: auto;
+        .ur-table-wrap { min-height: 380px; overflow-x: auto; }
+        .ur-table { width: 100%; min-width: 940px; border-collapse: collapse; font-size: 13px; }
+        .ur-table th { padding: 12px 16px; color: #4f5667; background: #f5f7fb; text-align: left; font-size: 11px; text-transform: uppercase; white-space: nowrap; }
+        .ur-table td { padding: 12px 16px; border-top: 1px solid var(--ur-line); color: #172033; font-weight: 700; vertical-align: middle; min-width: 0; }
+        .ur-table tr { transition: background .16s ease; }
+        .ur-table tbody tr:hover { background: #f9fbff; }
+        .ur-access-cell { max-width: 240px; color: #475569; font-size: 12px; font-weight: 680; line-height: 1.4; overflow-wrap: anywhere; }
+        .ur-user-cell { display: grid; grid-template-columns: 30px minmax(0,1fr); gap: 10px; align-items: center; min-width: 0; }
+        .ur-avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--role-accent, var(--ur-blue)); font-size: 10px; font-weight: 900; box-shadow: 0 6px 14px rgba(15,23,42,.14); }
+        .ur-name { display: block; max-width: 220px; line-height: 1.25; overflow-wrap: anywhere; }
+        .ur-email { display: inline-block; max-width: 240px; color: #5e6678; font-size: 12px; font-weight: 650; overflow-wrap: anywhere; }
+        .ur-user-filters { display: grid; grid-template-columns: minmax(200px,1fr) repeat(4, minmax(140px,auto)); gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--ur-line); background: #fbfcfd; }
+        .ur-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--ur-line); color: #5b6577; font-size: 13px; font-weight: 750; flex-wrap: wrap; }
+        .ur-pagination > div { display: flex; align-items: center; gap: 10px; }
+        .ur-role-pill, .ur-status, .ur-level-pill {
+          display: inline-flex; align-items: center; justify-content: center;
+          min-height: 22px; border-radius: 999px; padding: 0 8px;
+          font-size: 11px; font-weight: 900; line-height: 1.1; white-space: nowrap;
         }
-        .ur-table {
-          width: 100%;
-          min-width: 980px;
-          border-collapse: collapse;
-          font-size: 13px;
-        }
-        .ur-table th {
-          padding: 14px 16px;
-          color: #4f5667;
-          background: #f5f7fb;
-          text-align: left;
-          font-size: 11px;
-          text-transform: uppercase;
-          white-space: nowrap;
-        }
-        .ur-table td {
-          padding: 14px 16px;
-          border-top: 1px solid var(--ur-line);
-          color: #172033;
-          font-weight: 700;
-          vertical-align: middle;
-          min-width: 0;
-        }
-        .ur-table tr {
-          transition: background 0.16s ease;
-        }
-        .ur-table tbody tr:hover {
-          background: #f9fbff;
-        }
-        .ur-access-cell {
-          max-width: 260px;
-          color: #475569;
-          font-size: 12px;
-          font-weight: 680;
-          line-height: 1.45;
-          overflow-wrap: anywhere;
-        }
-        .ur-user-cell {
-          display: grid;
-          grid-template-columns: 32px minmax(0, 1fr);
-          gap: 10px;
-          align-items: center;
-          min-width: 0;
-        }
-        .ur-avatar {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          display: grid;
-          place-items: center;
-          color: #fff;
-          background: var(--role-accent, var(--ur-blue));
-          font-size: 11px;
-          font-weight: 900;
-          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
-        }
-        .ur-name {
-          display: block;
-          max-width: 240px;
-          line-height: 1.25;
-          overflow-wrap: anywhere;
-        }
-        .ur-email {
-          display: inline-block;
-          max-width: 260px;
-          color: #5e6678;
-          font-size: 12px;
-          font-weight: 650;
-          overflow-wrap: anywhere;
-        }
-        .ur-user-filters {
-          display: grid;
-          grid-template-columns: minmax(220px, 1fr) repeat(4, minmax(150px, auto));
-          gap: 10px;
-          padding: 14px 16px;
-          border-bottom: 1px solid var(--ur-line);
-          background: #fbfcfd;
-        }
-        .ur-pagination {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          padding: 14px 16px;
-          border-top: 1px solid var(--ur-line);
-          color: #5b6577;
-          font-size: 13px;
-          font-weight: 750;
-          flex-wrap: wrap;
-        }
-        .ur-pagination > div {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .ur-role-pill,
-        .ur-status,
-        .ur-level-pill {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 24px;
-          border-radius: 999px;
-          padding: 0 9px;
-          font-size: 11px;
-          font-weight: 900;
-          line-height: 1.1;
-          white-space: nowrap;
-        }
-        .ur-role-pill {
-          color: var(--role-accent, var(--ur-blue));
-          background: #f1f6ff;
-          border: 1px solid #dbe7ff;
-        }
+        .ur-role-pill { color: var(--role-accent, var(--ur-blue)); background: #f1f6ff; border: 1px solid #dbe7ff; }
         .ur-status.active { color: #07883c; background: #dcfce7; }
         .ur-status.inactive { color: #657080; background: #edf2f7; }
         .ur-level-pill.edit { color: #047857; background: #dcfce7; }
         .ur-level-pill.view { color: var(--ur-blue-dark); background: var(--ur-blue-soft); }
         .ur-level-pill.none { color: #6b7280; background: #eef2f7; }
-        .ur-row-actions {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex-wrap: nowrap;
-          min-width: max-content;
-        }
-        .ur-action-link {
-          min-height: 32px;
-          border: 1px solid #d8e3f8;
-          border-radius: 8px;
-          padding: 0 10px;
-          cursor: pointer;
-          color: var(--ur-blue);
-          background: #f8fbff;
-          font-size: 12px;
-          font-weight: 850;
-        }
-        .ur-side {
-          display: grid;
-          gap: 16px;
-          min-width: 0;
-        }
-        .ur-role-list {
-          padding: 12px 14px 14px;
-          display: grid;
-          gap: 8px;
-        }
+        .ur-row-actions { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: max-content; }
+        .ur-action-link { min-height: 30px; border: 1px solid #d8e3f8; border-radius: var(--ur-radius-sm); padding: 0 10px; cursor: pointer; color: var(--ur-blue); background: #f8fbff; font-size: 12px; font-weight: 850; }
+        .ur-side { display: grid; gap: 14px; min-width: 0; }
+        .ur-role-list { padding: 10px 12px 12px; display: grid; gap: 6px; }
         .ur-role-button {
-          min-height: 52px;
-          width: 100%;
+          min-height: 48px; width: 100%;
           border: 1px solid var(--ur-line);
-          border-radius: 8px;
-          padding: 9px 11px;
-          background: #fff;
-          color: #172033;
-          cursor: pointer;
-          text-align: left;
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) auto;
-          gap: 10px;
-          align-items: center;
+          border-radius: var(--ur-radius-md);
+          padding: 8px 11px;
+          background: #fff; color: #172033; cursor: pointer; text-align: left;
+          display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: center;
         }
-        .ur-role-button.active {
-          border-color: var(--role-accent, var(--ur-blue));
-          box-shadow: inset 0 0 0 1px var(--role-accent, var(--ur-blue)), 0 12px 26px rgba(11, 63, 179, 0.1);
-          color: var(--role-accent, var(--ur-blue));
-          background: #f7faff;
-        }
-        .ur-role-title {
-          display: block;
-          font-size: 14px;
-          font-weight: 900;
-          line-height: 1.2;
-          overflow-wrap: anywhere;
-        }
-        .ur-role-subtitle {
-          display: block;
-          margin-top: 3px;
-          color: #64748b;
-          font-size: 11px;
-          line-height: 1.25;
-          font-weight: 650;
-          overflow-wrap: anywhere;
-        }
-        .ur-role-count {
-          min-width: 26px;
-          height: 26px;
-          border-radius: 999px;
-          display: grid;
-          place-items: center;
-          background: #eef3ff;
-          color: var(--role-accent, var(--ur-blue));
-          font-size: 11px;
-          font-weight: 900;
-        }
-        .ur-label {
-          color: #5e6678;
-          font-size: 11px;
-          font-weight: 900;
-          text-transform: uppercase;
-        }
-        .ur-input,
-        .ur-select {
-          width: 100%;
-          min-height: 42px;
-          border: 1px solid #cdd7e8;
-          border-radius: 8px;
-          padding: 0 12px;
-          color: #172033;
-          background: #fff;
-          font: 760 14px/1.2 inherit;
-          min-width: 0;
-        }
-        .ur-input:focus,
-        .ur-select:focus,
-        .ur-action-link:focus,
-        .ur-button:focus,
-        .ur-role-button:focus,
-        .ur-segment-button:focus {
-          outline: 0;
-          border-color: var(--ur-blue);
-          box-shadow: 0 0 0 3px rgba(11, 63, 179, 0.12);
-        }
-        .ur-permissions {
-          padding: 4px 14px 14px;
-          display: grid;
-          gap: 10px;
-        }
-        .ur-role-meta {
-          color: #596374;
-          font-size: 13px;
-          font-weight: 650;
-          line-height: 1.45;
-          margin: 0 0 2px;
-          overflow-wrap: anywhere;
-        }
-        .ur-role-meta strong { color: var(--ur-blue); }
-        .ur-permission-row {
-          border: 1px solid #edf2fb;
-          border-radius: 8px;
-          padding: 11px;
-          display: grid;
-          gap: 10px;
-          background: #f8fafc;
-        }
-        .ur-permission-copy {
-          min-width: 0;
-        }
-        .ur-permission-copy strong {
-          display: block;
-          color: #243044;
-          font-size: 13px;
-          line-height: 1.25;
-          font-weight: 900;
-          overflow-wrap: anywhere;
-        }
-        .ur-permission-copy span {
-          display: block;
-          margin-top: 3px;
-          color: #64748b;
-          font-size: 12px;
-          line-height: 1.35;
-          font-weight: 650;
-          overflow-wrap: anywhere;
-        }
-        .ur-segmented {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 4px;
-          padding: 4px;
-          border-radius: 8px;
-          background: #edf6f8;
-        }
-        .ur-segment-button {
-          min-height: 32px;
-          border: 1px solid transparent;
-          border-radius: 6px;
-          background: transparent;
-          color: #526074;
-          cursor: pointer;
-          font-size: 11px;
-          font-weight: 900;
-          line-height: 1.1;
-          padding: 0 6px;
-          overflow-wrap: anywhere;
-        }
-        .ur-segment-button.active {
-          background: #fff;
-          color: var(--ur-blue);
-          border-color: #cfe0e7;
-          box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
-        }
-        .ur-segment-button.active.none { color: #6b7280; }
-        .ur-segment-button.active.view { color: var(--ur-blue-dark); }
-        .ur-segment-button.active.edit { color: #047857; }
-        .ur-permission-footer {
-          padding: 0 14px 14px;
-          display: grid;
-          gap: 8px;
-        }
-        .ur-permission-state {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 10px;
-          color: #64748b;
-          font-size: 12px;
-          font-weight: 750;
-          min-width: 0;
-        }
-        .ur-form-card {
-          margin-top: 16px;
-        }
-        .ur-user-form {
-          padding: 16px;
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 12px;
-        }
-        .ur-field {
-          display: grid;
-          gap: 6px;
-          min-width: 0;
-        }
-        .ur-field.full { grid-column: 1 / -1; }
-        .ur-readonly-user {
-          grid-column: 1 / -1;
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 10px;
-          padding: 12px;
-          border: 1px solid #e2eaf7;
-          border-radius: 8px;
-          background: #f8fbff;
-        }
-        .ur-readonly-item {
-          min-width: 0;
-        }
-        .ur-readonly-item span {
-          display: block;
-          margin-bottom: 4px;
-          color: #64748b;
-          font-size: 11px;
-          font-weight: 900;
-          text-transform: uppercase;
-        }
-        .ur-readonly-item strong {
-          display: block;
-          color: #172033;
-          font-size: 13px;
-          line-height: 1.35;
-          font-weight: 850;
-          overflow-wrap: anywhere;
-        }
-        .ur-form-actions {
-          grid-column: 1 / -1;
-          display: flex;
-          gap: 10px;
-          justify-content: flex-end;
-          flex-wrap: wrap;
-        }
-        .ur-activity {
-          margin-top: 16px;
-        }
-        .ur-activity-table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 13px;
-        }
-        .ur-activity-table th,
-        .ur-activity-table td {
-          padding: 11px 16px;
-          border-top: 1px solid var(--ur-line);
-          text-align: left;
-          line-height: 1.35;
-          overflow-wrap: anywhere;
-        }
-        .ur-activity-table th {
-          color: #5b6575;
-          font-size: 11px;
-          text-transform: uppercase;
-          background: #fff;
-        }
-        .ur-empty {
-          padding: 18px 16px;
-          color: #64748b;
-          font-weight: 700;
-          line-height: 1.45;
-          overflow-wrap: anywhere;
-        }
-        .ur-empty.compact {
-          padding: 12px 16px;
+        .ur-role-button.active { border-color: var(--role-accent, var(--ur-blue)); box-shadow: inset 0 0 0 1px var(--role-accent, var(--ur-blue)), 0 8px 20px rgba(11,63,179,.09); color: var(--role-accent, var(--ur-blue)); background: #f7faff; }
+        .ur-role-title { display: block; font-size: 13px; font-weight: 900; line-height: 1.2; overflow-wrap: anywhere; }
+        .ur-role-subtitle { display: block; margin-top: 2px; color: #64748b; font-size: 11px; line-height: 1.25; font-weight: 650; overflow-wrap: anywhere; }
+        .ur-role-count { min-width: 24px; height: 24px; border-radius: 999px; display: grid; place-items: center; background: #eef3ff; color: var(--role-accent, var(--ur-blue)); font-size: 11px; font-weight: 900; }
+        .ur-label { color: #5e6678; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+        .ur-input, .ur-select { width: 100%; min-height: 40px; border: 1px solid #cdd7e8; border-radius: var(--ur-radius-sm); padding: 0 11px; color: #172033; background: #fff; font: 760 13px/1.2 inherit; min-width: 0; }
+        .ur-input:focus, .ur-select:focus, .ur-action-link:focus, .ur-button:focus, .ur-role-button:focus, .ur-segment-button:focus { outline: 0; border-color: var(--ur-blue); box-shadow: 0 0 0 3px rgba(25,120,156,.15); }
+
+        /* ── Компактный блок "Права роли" ─────────────────────────── */
+        .ur-perm-list { padding: 0; }
+        .ur-perm-row {
+          display: flex; align-items: center; justify-content: space-between; gap: 10px;
+          padding: 0 14px;
+          min-height: 46px;
           border-bottom: 1px solid var(--ur-line);
-          background: #fbfcfd;
-          font-size: 13px;
+          transition: background .14s ease;
+          position: relative;
         }
-        .ur-stats {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 16px;
+        .ur-perm-row:last-child { border-bottom: none; }
+        .ur-perm-row:hover { background: #f5f9fc; }
+        .ur-perm-label { font-size: 13px; font-weight: 800; color: #172033; min-width: 0; }
+        .ur-perm-badge {
+          display: inline-flex; align-items: center; gap: 5px;
+          min-height: 28px; padding: 0 10px 0 8px;
+          border-radius: 999px; border: 1px solid transparent;
+          font-size: 12px; font-weight: 900; white-space: nowrap;
+          cursor: pointer; user-select: none;
+          transition: filter .14s ease, box-shadow .14s ease;
+          flex-shrink: 0;
         }
-        .ur-stat-card {
-          min-height: 112px;
-          border: 1px solid var(--ur-border);
-          border-radius: 8px;
-          color: #fff;
-          background: var(--ur-blue);
-          padding: 18px;
-          box-shadow: 0 12px 26px rgba(25, 120, 156, .2);
+        .ur-perm-badge:hover { filter: brightness(.94); }
+        .ur-perm-badge.edit  { color: #047857; background: #d1fae5; border-color: #6ee7b7; }
+        .ur-perm-badge.view  { color: var(--ur-blue-dark); background: var(--ur-blue-soft); border-color: #a5d4e4; }
+        .ur-perm-badge.none  { color: #6b7280; background: #f1f5f9; border-color: #d1d9e0; }
+        .ur-perm-badge svg   { width: 11px; height: 11px; flex-shrink: 0; }
+        /* dropdown */
+        .ur-perm-dd-wrap { position: relative; }
+        .ur-perm-dd {
+          position: absolute; top: calc(100% + 6px); right: 0; z-index: 200;
+          min-width: 168px;
+          background: #fff;
+          border: 1px solid #d0dae8;
+          border-radius: var(--ur-radius-md);
+          box-shadow: 0 16px 48px rgba(11,31,42,.18);
+          overflow: hidden;
+          animation: urDdIn .16s ease both;
         }
-        .ur-stat-card:nth-child(2) {
-          background: var(--ur-blue-dark);
+        .ur-perm-dd-item {
+          display: flex; align-items: center; gap: 10px;
+          padding: 10px 13px;
+          cursor: pointer; font-size: 13px; font-weight: 800;
+          transition: background .12s ease;
+          border: none; background: transparent; width: 100%; text-align: left; font-family: inherit;
         }
-        .ur-stat-card span {
-          display: block;
-          font-size: 12px;
-          font-weight: 900;
-          text-transform: uppercase;
-          opacity: .88;
-        }
-        .ur-stat-card strong {
-          display: block;
-          margin-top: 12px;
-          font-size: 34px;
-          line-height: 1;
-          font-weight: 950;
-        }
+        .ur-perm-dd-item:hover { background: #f0f6fa; }
+        .ur-perm-dd-item.active { background: #edf6f8; color: var(--ur-blue-dark); }
+        .ur-perm-dd-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+        .ur-perm-dd-dot.edit { background: #10b981; }
+        .ur-perm-dd-dot.view { background: var(--ur-blue); }
+        .ur-perm-dd-dot.none { background: #94a3b8; }
+        /* footer */
+        .ur-permission-footer { padding: 10px 14px 14px; display: grid; gap: 8px; }
+        .ur-permission-state { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; font-weight: 750; min-width: 0; }
+        .ur-perm-dirty { color: #92400e; }
+        .ur-perm-saved { color: #047857; }
+        .ur-perm-idle  { color: #64748b; }
+        .ur-role-meta { color: #596374; font-size: 12px; font-weight: 650; line-height: 1.4; padding: 10px 14px 0; margin: 0; overflow-wrap: anywhere; }
+        .ur-role-meta strong { color: var(--ur-blue); }
+        /* ── legacy segmented (скрываем, заменили на dropdown) ─────── */
+        .ur-permissions, .ur-permission-row, .ur-segmented { display: none; }
+
+        .ur-form-card { margin-top: 14px; }
+        .ur-user-form { padding: 14px; display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 11px; }
+        .ur-field { display: grid; gap: 5px; min-width: 0; }
+        .ur-field.full { grid-column: 1 / -1; }
+        .ur-readonly-user { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; padding: 11px; border: 1px solid #e2eaf7; border-radius: var(--ur-radius-md); background: #f8fbff; }
+        .ur-readonly-item { min-width: 0; }
+        .ur-readonly-item span { display: block; margin-bottom: 3px; color: #64748b; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+        .ur-readonly-item strong { display: block; color: #172033; font-size: 13px; line-height: 1.35; font-weight: 850; overflow-wrap: anywhere; }
+        .ur-form-actions { grid-column: 1 / -1; display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+        .ur-activity { margin-top: 14px; }
+        .ur-activity-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .ur-activity-table th, .ur-activity-table td { padding: 10px 14px; border-top: 1px solid var(--ur-line); text-align: left; line-height: 1.35; overflow-wrap: anywhere; }
+        .ur-activity-table th { color: #5b6575; font-size: 11px; text-transform: uppercase; background: #fff; }
+        .ur-empty { padding: 16px; color: #64748b; font-weight: 700; line-height: 1.45; overflow-wrap: anywhere; }
+        .ur-empty.compact { padding: 10px 14px; border-bottom: 1px solid var(--ur-line); background: #fbfcfd; font-size: 12px; }
+        .ur-stats { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+        .ur-stat-card { min-height: 96px; border: 1px solid var(--ur-border); border-radius: var(--ur-radius-md); color: #fff; background: var(--ur-blue); padding: 16px; box-shadow: 0 10px 22px rgba(25,120,156,.2); }
+        .ur-stat-card:nth-child(2) { background: var(--ur-blue-dark); }
+        .ur-stat-card span { display: block; font-size: 11px; font-weight: 900; text-transform: uppercase; opacity: .88; }
+        .ur-stat-card strong { display: block; margin-top: 10px; font-size: 30px; line-height: 1; font-weight: 950; }
         @media (max-width: 1180px) {
           .ur-layout { grid-template-columns: 1fr; }
-          .ur-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-          .ur-user-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .ur-side { grid-template-columns: repeat(2, minmax(0,1fr)); }
+          .ur-user-filters { grid-template-columns: repeat(2, minmax(0,1fr)); }
         }
         @media (max-width: 760px) {
           .ur-page-head { display: grid; }
@@ -983,16 +639,6 @@ export default function UsersRolesModule({ currentUser }) {
           .ur-pagination > div { justify-content: space-between; }
         }
       `}</style>
-
-      <div className="ur-page-head">
-        <div>
-          <h2>Пользователи и роли</h2>
-          <p>Управление учётными записями сотрудников и правами доступа к разделам системы</p>
-        </div>
-        <button type="button" className="ur-button secondary ur-refresh" onClick={loadData} disabled={loading}>
-          {loading ? "Обновление..." : "Обновить данные"}
-        </button>
-      </div>
 
       {error && <div className="ur-alert error">{error}</div>}
       {success && <div className="ur-alert success">{success}</div>}
@@ -1245,30 +891,50 @@ export default function UsersRolesModule({ currentUser }) {
             <div className="ur-card-head">
               <h3>Права роли</h3>
             </div>
-            <div className="ur-permissions">
-              <p className="ur-role-meta">
-                Выбрана роль: <strong>{getRoleLabel(selectedRole)}</strong><br />
-                Пользователей: <strong>{selectedRoleUsers}</strong>
-              </p>
+            <p className="ur-role-meta">
+              Роль: <strong>{getRoleLabel(selectedRole)}</strong> · Пользователей: <strong>{selectedRoleUsers}</strong>
+            </p>
+            <div className="ur-perm-list" role="list">
               {MODULE_DEFINITIONS.map((module) => {
-                const currentLevel = permissionDraft[module.key] || "none";
+                const lvl = permissionDraft[module.key] || "none";
+                const isOpen = openDropdown === module.key;
+                const badgeLabel = lvl === "edit" ? "Разрешено" : lvl === "view" ? "Просмотр" : "Запрещено";
                 return (
-                  <div className="ur-permission-row" key={module.key}>
-                    <div className="ur-permission-copy">
-                      <strong>{module.label}</strong>
-                      <span>{module.description}</span>
-                    </div>
-                    <div className="ur-segmented" role="group" aria-label={`Права: ${module.label}`}>
-                      {PERMISSION_OPTIONS.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          className={`ur-segment-button ${currentLevel === option.value ? `active ${option.value}` : ""}`}
-                          onClick={() => updatePermission(module.key, option.value)}
+                  <div className="ur-perm-row" key={module.key} role="listitem">
+                    <span className="ur-perm-label">{module.label}</span>
+                    <div className="ur-perm-dd-wrap">
+                      <button
+                        type="button"
+                        className={`ur-perm-badge ${lvl}`}
+                        aria-haspopup="listbox"
+                        aria-expanded={isOpen}
+                        onClick={(e) => { e.stopPropagation(); setOpenDropdown(isOpen ? null : module.key); }}
+                      >
+                        <svg viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="4"/></svg>
+                        {badgeLabel}
+                        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M1 1l4 4 4-4"/></svg>
+                      </button>
+                      {isOpen && (
+                        <div
+                          className="ur-perm-dd"
+                          role="listbox"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          {option.short}
-                        </button>
-                      ))}
+                          {PERMISSION_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              role="option"
+                              aria-selected={lvl === opt.value}
+                              className={`ur-perm-dd-item${lvl === opt.value ? " active" : ""}`}
+                              onClick={() => { updatePermission(module.key, opt.value); setOpenDropdown(null); }}
+                            >
+                              <span className={`ur-perm-dd-dot ${opt.value}`} />
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -1276,18 +942,18 @@ export default function UsersRolesModule({ currentUser }) {
             </div>
             <div className="ur-permission-footer">
               <div className="ur-permission-state">
-                <span>Текущее состояние</span>
-                <span className={`ur-level-pill ${permissionClass(permissionDraft.users_roles)}`}>
-                  Пользователи и роли: {permissionLabel(permissionDraft.users_roles)}
+                <span className={permissionsDirty ? "ur-perm-dirty" : success && !permissionsDirty ? "ur-perm-saved" : "ur-perm-idle"}>
+                  {permissionsDirty ? "• Есть несохранённые изменения" : success && !permissionsDirty ? "✓ Права сохранены" : ""}
                 </span>
               </div>
               <button
                 type="button"
-                className="ur-button primary"
+                className={`ur-button ${permissionsDirty ? "primary" : "ghost"}`}
+                style={{ width: "100%" }}
                 onClick={saveRolePermissions}
                 disabled={!selectedRoleData || !permissionsDirty || savingPermissions}
               >
-                {savingPermissions ? "Сохранение..." : permissionsDirty ? "Сохранить права роли" : "Права сохранены"}
+                {savingPermissions ? "Сохранение..." : "Сохранить права роли"}
               </button>
             </div>
           </div>

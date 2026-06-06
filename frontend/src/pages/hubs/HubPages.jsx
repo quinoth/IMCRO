@@ -12,6 +12,8 @@ import {
   NOKO_ROUTES,
   methodikaSubjectBySlug,
 } from "../../features/admin/articleTaxonomy.js";
+import { HubHomePageLayout } from "./HubHomePageLayout.jsx";
+import { NOKO_HUB_HOME_CONFIG } from "./hubHomeConfig.js";
 
 function HubShell({ currentUser, onGoAuth, onGoAdmin, onGoProfile, children }) {
   return (
@@ -219,7 +221,11 @@ function GenericHubSection({ homePath, homeLabel, section, newsItems = [], kind,
 }
 
 export function NokoHomePage(props) {
-  return <GenericHubHome {...props} eyebrow="НОКО" title="Независимая оценка качества образования" lead="Раздел НОКО: оперативная информация, ГИА и тематические сборники." sections={NOKO_ROUTES} />;
+  return <HubHomePageLayout {...props} {...NOKO_HUB_HOME_CONFIG} />;
+}
+
+export function HubHomeRoutePage({ config, ...props }) {
+  return <HubHomePageLayout {...props} {...config} />;
 }
 
 export function NokoSectionPage({ section, ...props }) {

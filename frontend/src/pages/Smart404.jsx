@@ -135,8 +135,8 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
           width: fit-content;
           padding: 7px 11px;
           border-radius: 999px;
-          background: #eef2ff;
-          color: #6d28d9;
+          background: rgba(31, 80, 115, 0.08);
+          color: #1F5073;
           font-size: 12px;
           font-weight: 950;
           letter-spacing: 0.05em;
@@ -184,8 +184,8 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
         }
 
         .smart404-search input:focus {
-          border-color: #8b5cf6;
-          box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.12);
+          border-color: #1F5073;
+          box-shadow: 0 0 0 4px rgba(31, 80, 115, 0.12);
         }
 
         .smart404-button,
@@ -199,7 +199,7 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
           justify-content: center;
           text-align: center;
           color: #fff;
-          background: linear-gradient(135deg, #1e3a8a, #6d28d9);
+          background: #1F5073;
           font-weight: 950;
           text-decoration: none;
           cursor: pointer;
@@ -240,7 +240,7 @@ export default function Smart404({ currentUser, onGoAuth, onGoAdmin, onGoProfile
         .smart404-card:hover,
         .smart404-popular-card:hover {
           transform: translateY(-2px);
-          border-color: #c4b5fd;
+          border-color: #1F5073;
           box-shadow: 0 18px 38px rgba(30, 58, 138, 0.09);
         }
 

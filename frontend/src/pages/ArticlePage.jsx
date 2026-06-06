@@ -2,7 +2,7 @@ import Header from "../features/nav/Header.jsx";
 import Footer from "../components/Footer.jsx";
 import Breadcrumbs from "../components/Breadcrumbs.jsx";
 import Badge from "../components/Badge.jsx";
-import { BlockPreview } from "../features/admin/BlockEditor.jsx";
+import { articleToEditorHtml } from "../features/admin/articleEditorContent.js";
 
 function getDate(article) {
   const raw = article?.dateSortValue || article?.date || "";
@@ -12,16 +12,8 @@ function getDate(article) {
 }
 
 function StaticContent({ article }) {
-  if (article.body) {
-    try {
-      const blocks = JSON.parse(article.body);
-      if (Array.isArray(blocks)) {
-        return blocks.map((block, index) => <BlockPreview key={block.id || `${block.type}-${index}`} block={block} />);
-      }
-    } catch {
-      return <p style={{ fontSize: 16, color: "#334155", lineHeight: 1.8 }}>{article.body}</p>;
-    }
-  }
+  const html = articleToEditorHtml(article);
+  if (html) return <div dangerouslySetInnerHTML={{ __html: html }} />;
   return <p style={{ fontSize: 16, color: "#334155", lineHeight: 1.8 }}>{article.excerpt || article.content || ""}</p>;
 }
 
@@ -43,7 +35,7 @@ export default function ArticlePage({
   onGoProfile,
   onOpenAuthor,
 }) {
-  const hasBlocks = article.blocks && article.blocks.length > 0;
+  const bodyHtml = articleToEditorHtml(article);
   const heroImage = article.cover_image_url || article.image;
   const breadcrumbs = [
     { label: "Главная", to: "/" },
@@ -60,6 +52,11 @@ export default function ArticlePage({
         .article-md h1, .article-md h2, .article-md h3 { color: #0F172A; line-height: 1.25; }
         .article-md ul, .article-md ol { padding-left: 22px; }
         .article-md img { max-width: 100%; border-radius: 12px; }
+        .article-md figure { margin: 22px 0; }
+        .article-md figcaption { margin-top: 8px; color: #64748B; font-size: 13px; text-align: center; }
+        .article-md blockquote { border-left: 4px solid #19789c; background: #edf6f8; color: #004f75; padding: 14px 16px; border-radius: 0 8px 8px 0; margin: 18px 0; }
+        .article-md table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        .article-md td, .article-md th { border: 1px solid #CBD5E1; padding: 8px 10px; }
         .article-md [data-font-size-span="true"] { line-height: 1.2; }
         .article-pin {
           position: absolute;
@@ -112,7 +109,7 @@ export default function ArticlePage({
             {article.lead && <p style={{ margin: "0 0 18px", fontSize: 18, color: "#475569", lineHeight: 1.65, fontWeight: 650 }}>{article.lead}</p>}
 
             <div className="article-md" style={{ fontSize: 15 }}>
-              {hasBlocks ? article.blocks.map((block) => <BlockPreview key={block.id} block={block} />) : <StaticContent article={article} />}
+              {bodyHtml ? <div dangerouslySetInnerHTML={{ __html: bodyHtml }} /> : <StaticContent article={article} />}
             </div>
 
             {Boolean(article.attachments?.length) && (

@@ -283,6 +283,7 @@ export function hasPermission(user, moduleKey, minLevel = "view") {
 
 export function canAccessAdmin(user) {
   const role = normalizeRoleName(user);
+  if (role === "domu_editor") return false;
   return (
     role === "methodist"
     || role === "admin"

@@ -41,7 +41,7 @@ function shortUserName(currentUser, fullName) {
   return parts[0] || fullName || "";
 }
 
-function userInitials(currentUser, fullName) {
+function _userInitials(currentUser, fullName) {
   const last = currentUser?.lastName || "";
   const first = currentUser?.firstName || "";
   if (last || first) {
@@ -82,7 +82,6 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
   const displayTitle = title || activeModule?.label || "Админ-панель";
   const name = userName(currentUser);
   const shortName = shortUserName(currentUser, name);
-  const initials = userInitials(currentUser, name);
 
   useEffect(() => {
     try {
@@ -104,6 +103,9 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           --admin-border-soft: #e5ebef;
           --admin-text: #17232b;
           --admin-muted: #667783;
+          --admin-radius-lg: 18px;
+          --admin-radius-md: 12px;
+          --admin-radius-sm: 8px;
           min-height: 100vh;
           background: var(--admin-bg);
           color: var(--admin-text);
@@ -136,33 +138,55 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
         }
         .admin-brand {
           display: flex;
+          flex-direction: column;
+          gap: 0;
+          margin-bottom: 20px;
+          min-width: 0;
+          overflow: hidden;
+        }
+        .admin-brand-header {
+          display: flex;
           align-items: center;
-          gap: 10px;
-          min-height: 54px;
-          margin-bottom: 18px;
+          justify-content: space-between;
+          gap: 8px;
           min-width: 0;
         }
-        .admin-brand-text {
+        .admin-brand-logo-wrap {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
           min-width: 0;
           flex: 1;
-          transition: opacity .16s ease, width .16s ease;
+          overflow: hidden;
+          transition: opacity .18s ease, max-height .18s ease;
+          max-height: 80px;
         }
-        .admin-brand-mark {
-          width: 42px;
-          height: 42px;
-          border-radius: 8px;
-          display: grid;
-          place-items: center;
-          color: #fff;
-          background: var(--admin-primary);
-          box-shadow: 0 10px 22px rgba(25, 120, 156, .24);
+        .admin-brand-logo-wrap img {
+          height: 44px;
+          width: auto;
+          max-width: 100%;
+          object-fit: contain;
+          object-position: left center;
+          display: block;
         }
-        .admin-brand-mark svg {
-          width: 24px;
-          height: 24px;
-          fill: none;
-          stroke: currentColor;
-          stroke-width: 2;
+        .admin-brand-subtitle {
+          font-size: 11px;
+          font-weight: 800;
+          color: var(--admin-muted);
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          white-space: nowrap;
+          padding-left: 2px;
+        }
+        .admin-shell.is-collapsed .admin-brand-logo-wrap {
+          opacity: 0;
+          max-height: 0;
+          pointer-events: none;
+          overflow: hidden;
+        }
+        .admin-shell.is-collapsed .admin-brand-header {
+          justify-content: center;
         }
         .admin-sidebar-toggle {
           width: 32px;
@@ -197,20 +221,10 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           transform: rotate(180deg);
         }
         .admin-brand strong {
-          display: block;
-          color: var(--admin-primary-dark);
-          font-size: 25px;
-          line-height: 1;
-          font-weight: 950;
+          display: none;
         }
         .admin-brand span {
-          display: block;
-          margin-top: 4px;
-          color: #1f2933;
-          font-size: 12px;
-          line-height: 1.1;
-          font-weight: 850;
-          text-transform: uppercase;
+          display: none;
         }
         .admin-nav {
           display: grid;
@@ -224,7 +238,7 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           align-items: center;
           gap: 14px;
           border: 1px solid transparent;
-          border-radius: 8px;
+          border-radius: var(--admin-radius-md);
           background: transparent;
           color: #24323a;
           padding: 0 14px;
@@ -261,8 +275,7 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           stroke-linejoin: round;
         }
         .admin-shell.is-collapsed .admin-brand {
-          justify-content: center;
-          margin-bottom: 16px;
+          margin-bottom: 12px;
         }
         .admin-shell.is-collapsed .admin-brand-text,
         .admin-shell.is-collapsed .admin-nav-button > span,
@@ -284,7 +297,7 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           transform: translateY(-50%);
           min-width: max-content;
           max-width: 240px;
-          border-radius: 8px;
+          border-radius: var(--admin-radius-sm);
           background: #0b1f2a;
           color: #fff;
           padding: 7px 10px;
@@ -314,16 +327,27 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           justify-content: center;
         }
         .admin-avatar {
-          width: 38px;
-          height: 38px;
+          width: 36px;
+          height: 36px;
           border-radius: 999px;
-          display: grid;
-          place-items: center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           color: #fff;
           background: var(--admin-primary-dark);
-          font-size: 13px;
-          font-weight: 900;
-          flex: 0 0 auto;
+          flex: 0 0 36px;
+          overflow: hidden;
+        }
+        .admin-avatar svg {
+          display: block;
+          width: 19px;
+          height: 19px;
+          fill: none;
+          stroke: #fff;
+          stroke-width: 1.8;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          flex-shrink: 0;
         }
         .admin-sidebar-user strong,
         .admin-sidebar-user span {
@@ -420,7 +444,7 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           align-items: center;
           gap: 9px;
           border: 1px solid var(--admin-border);
-          border-radius: 8px;
+          border-radius: var(--admin-radius-md);
           background: #fff;
           color: #17232b;
           padding: 0 12px 0 6px;
@@ -430,9 +454,18 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           min-width: 0;
         }
         .admin-profile-chip .admin-avatar {
-          width: 30px;
-          height: 30px;
-          font-size: 11px;
+          width: 28px;
+          height: 28px;
+          flex: 0 0 28px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+        .admin-profile-chip .admin-avatar svg {
+          width: 16px;
+          height: 16px;
         }
         .admin-profile-chip span:last-child {
           min-width: 0;
@@ -463,7 +496,7 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
         .admin-placeholder,
         .admin-dashboard-card {
           border: 1px solid var(--admin-border-soft);
-          border-radius: 8px;
+          border-radius: var(--admin-radius-lg);
           background: #fff;
           box-shadow: 0 10px 28px rgba(15, 23, 42, .06);
         }
@@ -540,26 +573,23 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
 
       <aside className="admin-sidebar" aria-label="Разделы админ-панели">
         <div className="admin-brand">
-          <span className="admin-brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24">
-              <path d="M12 3 4 7l8 4 8-4-8-4Zm-6 7v5l6 3 6-3v-5" />
-            </svg>
-          </span>
-          <div className="admin-brand-text">
-            <strong>ИМЦРО</strong>
-            <span>Админ-панель</span>
+          <div className="admin-brand-header">
+            <div className="admin-brand-logo-wrap">
+              <img src="https://mc.eduirk.ru/images/headers/imcro2.png" alt="ИМЦРО" />
+              <span className="admin-brand-subtitle">Админ-панель</span>
+            </div>
+            <button
+              className="admin-sidebar-toggle"
+              type="button"
+              onClick={() => setCollapsed((value) => !value)}
+              aria-label={collapsed ? "Развернуть меню" : "Свернуть меню"}
+              title={collapsed ? "Развернуть меню" : "Свернуть меню"}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+            </button>
           </div>
-          <button
-            className="admin-sidebar-toggle"
-            type="button"
-            onClick={() => setCollapsed((value) => !value)}
-            aria-label={collapsed ? "Развернуть меню" : "Свернуть меню"}
-            title={collapsed ? "Развернуть меню" : "Свернуть меню"}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </button>
         </div>
 
         <nav className="admin-nav">
@@ -579,7 +609,9 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
         </nav>
 
         <div className="admin-sidebar-user" title={name}>
-          <span className="admin-avatar">{initials}</span>
+          <span className="admin-avatar" aria-hidden="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5" /><path d="M5 20c0-3.87 3.13-7 7-7s7 3.13 7 7" /></svg>
+          </span>
           <div>
             <strong>{name}</strong>
             <span>{userRole(currentUser)}</span>
@@ -606,7 +638,9 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
               </svg>
             </button>
             <div className="admin-profile-chip" title={`${name} • ${userRole(currentUser)}`}>
-              <span className="admin-avatar">{initials}</span>
+              <span className="admin-avatar" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5" /><path d="M5 20c0-3.87 3.13-7 7-7s7 3.13 7 7" /></svg>
+              </span>
               <span>{shortName}</span>
             </div>
           </div>

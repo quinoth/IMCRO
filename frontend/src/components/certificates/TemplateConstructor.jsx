@@ -11,13 +11,11 @@
  * - Containment Logic: умное выравнивание текста по краям рабочей зоны
  */
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { API_BASE } from "../../constants/index.js";
 import { getApiErrorMessage } from "../../utils/apiError.js";
 import { authHeaders } from "../../utils/authHeaders.js";
 import { isObjectUrl, revokeObjectUrl, stripObjectUrls } from "../../utils/objectUrls.js";
 import AlertBanner from "./shared/AlertBanner.jsx";
-import { cardStyle, inputStyle, labelStyle, sectionBox, dangerBtn } from "./shared/styles.js";
 import AccuratePreview from "./shared/AccuratePreview.jsx";
 import { smartAlign, clamp } from "./shared/previewMath.js";
 import useHotkeys from "./shared/useHotkeys.js";
@@ -81,10 +79,44 @@ const VARIABLE_HINTS = {
   "Награда": "Тип награды: победитель, призёр и т.д. Колонка «Награда» в Excel.",
 };
 const PREVIEW_STORAGE_PREFIX = "certificate-template-preview-vars:";
+const SHOW_LEGACY_LAYER_SECTIONS = false;
 const DEFAULT_PREVIEW_VARIABLES = {
   "ФИО": "Григорьев Владислав Дмитриевич",
   "Мероприятие": "Всероссийская олимпиада по информатике",
 };
+
+function createCanvasId(prefix) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function normalizeElementType(rawType) {
+  const type = String(rawType || "text").toLowerCase();
+  if (type === "seal") return "stamp";
+  if (type === "facsimile") return "signature";
+  return type;
+}
+
+function isImageElementType(type) {
+  return ["image", "stamp", "seal", "signature", "facsimile", "line"].includes(String(type || "").toLowerCase());
+}
+
+function sourceUrlToPreview(sourceUrl) {
+  if (!sourceUrl) return null;
+  return String(sourceUrl).startsWith("blob:") || String(sourceUrl).startsWith("http")
+    ? sourceUrl
+    : `${API_BASE}${sourceUrl}`;
+}
+
+function sourceUrlToApi(sourceUrl) {
+  if (!sourceUrl) return null;
+  const value = String(sourceUrl);
+  return value.startsWith(API_BASE) ? value.slice(API_BASE.length) : value;
+}
+
+function imageKindToElementType(kind) {
+  const normalized = normalizeElementType(kind);
+  return normalized === "stamp" ? "seal" : normalized;
+}
 
 function previewStorageKey(templateId) {
   return `${PREVIEW_STORAGE_PREFIX}${templateId}`;
@@ -142,6 +174,14 @@ function hasRussianWord(text, pattern) {
 
 function isGenderVariantPlaceholder(key) {
   return /^(?:род|пол|gender)\s*:\s*[^|{}]+\|[^{}]+$/i.test(String(key || "").trim());
+}
+
+function placeholderKeyForUi(rawKey) {
+  const key = String(rawKey || "").trim();
+  if (!key || isGenderVariantPlaceholder(key)) return "";
+  if (key.includes("|")) return key.split("|")[0].trim();
+  if (key.includes(":")) return key.split(":")[0].trim();
+  return key;
 }
 
 function getPreviewContext(elements) {
@@ -221,7 +261,7 @@ function declinePreviewFio(fio, caseName, gender) {
   return declined.concat(parts.slice(3)).join(" ");
 }
 
-function applyGenderVariantsPreview(text, gender) {
+function _applyGenderVariantsPreview(text, gender) {
   return String(text || "").replace(/\{([^}]+)\}/g, (match, inner) => {
     const key = inner.trim();
     const genderMatch = key.match(/^(?:род|пол|gender)\s*:\s*([^|{}]+)\|([^{}]+)$/i);
@@ -286,7 +326,6 @@ function Tooltip({ text }) {
 // ── Компонент ───────────────────────────────────────────────────────────────
 
 export default function TemplateConstructor({ templates, onTemplatesSaved }) {
-  const navigate = useNavigate();
   // Режим: "new" | "edit"
   const [mode, setMode] = useState("new");
   const [editingId, setEditingId] = useState(null);
@@ -320,7 +359,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
 
   const objectUrlsRef = useRef([]);
   const [saving, setSaving] = useState(false);
-  const [uploadingFont, setUploadingFont] = useState(false);
+  const [_uploadingFont, setUploadingFont] = useState(false);
   const [availableFonts, setAvailableFonts] = useState(BUILTIN_FONTS);
   const [msg, setMsg] = useState(null);
   const [msgType, setMsgType] = useState("info");
@@ -329,13 +368,14 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
 
   // ── UX: выделение, контекстное меню, автосохранение ──────────────────────
   const [selectedElementId, setSelectedElementId] = useState(null);
+  const [selectedSignerId, setSelectedSignerId] = useState(null);
   const [ctxMenu, setCtxMenu] = useState(null); // { x, y, elementId }
   const [autoSaveStatus, setAutoSaveStatus] = useState(""); // "", "saving", "saved"
   const autoSaveTimerRef = useRef(null);
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const MAX_UNDO = 40;
-  const [showOnboarding, setShowOnboarding] = useState(() => {
+  const [_showOnboarding, _setShowOnboarding] = useState(() => {
     try { return !window.localStorage.getItem("constructor-onboarding-v1-dismissed"); } catch { return true; }
   });
   // Инлайн-пикер переменных
@@ -343,8 +383,8 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
   const textareaRefs = useRef({}); // { [elId]: HTMLTextAreaElement }
 
   const bgInputRef = useRef(null);
-  const bgDragCounter = useRef(0);
-  const [bgDrag, setBgDrag] = useState(false);
+  const _bgDragCounter = useRef(0);
+  const [_bgDrag, _setBgDrag] = useState(false);
 
   // ── Новые возможности конструктора ────────────────────────────────────────
   // Пользовательские переменные шаблона
@@ -360,6 +400,15 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
   const signatureInputRef = useRef(null);
   const imageInputRef = useRef(null);
   const imageReplaceInputRef = useRef(null);
+  const signerFacInputRef = useRef(null);
+  const [signerPresetOpen, setSignerPresetOpen] = useState(false);
+  const [signerDraft, setSignerDraft] = useState({
+    position: "Директор ИМЦРО",
+    fullName: "",
+    facFile: null,
+    facPreview: null,
+    includeLine: true,
+  });
 
   // Сетка, масштаб, слои
   const [showGrid, setShowGrid] = useState(true);
@@ -372,6 +421,12 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
   // Грязный флаг для предупреждения и индикатора автосохранения
   const [isDirty, setIsDirty] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState(null);
+  // Флаг зелёного уведомления после ручного сохранения
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const saveSuccessTimerRef = useRef(null);
+
+  // Предложение восстановить черновик из localStorage
+  const [draftOffer, setDraftOffer] = useState(null); // null | { key, data }
 
   // Буфер обмена для копирования
   const clipboardRef = useRef(null);
@@ -387,6 +442,44 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     objectUrlsRef.current = [];
   }, []);
 
+  // ── Восстановление черновика из localStorage ─────────────────────────────
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const key = `cert-constructor-autosave:${editingId || "new"}`;
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && (parsed.name || parsed.elements?.length)) {
+          setDraftOffer({ key, data: parsed });
+        }
+      }
+    } catch { /* ignore */ }
+  }, [editingId]);
+
+  const restoreDraft = useCallback(() => {
+    if (!draftOffer) return;
+    const d = draftOffer.data;
+    if (d.name) setName(d.name);
+    if (d.bgUrl && !d.bgUrl.startsWith("blob:")) setBgUrl(d.bgUrl);
+    if (d.margins) setMargins(d.margins);
+    if (d.signersLayout) setSignersLayout(d.signersLayout);
+    if (Array.isArray(d.elements)) setElements(d.elements);
+    if (Array.isArray(d.signers)) setSigners(d.signers);
+    if (Array.isArray(d.images)) setImages(d.images);
+    if (d.userVariables) setUserVariables(d.userVariables);
+    try { window.localStorage.removeItem(draftOffer.key); } catch { /* ignore */ }
+    setDraftOffer(null);
+    setIsDirty(true);
+    setMsg("Черновик восстановлен"); setMsgType("success");
+  }, [draftOffer]);
+
+  const dismissDraft = useCallback(() => {
+    if (!draftOffer) return;
+    try { window.localStorage.removeItem(draftOffer.key); } catch { /* ignore */ }
+    setDraftOffer(null);
+  }, [draftOffer]);
+
   // Вычисляем безопасную зону в %
   const safePct = useMemo(() => ({
     xMin: (margins.left / PAGE_W) * 100,
@@ -401,8 +494,8 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     for (const el of elements) {
       const matches = el.text.matchAll(/\{([^}]+)\}/g);
       for (const m of matches) {
-        const key = m[1].trim();
-        if (!isGenderVariantPlaceholder(key)) found.add(key);
+        const key = placeholderKeyForUi(m[1]);
+        if (key) found.add(key);
       }
     }
     return [...found];
@@ -432,6 +525,46 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     fio: fioDeclensionPreview.declinedFio,
     FIO: fioDeclensionPreview.declinedFio,
   }), [previewVariables, fioDeclensionPreview]);
+
+  const getMaxZIndex = useCallback(() => {
+    const textZ = elements.map((item, index) => (typeof item.zIndex === "number" ? item.zIndex : index + 20));
+    const imageZ = images.map((item, index) => (typeof item.zIndex === "number" ? item.zIndex : index + 1));
+    return Math.max(0, ...textZ, ...imageZ);
+  }, [elements, images]);
+
+  const signerGroupCount = useMemo(() => {
+    const ids = new Set();
+    for (const item of [...elements, ...images]) {
+      if (item.signerGroupId) ids.add(item.signerGroupId);
+    }
+    return ids.size;
+  }, [elements, images]);
+
+  const layerItems = useMemo(() => {
+    const textItems = elements.map((el, index) => ({
+      kind: "element",
+      id: el.id,
+      label: el.signerGroupId
+        ? (el.text?.includes("{") ? "Переменная подписанта" : (el.text || "Текст подписанта"))
+        : (el.text || "Текст"),
+      group: el.signerGroupId,
+      hidden: !!el.hidden,
+      locked: !!el.locked,
+      z: typeof el.zIndex === "number" ? el.zIndex : index + 20,
+      icon: (el.text || "").includes("{") ? "▣" : "T",
+    }));
+    const imageItems = images.map((img, index) => ({
+      kind: "image",
+      id: img.id,
+      label: img.kind === "line" ? "Линия подписи" : (img.label || "Изображение"),
+      group: img.signerGroupId,
+      hidden: !!img.hidden,
+      locked: !!img.locked,
+      z: typeof img.zIndex === "number" ? img.zIndex : index + 1,
+      icon: img.kind === "line" ? "—" : "□",
+    }));
+    return [...textItems, ...imageItems].sort((a, b) => b.z - a.z);
+  }, [elements, images]);
 
   useEffect(() => {
     let cancelled = false;
@@ -486,41 +619,140 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         name_color: t.signers_name_color || "",
       });
 
-      // Конвертируем элементы из мм в %
-      setElements(data.elements.map((el, i) => ({
-        id: el.id || i + 1,
-        text: el.text,
-        x: (el.x_mm / PAGE_W) * 100,
-        y: (el.y_mm / PAGE_H) * 100,
-        size: el.font_size,
-        color: el.color || "#0F172A",
-        weight: el.font_weight || "400",
-        fontFamily: el.font_family || DEFAULT_FONT_FAMILY,
-        align: el.align,
-        maxWidthMm: el.max_width_mm,
-        maxHeightMm: el.max_height_mm,
-      })));
+      const loadedTextElements = [];
+      const loadedImages = [];
+      for (const [i, el] of (data.elements || []).entries()) {
+        const elementType = normalizeElementType(el.type || el.element_type);
+        const common = {
+          id: el.id || el.client_id || el.db_id || i + 1,
+          x: (Number(el.x_mm) / PAGE_W) * 100,
+          y: (Number(el.y_mm) / PAGE_H) * 100,
+          zIndex: typeof el.z_index === "number" ? el.z_index : undefined,
+          hidden: !!el.hidden,
+          locked: !!el.locked,
+          opacity: el.opacity ?? 1,
+          signerGroupId: el.signerGroupId || el.signer_group_id || null,
+        };
+        if (isImageElementType(elementType)) {
+          loadedImages.push({
+            ...common,
+            kind: elementType,
+            label: elementType === "line" ? "Линия подписи" : elementType === "stamp" ? "Печать" : elementType === "signature" ? "Подпись" : "Изображение",
+            file: null,
+            sourceUrl: el.source_url || null,
+            url: sourceUrlToPreview(el.source_url),
+            widthMm: el.width ?? el.width_mm ?? el.max_width_mm ?? 50,
+            heightMm: el.height ?? el.height_mm ?? el.max_height_mm ?? (elementType === "line" ? 0.6 : 30),
+          });
+        } else {
+          loadedTextElements.push({
+            ...common,
+            text: el.text || "",
+            size: el.font_size || 24,
+            color: el.color || "#0F172A",
+            weight: el.font_weight || "400",
+            italic: !!el.italic,
+            underline: !!el.underline,
+            lineHeight: el.line_height || 1.25,
+            fontFamily: el.font_family || DEFAULT_FONT_FAMILY,
+            align: el.align,
+            maxWidthMm: el.width ?? el.width_mm ?? el.max_width_mm,
+            maxHeightMm: el.height ?? el.height_mm ?? el.max_height_mm,
+            variableName: el.variableName || el.variable_name || null,
+            grammarSettings: el.grammar_settings || null,
+          });
+        }
+      }
+
+      const legacySignerText = [];
+      const legacySignerImages = [];
+      for (const [i, signer] of (data.signers || []).entries()) {
+        const groupId = `legacy_signer_${signer.id || i + 1}`;
+        const rowTop = (t.signers_y_mm || 248) + i * (t.signers_row_height_mm || 32) + (signer.offset_y_mm || 0);
+        const band = t.signers_band_width_mm || 168;
+        const leftEdge = (t.signers_block_x_mm || 105) - band / 2;
+        const rightEdge = (t.signers_block_x_mm || 105) + band / 2;
+        const midX = t.signers_block_x_mm || 105;
+        legacySignerText.push({
+          id: `${groupId}_position`,
+          text: signer.position || "Должность",
+          x: ((leftEdge + 4) / PAGE_W) * 100,
+          y: ((rowTop + 8) / PAGE_H) * 100,
+          size: t.signers_font_size || 10,
+          color: t.signers_position_color || t.signers_text_color || "#1e293b",
+          weight: t.signers_font_weight || "400",
+          fontFamily: t.signers_font_family || DEFAULT_FONT_FAMILY,
+          align: "left",
+          maxWidthMm: band * 0.38,
+          maxHeightMm: (t.signers_row_height_mm || 32) * 0.55,
+          signerGroupId: groupId,
+          zIndex: 40 + i * 4,
+          lineHeight: 1.2,
+        });
+        legacySignerText.push({
+          id: `${groupId}_name`,
+          text: signer.full_name || "Фамилия И.О.",
+          x: ((rightEdge - 4) / PAGE_W) * 100,
+          y: ((rowTop + 8) / PAGE_H) * 100,
+          size: t.signers_font_size || 10,
+          color: t.signers_name_color || t.signers_text_color || "#1e293b",
+          weight: t.signers_font_weight || "400",
+          fontFamily: t.signers_font_family || DEFAULT_FONT_FAMILY,
+          align: "right",
+          maxWidthMm: band * 0.38,
+          maxHeightMm: (t.signers_row_height_mm || 32) * 0.55,
+          signerGroupId: groupId,
+          zIndex: 41 + i * 4,
+          lineHeight: 1.2,
+        });
+        legacySignerImages.push({
+          id: `${groupId}_line`,
+          kind: "line",
+          label: "Линия подписи",
+          x: (midX / PAGE_W) * 100,
+          y: ((rowTop + 15) / PAGE_H) * 100,
+          widthMm: band * 0.24,
+          heightMm: 0.5,
+          opacity: 1,
+          signerGroupId: groupId,
+          zIndex: 42 + i * 4,
+        });
+        if (signer.facsimile_url) {
+          legacySignerImages.push({
+            id: `${groupId}_facsimile`,
+            kind: "signature",
+            label: "Факсимиле",
+            file: null,
+            sourceUrl: signer.facsimile_url,
+            url: sourceUrlToPreview(signer.facsimile_url),
+            x: ((midX + (signer.facsimile_offset_x_mm || 0)) / PAGE_W) * 100,
+            y: ((rowTop + 13 + (signer.facsimile_offset_y_mm || 0)) / PAGE_H) * 100,
+            widthMm: 52 * (signer.facsimile_scale || 1),
+            heightMm: 20 * (signer.facsimile_scale || 1),
+            opacity: 1,
+            signerGroupId: groupId,
+            zIndex: 43 + i * 4,
+          });
+        }
+      }
+
+      setElements([...loadedTextElements, ...legacySignerText]);
 
       setPreviewVariables({
         ...DEFAULT_PREVIEW_VARIABLES,
         ...readStoredPreviewVariables(id),
       });
 
-      setSigners(data.signers.length > 0 ? data.signers.map((s) => ({
-        id: s.id,
-        position: s.position,
-        fullName: s.full_name,
-        facFile: null,
-        facPreview: s.facsimile_url ? `${API_BASE}${s.facsimile_url}` : null,
-        facUrl: s.facsimile_url,
-        offsetY: s.offset_y_mm,
-        facOffsetX: s.facsimile_offset_x_mm,
-        facOffsetY: s.facsimile_offset_y_mm,
-        facScale: s.facsimile_scale,
-      })) : []);
-      setImages([]);
+      setSigners([]);
+      setImages([...loadedImages, ...legacySignerImages]);
       setSelectedImageId(null);
+      setSelectedSignerId(null);
 
+      // Сбрасываем dirty-флаг и статус после загрузки шаблона
+      skipDirtyRef.current = true;
+      setIsDirty(false);
+      setAutoSaveStatus("");
+      setSaveSuccess(false);
       setMsg(null);
     } catch (e) {
       setMsg(e.message); setMsgType("error");
@@ -543,9 +775,17 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     setPreviewVariables(DEFAULT_PREVIEW_VARIABLES);
     setSigners([]);
     setImages([]);
+    setSignerDraft({ position: "Директор ИМЦРО", fullName: "", facFile: null, facPreview: null, includeLine: true });
+    setSignerPresetOpen(false);
     setUserVariables([]);
     setSelectedImageId(null);
+    setSelectedSignerId(null);
     setSelectedElementId(null);
+    // Сбрасываем dirty при переходе на новый шаблон
+    skipDirtyRef.current = true;
+    setIsDirty(false);
+    setAutoSaveStatus("");
+    setSaveSuccess(false);
     setMsg(null);
   };
 
@@ -578,14 +818,14 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
   };
 
   // ── Элементы ──────────────────────────────────────────────────────────────
-  const addElement = () => {
-    const newId = Math.max(0, ...elements.map((e) => e.id)) + 1;
+  const _addElement = () => {
+    const newId = createCanvasId("txt");
     const cx = (safePct.xMin + safePct.xMax) / 2;
     const cy = (safePct.yMin + safePct.yMax) / 2;
-    setElements((prev) => [...prev, { id: newId, text: "Новый текст", x: cx, y: cy, size: 24, color: "#000000", weight: "400", fontFamily: DEFAULT_FONT_FAMILY, maxWidthMm: null }]);
+    setElements((prev) => [...prev, { id: newId, text: "Новый текст", x: cx, y: cy, size: 24, color: "#000000", weight: "400", fontFamily: DEFAULT_FONT_FAMILY, maxWidthMm: null, zIndex: getMaxZIndex() + 1 }]);
   };
   const insertVariableBlock = (key) => {
-    const newId = Math.max(0, ...elements.map((e) => e.id)) + 1;
+    const newId = createCanvasId("txt");
     const cx = (safePct.xMin + safePct.xMax) / 2;
     const cy = Math.min(safePct.yMax, Math.max(safePct.yMin, 44 + (detectedPlaceholders.length % 4) * 6));
     setElements((prev) => [...prev, {
@@ -598,11 +838,12 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
       weight: key === "ФИО" ? "700" : "500",
       fontFamily: DEFAULT_FONT_FAMILY,
       maxWidthMm: null,
+      zIndex: getMaxZIndex() + 1,
     }]);
   };
 
-  const insertGenderVariantBlock = (variantText) => {
-    const newId = Math.max(0, ...elements.map((e) => e.id)) + 1;
+  const _insertGenderVariantBlock = (variantText) => {
+    const newId = createCanvasId("txt");
     const cx = (safePct.xMin + safePct.xMax) / 2;
     const cy = Math.min(safePct.yMax, Math.max(safePct.yMin, 50 + (elements.length % 4) * 6));
     setElements((prev) => [...prev, {
@@ -615,11 +856,12 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
       weight: "400",
       fontFamily: DEFAULT_FONT_FAMILY,
       maxWidthMm: 168,
+      zIndex: getMaxZIndex() + 1,
     }]);
   };
 
   /** Вставить текст в позицию курсора выбранного textarea */
-  const insertAtCursor = useCallback((elId, insertText) => {
+  const _insertAtCursor = useCallback((elId, insertText) => {
     const ta = textareaRefs.current[elId];
     setElements((prev) => {
       const el = prev.find((e) => e.id === elId);
@@ -653,8 +895,8 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     setElements((prev) => {
       const src = prev.find((e) => e.id === id);
       if (!src) return prev;
-      const newId = Math.max(0, ...prev.map((e) => e.id)) + 1;
-      return [...prev, { ...src, id: newId, y: Math.min(safePct.yMax, src.y + 3) }];
+      const newId = createCanvasId("txt");
+      return [...prev, { ...src, id: newId, y: Math.min(safePct.yMax, src.y + 3), zIndex: getMaxZIndex() + 1 }];
     });
   };
 
@@ -732,15 +974,21 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     "ctrl+s": () => { handleSave(); },
     "delete": () => {
       if (selectedElementId) { pushUndo(); removeEl(selectedElementId); }
+      else if (selectedSignerId) { pushUndo(); removeSigner(selectedSignerId); }
+      else if (selectedImageId) { pushUndo(); removeImage(selectedImageId); }
       else if (selectedElementId == null && typeof window !== "undefined" && window.__tpl_selImg) { /* noop */ }
     },
     "backspace": () => {
       if (selectedElementId) { pushUndo(); removeEl(selectedElementId); }
+      else if (selectedSignerId) { pushUndo(); removeSigner(selectedSignerId); }
     },
-    "ctrl+d": () => { if (selectedElementId) { pushUndo(); duplicateEl(selectedElementId); } },
-    "ctrl+c": () => { if (selectedElementId || selectedImageId) copyElement(); },
+    "ctrl+d": () => {
+      if (selectedElementId) { pushUndo(); duplicateEl(selectedElementId); }
+      else if (selectedSignerId) { pushUndo(); duplicateSigner(selectedSignerId); }
+    },
+    "ctrl+c": () => { if (selectedElementId || selectedImageId || selectedSignerId) copyElement(); },
     "ctrl+v": () => { if (clipboardRef.current) pasteElement(); },
-    "escape": () => { setSelectedElementId(null); setSelectedImageId(null); setCtxMenu(null); setPickerOpenId(null); setLayersOpen(false); },
+    "escape": () => { setSelectedElementId(null); setSelectedImageId(null); setSelectedSignerId(null); setCtxMenu(null); setPickerOpenId(null); setLayersOpen(false); },
   });
 
   // Закрываем пикер по клику вне — bubble-phase на document (capture вызывал гонку с onClick кнопок)
@@ -761,11 +1009,14 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
   useEffect(() => {
     if (skipDirtyRef.current) { skipDirtyRef.current = false; return; }
     setIsDirty(true);
+    setSaveSuccess(false); // сбрасываем зелёный статус при любом изменении
     setAutoSaveStatus("dirty");
   }, [name, elements, signers, margins, signersLayout, bgUrl, images, userVariables]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    // автосохранение только если есть несохранённые изменения
+    if (!isDirty) return;
     const key = `cert-constructor-autosave:${editingId || "new"}`;
     clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
@@ -781,7 +1032,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
       } catch { setAutoSaveStatus("error"); }
     }, 12000);
     return () => clearTimeout(autoSaveTimerRef.current);
-  }, [name, elements, signers, margins, signersLayout, bgUrl, images, userVariables, editingId]);
+  }, [name, elements, signers, margins, signersLayout, bgUrl, images, userVariables, editingId, isDirty]);
 
   // Предупреждение при выходе со страницы с несохранёнными изменениями
   useEffect(() => {
@@ -797,12 +1048,15 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
   }, [isDirty]);
 
   // ── Подписанты ────────────────────────────────────────────────────────────
-  const addSigner = () => {
+  const _addSigner = () => {
     if (signers.length >= 3) return;
-    setSigners((prev) => [...prev, { id: `s_${Date.now()}`, position: "Должность", fullName: "", facFile: null, facPreview: null, offsetY: 0, facOffsetX: 0, facOffsetY: 0, facScale: 1 }]);
+    setSigners((prev) => [...prev, { id: `s_${Date.now()}`, position: "Должность", fullName: "", facFile: null, facPreview: null, offsetY: 0, facOffsetX: 0, facOffsetY: 0, facScale: 1, showLine: true, align: "split" }]);
   };
   const updateSigner = (id, field, val) => setSigners((prev) => prev.map((s) => s.id === id ? { ...s, [field]: val } : s));
-  const removeSigner = (id) => setSigners((prev) => prev.length > 1 ? prev.filter((s) => s.id !== id) : prev);
+  const removeSigner = (id) => {
+    setSigners((prev) => prev.filter((s) => s.id !== id));
+    if (selectedSignerId === id) setSelectedSignerId(null);
+  };
 
   /** Простая загрузка факсимиле — локальный blob-превью без сетевых вызовов */
   const handleFacsimile = (id, e) => {
@@ -827,7 +1081,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     }));
   };
 
-  const handleFontUpload = async (e) => {
+  const _handleFontUpload = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
@@ -904,10 +1158,12 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
       file, url, x: preset.x, y: preset.y,
       widthMm: preset.widthMm, heightMm: preset.heightMm,
       opacity: preset.opacity,
+      zIndex: getMaxZIndex() + 1,
     }]);
     setSelectedImageId(id);
     setSelectedElementId(null);
-  }, [createTrackedObjectUrl, pushUndo]);
+    setSelectedSignerId(null);
+  }, [createTrackedObjectUrl, pushUndo, getMaxZIndex]);
 
   const updateImage = useCallback((id, patch) => {
     setImages((prev) => prev.map((img) => img.id === id ? { ...img, ...patch } : img));
@@ -928,26 +1184,146 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     setImages((prev) => prev.map((img) => img.id === id ? { ...img, file, url } : img));
   }, [createTrackedObjectUrl]);
 
-  // ── Слои ───────────────────────────────────────────────────────────────────
-  // Порядок в массиве = z-order. Последний элемент сверху.
-  const moveLayer = useCallback((kind, id, direction) => {
-    const setter = kind === "image" ? setImages : setElements;
-    setter((prev) => {
-      const idx = prev.findIndex((e) => e.id === id);
-      if (idx === -1) return prev;
-      const next = [...prev];
-      let target;
-      if (direction === "up") target = Math.min(prev.length - 1, idx + 1);
-      else if (direction === "down") target = Math.max(0, idx - 1);
-      else if (direction === "front") target = prev.length - 1;
-      else if (direction === "back") target = 0;
-      else return prev;
-      if (target === idx) return prev;
-      const [item] = next.splice(idx, 1);
-      next.splice(target, 0, item);
-      return next;
+  const handleSignerPresetFacsimile = useCallback((event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !file.type?.startsWith("image/")) return;
+    const url = createTrackedObjectUrl(file);
+    setSignerDraft((prev) => {
+      if (prev.facPreview && prev.facFile) revokeObjectUrl(prev.facPreview);
+      return { ...prev, facFile: file, facPreview: url };
+    });
+  }, [createTrackedObjectUrl]);
+
+  const resetSignerDraft = useCallback(() => {
+    setSignerDraft((prev) => {
+      if (prev.facPreview && prev.facFile) revokeObjectUrl(prev.facPreview);
+      return { position: "Директор ИМЦРО", fullName: "", facFile: null, facPreview: null, includeLine: true };
     });
   }, []);
+
+  const addSignerPreset = useCallback(() => {
+    const position = signerDraft.position.trim();
+    const fullName = signerDraft.fullName.trim();
+    if (!position || !fullName) {
+      setMsg("Заполните должность и ФИО подписанта");
+      setMsgType("error");
+      return;
+    }
+
+    pushUndo();
+    const groupId = `signer_${Date.now()}_${signerGroupCount + 1}`;
+    const baseY = Math.min(88, 74 + signerGroupCount * 7);
+    const baseZ = getMaxZIndex() + 1;
+    const positionId = createCanvasId("txt");
+    const nameId = createCanvasId("txt");
+    const nextText = [
+      {
+        id: positionId,
+        text: position,
+        x: 22,
+        y: baseY,
+        size: 10,
+        color: "#1e293b",
+        weight: "500",
+        fontFamily: DEFAULT_FONT_FAMILY,
+        align: "left",
+        maxWidthMm: 78,
+        maxHeightMm: 18,
+        lineHeight: 1.2,
+        signerGroupId: groupId,
+        zIndex: baseZ,
+      },
+      {
+        id: nameId,
+        text: fullName,
+        x: 78,
+        y: baseY,
+        size: 10,
+        color: "#1e293b",
+        weight: "600",
+        fontFamily: DEFAULT_FONT_FAMILY,
+        align: "right",
+        maxWidthMm: 78,
+        maxHeightMm: 18,
+        lineHeight: 1.2,
+        signerGroupId: groupId,
+        zIndex: baseZ + 1,
+      },
+    ];
+    const nextImages = [];
+    if (signerDraft.includeLine) {
+      nextImages.push({
+        id: createCanvasId("line"),
+        kind: "line",
+        label: "Линия подписи",
+        x: 50,
+        y: baseY + 1.8,
+        widthMm: 58,
+        heightMm: 0.55,
+        opacity: 1,
+        signerGroupId: groupId,
+        zIndex: baseZ + 2,
+      });
+    }
+    if (signerDraft.facFile && signerDraft.facPreview) {
+      nextImages.push({
+        id: createCanvasId("sig"),
+        kind: "signature",
+        label: "Факсимиле",
+        file: signerDraft.facFile,
+        url: signerDraft.facPreview,
+        x: 50,
+        y: baseY - 0.4,
+        widthMm: 56,
+        heightMm: 20,
+        opacity: 1,
+        signerGroupId: groupId,
+        zIndex: baseZ + 3,
+      });
+    }
+
+    setElements((prev) => [...prev, ...nextText]);
+    setImages((prev) => [...prev, ...nextImages]);
+    setSelectedElementId(positionId);
+    setSelectedImageId(null);
+    setSelectedSignerId(null);
+    setSignerPresetOpen(false);
+    setSignerDraft({ position: "Директор ИМЦРО", fullName: "", facFile: null, facPreview: null, includeLine: true });
+    setMsg("Подписант добавлен как отдельные элементы");
+    setMsgType("success");
+  }, [getMaxZIndex, pushUndo, signerDraft, signerGroupCount]);
+
+  // ── Слои ───────────────────────────────────────────────────────────────────
+  const moveLayer = useCallback((kind, id, direction) => {
+    const allItems = [
+      ...elements.map((item, index) => ({ kind: "element", id: item.id, z: typeof item.zIndex === "number" ? item.zIndex : index + 20 })),
+      ...images.map((item, index) => ({ kind: "image", id: item.id, z: typeof item.zIndex === "number" ? item.zIndex : index + 1 })),
+    ].sort((a, b) => a.z - b.z);
+    const currentIndex = allItems.findIndex((item) => item.kind === kind && item.id === id);
+    if (currentIndex === -1) return;
+
+    const applyZ = (targetKind, targetId, zIndex) => {
+      const setter = targetKind === "image" ? setImages : setElements;
+      setter((prev) => prev.map((item) => item.id === targetId ? { ...item, zIndex } : item));
+    };
+
+    if (direction === "front") {
+      applyZ(kind, id, Math.max(...allItems.map((item) => item.z), 0) + 1);
+      return;
+    }
+    if (direction === "back") {
+      applyZ(kind, id, Math.min(...allItems.map((item) => item.z), 0) - 1);
+      return;
+    }
+
+    const targetIndex = direction === "up" ? currentIndex + 1 : direction === "down" ? currentIndex - 1 : currentIndex;
+    const target = allItems[targetIndex];
+    const current = allItems[currentIndex];
+    if (!target || target.id === current.id) return;
+    applyZ(current.kind, current.id, target.z);
+    applyZ(target.kind, target.id, current.z);
+  }, [elements, images]);
 
   const moveElementZ = useCallback((id, direction) => {
     moveLayer("element", id, direction);
@@ -975,11 +1351,14 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     setElements((prev) => prev.map((e) => e.id === id ? { ...e, text: newText } : e));
   }, [pushUndo]);
 
-  const handleElementResize = useCallback((id, kind, widthMm, heightMm) => {
+  const handleElementResize = useCallback((id, kind, patchOrWidth, heightMm) => {
+    const patch = typeof patchOrWidth === "object" && patchOrWidth !== null
+      ? patchOrWidth
+      : { widthMm: patchOrWidth, heightMm };
     if (kind === "image") {
-      setImages((prev) => prev.map((img) => img.id === id ? { ...img, widthMm, heightMm } : img));
+      setImages((prev) => prev.map((img) => img.id === id ? { ...img, ...patch } : img));
     } else {
-      setElements((prev) => prev.map((e) => e.id === id ? { ...e, maxWidthMm: widthMm, maxHeightMm: heightMm } : e));
+      setElements((prev) => prev.map((e) => e.id === id ? { ...e, ...patch } : e));
     }
   }, []);
 
@@ -990,41 +1369,129 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     } else if (selectedImageId) {
       const img = images.find((i) => i.id === selectedImageId);
       if (img) clipboardRef.current = { kind: "image", data: img };
+    } else if (selectedSignerId) {
+      const signer = signers.find((s) => s.id === selectedSignerId);
+      if (signer) clipboardRef.current = { kind: "signer", data: signer };
     }
-  }, [selectedElementId, selectedImageId, elements, images]);
+  }, [selectedElementId, selectedImageId, selectedSignerId, elements, images, signers]);
 
   const pasteElement = useCallback(() => {
     const buf = clipboardRef.current;
     if (!buf) return;
     pushUndo();
     if (buf.kind === "element") {
-      const newId = Math.max(0, ...elements.map((e) => e.id)) + 1;
-      const cp = { ...buf.data, id: newId, x: Math.min(95, (buf.data.x || 50) + 3), y: Math.min(95, (buf.data.y || 50) + 3) };
+      const newId = createCanvasId("txt");
+      const cp = { ...buf.data, id: newId, x: Math.min(95, (buf.data.x || 50) + 3), y: Math.min(95, (buf.data.y || 50) + 3), zIndex: getMaxZIndex() + 1 };
       setElements((prev) => [...prev, cp]);
       setSelectedElementId(newId);
       setSelectedImageId(null);
+      setSelectedSignerId(null);
     } else {
+      if (buf.kind === "signer") {
+        if (signers.length >= 4) return;
+        const newId = `s_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+        const cp = {
+          ...buf.data,
+          id: newId,
+          offsetY: (Number(buf.data.offsetY) || 0) + 8,
+          zIndex: (typeof buf.data.zIndex === "number" ? buf.data.zIndex : 40) + 1,
+        };
+        setSigners((prev) => [...prev, cp]);
+        setSelectedSignerId(newId);
+        setSelectedImageId(null);
+        setSelectedElementId(null);
+        return;
+      }
       const newId = `img_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
-      const cp = { ...buf.data, id: newId, x: Math.min(95, (buf.data.x || 50) + 3), y: Math.min(95, (buf.data.y || 50) + 3) };
+      const cp = { ...buf.data, id: newId, x: Math.min(95, (buf.data.x || 50) + 3), y: Math.min(95, (buf.data.y || 50) + 3), zIndex: getMaxZIndex() + 1 };
       setImages((prev) => [...prev, cp]);
       setSelectedImageId(newId);
       setSelectedElementId(null);
+      setSelectedSignerId(null);
     }
-  }, [elements, pushUndo]);
+  }, [pushUndo, signers.length, getMaxZIndex]);
 
   // Подписанты — отдельный элемент конструктора
-  const addSignerSlot = useCallback(() => {
+  const _addSignerSlot = useCallback(() => {
+    if (signers.length >= 4) return;
+    const id = `s_${Date.now()}_${signers.length}`;
+    const offset = signers.length * 12;
     setSigners((prev) => {
       if (prev.length >= 4) return prev;
-      const offset = prev.length * 12;
       return [...prev, {
-        id: `s_${Date.now()}_${prev.length}`,
+        id,
         position: "Должность",
         fullName: "Фамилия И.О.",
         facFile: null, facPreview: null,
         offsetY: offset, facOffsetX: 0, facOffsetY: 0, facScale: 1,
+        showLine: true, align: "split",
       }];
     });
+    setSelectedSignerId(id);
+    setSelectedElementId(null);
+    setSelectedImageId(null);
+  }, [signers.length]);
+
+  const handleSignerMove = useCallback((id, xMm, yMm) => {
+    const idx = signers.findIndex((s) => s.id === id);
+    if (idx === -1) return;
+    const roundedX = Math.round(clamp(xMm, 0, PAGE_W) * 10) / 10;
+    const roundedOffset = Math.round((yMm - signersLayout.y_mm - idx * signersLayout.row_h_mm) * 10) / 10;
+    setSignersLayout((p) => ({ ...p, x_mm: roundedX }));
+    setSigners((prev) => prev.map((s) => s.id === id ? { ...s, offsetY: roundedOffset } : s));
+  }, [signers, signersLayout.y_mm, signersLayout.row_h_mm]);
+
+  const handleSignerResize = useCallback((id, patch) => {
+    const idx = signers.findIndex((s) => s.id === id);
+    if (idx === -1) return;
+    const nextWidth = Math.round(clamp(Number(patch.widthMm) || signersLayout.band_mm, 25, PAGE_W) * 10) / 10;
+    const nextHeight = Math.round(clamp(Number(patch.heightMm) || signersLayout.row_h_mm, 10, 160) * 10) / 10;
+    const nextX = Math.round(clamp(Number(patch.xMm) || signersLayout.x_mm, 0, PAGE_W) * 10) / 10;
+    const nextOffset = Math.round(((Number(patch.yMm) || signersLayout.y_mm) - signersLayout.y_mm - idx * nextHeight) * 10) / 10;
+    setSignersLayout((p) => ({ ...p, x_mm: nextX, band_mm: nextWidth, row_h_mm: nextHeight }));
+    setSigners((prev) => prev.map((s) => s.id === id ? { ...s, offsetY: nextOffset } : s));
+  }, [signers, signersLayout]);
+
+  const duplicateSigner = useCallback((id) => {
+    const src = signers.find((s) => s.id === id);
+    if (!src || signers.length >= 4) return;
+    const newId = `s_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+    setSigners((prev) => [...prev, {
+      ...src,
+      id: newId,
+      offsetY: (Number(src.offsetY) || 0) + 8,
+      zIndex: (typeof src.zIndex === "number" ? src.zIndex : 40) + 1,
+    }]);
+    setSelectedSignerId(newId);
+    setSelectedElementId(null);
+    setSelectedImageId(null);
+  }, [signers]);
+
+  const moveSignerLayer = useCallback((id, direction) => {
+    setSigners((prev) => {
+      const zValues = prev.map((s, i) => typeof s.zIndex === "number" ? s.zIndex : 40 + i);
+      const idx = prev.findIndex((s) => s.id === id);
+      if (idx === -1) return prev;
+      const current = zValues[idx];
+      const nextZ = direction === "front"
+        ? Math.max(...zValues, 40) + 1
+        : direction === "back"
+          ? Math.min(...zValues, 40) - 1
+          : direction === "up"
+            ? current + 1
+            : direction === "down"
+              ? current - 1
+              : current;
+      return prev.map((s) => s.id === id ? { ...s, zIndex: nextZ } : s);
+    });
+  }, []);
+
+  const toggleSignerHidden = useCallback((id) => {
+    setSigners((prev) => prev.map((s) => s.id === id ? { ...s, hidden: !s.hidden } : s));
+  }, []);
+
+  const toggleSignerLocked = useCallback((id) => {
+    setSigners((prev) => prev.map((s) => s.id === id ? { ...s, locked: !s.locked } : s));
   }, []);
 
   // ── Сохранение ────────────────────────────────────────────────────────────
@@ -1071,21 +1538,83 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         });
       }
 
-      // 3. Конвертируем элементы из % в мм
+      // 3. Загружаем новые изображения, печати, подписи и факсимиле
+      const imageElementsData = [];
+      for (const img of images) {
+        let sourceUrl = sourceUrlToApi(img.sourceUrl || img.source_url || null);
+        if (img.kind !== "line" && img.file) {
+          const fd = new FormData();
+          fd.append("file", img.file);
+          const r = await fetch(`${API_BASE}/certificates/upload-image`, {
+            method: "POST",
+            headers: authHeaders(),
+            body: fd,
+          });
+          if (!r.ok) throw new Error(await getApiErrorMessage(r, "Ошибка загрузки изображения"));
+          const uploaded = await r.json();
+          sourceUrl = uploaded.source_url || uploaded.image_url || null;
+        }
+        imageElementsData.push({
+          id: img.id,
+          type: imageKindToElementType(img.kind),
+          text: img.label || "",
+          value: img.label || "",
+          is_variable: false,
+          x_mm: (Number(img.x || 0) / 100) * PAGE_W,
+          y_mm: (Number(img.y || 0) / 100) * PAGE_H,
+          width: Number(img.widthMm) || (img.kind === "line" ? 58 : 40),
+          height: Number(img.heightMm) || (img.kind === "line" ? 0.55 : 25),
+          max_width_mm: Number(img.widthMm) || null,
+          max_height_mm: Number(img.heightMm) || null,
+          font_size: 12,
+          color: img.color || "#1e293b",
+          font_weight: "400",
+          font_family: DEFAULT_FONT_FAMILY,
+          align: "center",
+          line_height: 1,
+          z_index: typeof img.zIndex === "number" ? img.zIndex : 1,
+          hidden: !!img.hidden,
+          locked: !!img.locked,
+          opacity: img.opacity ?? 1,
+          source_url: sourceUrl,
+          signerGroupId: img.signerGroupId || null,
+          anchor: "center",
+        });
+      }
+
+      // 4. Конвертируем текстовые элементы из % в мм
       const elementsData = elements.map((el) => {
         const align = el.align || smartAlign(el.x, safePct.xMin, safePct.xMax);
+        const widthMm = el.maxWidthMm ? Number(el.maxWidthMm) : null;
+        const heightMm = el.maxHeightMm ? Number(el.maxHeightMm) : null;
         return {
+          id: el.id,
+          type: el.type || "text",
           text: el.text,
+          value: el.value || el.text,
           is_variable: el.text.includes("{"),
           x_mm: (el.x / 100) * PAGE_W,
           y_mm: (el.y / 100) * PAGE_H,
+          width: widthMm,
+          height: heightMm,
           font_size: el.size,
           color: el.color,
           font_weight: el.weight,
           font_family: el.fontFamily || DEFAULT_FONT_FAMILY,
           align,
-          max_width_mm: el.maxWidthMm ? Number(el.maxWidthMm) : null,
-          max_height_mm: el.maxHeightMm ? Number(el.maxHeightMm) : null,
+          line_height: el.lineHeight || 1.25,
+          z_index: typeof el.zIndex === "number" ? el.zIndex : 20,
+          hidden: !!el.hidden,
+          locked: !!el.locked,
+          opacity: el.opacity ?? 1,
+          italic: !!el.italic,
+          underline: !!el.underline,
+          variableName: el.variableName || null,
+          grammar_settings: el.grammarSettings || null,
+          signerGroupId: el.signerGroupId || null,
+          anchor: "center",
+          max_width_mm: widthMm,
+          max_height_mm: heightMm,
         };
       });
 
@@ -1100,7 +1629,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         signers_name_color: signersLayout.name_color || null,
         margin_left_mm: margins.left, margin_right_mm: margins.right,
         margin_top_mm: margins.top, margin_bottom_mm: margins.bottom,
-        elements: elementsData, signers: signersData,
+        elements: [...elementsData, ...imageElementsData], signers: signersData,
       };
 
       let res;
@@ -1117,10 +1646,15 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         });
         if (res.ok) {
           const created = await res.json();
-          setMode("edit"); setEditingId(created.template.id);
-          writeStoredPreviewVariables(created.template.id, detectedPlaceholders, previewVariables);
-          setMsg("Шаблон создан и сохранён!"); setMsgType("success");
+          const newId = created.template.id;
+          setMode("edit"); setEditingId(newId);
+          writeStoredPreviewVariables(newId, detectedPlaceholders, previewVariables);
+          // Очищаем autosave-draft для нового шаблона
+          try { window.localStorage.removeItem(`cert-constructor-autosave:new`); } catch { /* ignore */ }
           setIsDirty(false); setAutoSaveStatus("saved"); setLastSavedAt(new Date());
+          clearTimeout(saveSuccessTimerRef.current);
+          setSaveSuccess(true);
+          saveSuccessTimerRef.current = setTimeout(() => setSaveSuccess(false), 4000);
           onTemplatesSaved?.();
           return;
         }
@@ -1131,9 +1665,13 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
       }
       if (mode === "edit" && editingId) {
         writeStoredPreviewVariables(editingId, detectedPlaceholders, previewVariables);
+        // Очищаем autosave-draft после ручного сохранения
+        try { window.localStorage.removeItem(`cert-constructor-autosave:${editingId}`); } catch { /* ignore */ }
       }
-      setMsg(mode === "edit" ? "Шаблон обновлён!" : "Шаблон сохранён!"); setMsgType("success");
       setIsDirty(false); setAutoSaveStatus("saved"); setLastSavedAt(new Date());
+      clearTimeout(saveSuccessTimerRef.current);
+      setSaveSuccess(true);
+      saveSuccessTimerRef.current = setTimeout(() => setSaveSuccess(false), 4000);
       onTemplatesSaved?.();
     } catch (e) {
       setMsg(e.message || "Ошибка сохранения"); setMsgType("error");
@@ -1142,15 +1680,20 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     }
   };
 
-  const selectedElement = elements.find((element) => element.id === selectedElementId) || elements[0] || null;
+  const selectedElement = selectedElementId == null ? null : (elements.find((element) => element.id === selectedElementId) || null);
   const selectedAlign = selectedElement?.align || smartAlign(selectedElement?.x || 50, safePct.xMin, safePct.xMax);
-  const addPresetBlock = (key) => {
+  const selectedSigner = selectedSignerId == null ? null : (signers.find((signer) => signer.id === selectedSignerId) || null);
+  const selectedSignerIndex = selectedSigner ? signers.findIndex((signer) => signer.id === selectedSigner.id) : -1;
+  const selectedSignerYmm = selectedSigner
+    ? signersLayout.y_mm + selectedSignerIndex * signersLayout.row_h_mm + (Number(selectedSigner.offsetY) || 0)
+    : signersLayout.y_mm;
+  const _addPresetBlock = (key) => {
     pushUndo();
     insertVariableBlock(key);
   };
   const addDecorBlock = (text, overrides = {}) => {
     pushUndo();
-    const newId = Math.max(0, ...elements.map((e) => e.id)) + 1;
+    const newId = createCanvasId("txt");
     setElements((prev) => [...prev, {
       id: newId,
       text,
@@ -1163,6 +1706,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
       align: overrides.align ?? "center",
       maxWidthMm: overrides.maxWidthMm ?? 160,
       maxHeightMm: overrides.maxHeightMm ?? null,
+      zIndex: overrides.zIndex ?? getMaxZIndex() + 1,
     }]);
     setSelectedElementId(newId);
   };
@@ -1170,11 +1714,37 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
     if (!selectedElement) return;
     updateEl(selectedElement.id, field, value);
   };
-  const handleCanvasPreview = () => {
+  const updateSelectedSignerField = (field, value) => {
+    if (!selectedSigner) return;
+    updateSigner(selectedSigner.id, field, value);
+  };
+  const updateSelectedSignerLayout = (field, value) => {
+    if (!selectedSigner) return;
+    const numeric = Number(value);
+    if (field === "x_mm") {
+      setSignersLayout((prev) => ({ ...prev, x_mm: Math.round(clamp(numeric, 0, PAGE_W) * 10) / 10 }));
+      return;
+    }
+    if (field === "y_mm") {
+      const nextOffset = Math.round((clamp(numeric, 0, PAGE_H) - signersLayout.y_mm - selectedSignerIndex * signersLayout.row_h_mm) * 10) / 10;
+      updateSigner(selectedSigner.id, "offsetY", nextOffset);
+      return;
+    }
+    if (field === "band_mm") {
+      setSignersLayout((prev) => ({ ...prev, band_mm: Math.round(clamp(numeric, 25, PAGE_W) * 10) / 10 }));
+      return;
+    }
+    if (field === "row_h_mm") {
+      setSignersLayout((prev) => ({ ...prev, row_h_mm: Math.round(clamp(numeric, 10, 160) * 10) / 10 }));
+      return;
+    }
+    setSignersLayout((prev) => ({ ...prev, [field]: value }));
+  };
+  const _handleCanvasPreview = () => {
     setMsg("Предпросмотр обновляется на холсте в реальном времени.");
     setMsgType("info");
   };
-  const visibleVariables = useMemo(() => {
+  const _visibleVariables = useMemo(() => {
     const merged = new Set();
     QUICK_VARIABLES.forEach((v) => merged.add(v));
     detectedPlaceholders.forEach((v) => merged.add(v));
@@ -1198,12 +1768,27 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
   const handleSelectElement = (id) => {
     setSelectedElementId(id);
     setSelectedImageId(null);
+    setSelectedSignerId(null);
   };
 
   const handleSelectImage = (id) => {
     setSelectedImageId(id);
     setSelectedElementId(null);
+    setSelectedSignerId(null);
   };
+
+  const handleSelectSigner = (id) => {
+    setSelectedSignerId(id);
+    setSelectedElementId(null);
+    setSelectedImageId(null);
+  };
+
+  const clearCanvasSelection = useCallback(() => {
+    setSelectedElementId(null);
+    setSelectedImageId(null);
+    setSelectedSignerId(null);
+    setCtxMenu(null);
+  }, []);
 
   const handleStampFile = (e) => {
     const f = e.target.files?.[0]; e.target.value = "";
@@ -1428,7 +2013,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         .tpl-btn.primary:hover:not(:disabled) { background: var(--tpl-primary-dark); border-color: var(--tpl-primary-dark); }
         .tpl-btn.primary:disabled { background: #b2bec5; border-color: #b2bec5; box-shadow: none; color: #fff; }
         .tpl-btn.danger { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
-        .tpl-btn.danger:hover { background: #fee2e2; border-color: #fca5a5; }
+        .tpl-btn.danger:hover:not(:disabled) { background: #fee2e2; border-color: #fca5a5; }
 
         .tpl-side {
           min-height: 0;
@@ -1680,6 +2265,9 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           border-radius: 8px;
           background: #f4f7f9;
         }
+        .tpl-toggle-row.tpl-toggle-row-4 {
+          grid-template-columns: repeat(4, 1fr);
+        }
         .tpl-toggle-row button {
           min-height: 30px;
           border: 0;
@@ -1704,6 +2292,48 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           text-align: center;
         }
         .tpl-divider { height: 1px; background: var(--tpl-border-soft); margin: 6px 0; }
+        .tpl-action-section {
+          display: grid;
+          gap: 8px;
+        }
+        .tpl-action-title {
+          color: #52636d;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: .04em;
+          text-transform: uppercase;
+        }
+        .tpl-action-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+        .tpl-action-grid .tpl-btn {
+          width: 100%;
+          min-height: 36px;
+          justify-content: center;
+          text-align: center;
+          padding: 0 10px;
+        }
+        .tpl-checkbox-row {
+          display: flex !important;
+          grid-template-columns: none !important;
+          align-items: center;
+          gap: 8px !important;
+          min-height: 34px;
+          color: var(--tpl-text) !important;
+          font-size: 13px !important;
+          font-weight: 800 !important;
+          letter-spacing: 0 !important;
+          text-transform: none !important;
+        }
+        .tpl-checkbox-row input[type="checkbox"] {
+          width: 16px;
+          min-height: 16px;
+          height: 16px;
+          padding: 0;
+          accent-color: var(--tpl-primary);
+        }
 
         .tpl-layers-popover {
           position: absolute;
@@ -1778,9 +2408,6 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
 
       <div className="template-toolbar">
         <div className="tpl-toolbar-group" style={{ minWidth: 0, flex: 1 }}>
-          <button type="button" className="tpl-back-btn" onClick={() => navigate("/admin/certificates")} aria-label="Назад" title="Назад">
-            ←
-          </button>
           <span className="tpl-toolbar-title">Конструктор шаблонов</span>
           <input
             className="tpl-title-input"
@@ -1866,15 +2493,26 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
               setBgUrl(createTrackedObjectUrl(file));
             }}
           />
-          <span className={`tpl-save-status tpl-save-status--${autoSaveStatus || (isDirty ? "dirty" : "idle")}`}>
+          <span className={`tpl-save-status tpl-save-status--${
+            saveSuccess ? "saved" :
+            autoSaveStatus === "saving" || saving ? "saving" :
+            autoSaveStatus === "error" ? "error" :
+            isDirty ? "dirty" : "idle"
+          }`}>
             {(() => {
-              if (saving) return "Сохраняется…";
-              if (autoSaveStatus === "saving") return "Сохраняется…";
-              if (autoSaveStatus === "saved") return lastSavedAt ? `Сохранено ${lastSavedAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}` : "Сохранено";
-              if (autoSaveStatus === "autosaved") return lastSavedAt ? `Черновик ${lastSavedAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}` : "Черновик сохранён";
+              if (saving || autoSaveStatus === "saving") return "Сохраняется…";
+              if (saveSuccess) return lastSavedAt
+                ? `Шаблон успешно сохранён • ${lastSavedAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`
+                : "Шаблон успешно сохранён";
+              if (autoSaveStatus === "saved") return lastSavedAt
+                ? `Сохранено ${lastSavedAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`
+                : "Сохранено";
+              if (autoSaveStatus === "autosaved") return lastSavedAt
+                ? `Черновик ${lastSavedAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`
+                : "Черновик сохранён";
               if (autoSaveStatus === "error") return "Ошибка сохранения";
               if (isDirty) return "Есть несохранённые изменения";
-              return "Изменений нет";
+              return "";
             })()}
           </span>
           <button type="button" className="tpl-btn secondary" onClick={() => bgInputRef.current?.click()}>
@@ -1891,6 +2529,76 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         </div>
       </div>
 
+      {draftOffer && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="draft-modal-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(11,31,42,0.52)",
+            backdropFilter: "blur(2px)",
+            padding: "16px",
+          }}
+        >
+          <div style={{
+            background: "#fff",
+            borderRadius: 14,
+            boxShadow: "0 24px 64px rgba(11,31,42,0.22)",
+            padding: "32px 32px 28px",
+            maxWidth: 440,
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+          }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+              <span style={{
+                width: 44, height: 44, borderRadius: "50%",
+                background: "#edf6f8",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
+              }}>
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#19789c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 9v4M12 17h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+              </span>
+              <div>
+                <h2 id="draft-modal-title" style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 800, color: "#0b1f2a", lineHeight: 1.2 }}>
+                  Обнаружен несохранённый черновик
+                </h2>
+                <p style={{ margin: 0, fontSize: 14, color: "#4a6370", lineHeight: 1.55 }}>
+                  Найден черновик шаблона{draftOffer.data?.name ? ` «${draftOffer.data.name}»` : ""}.
+                  {" "}Хотите восстановить его?
+                </p>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+              <button
+                type="button"
+                className="tpl-btn secondary"
+                onClick={dismissDraft}
+                autoFocus
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="tpl-btn primary"
+                onClick={restoreDraft}
+              >
+                Восстановить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {layersOpen && (
         <div className="tpl-layers-popover" role="dialog" aria-label="Слои">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1900,10 +2608,39 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           <p style={{ margin: "8px 0 10px", color: "#667783", fontSize: 11, lineHeight: 1.4 }}>
             Сверху списка — верхние слои. Они перекрывают нижние на холсте и в PDF.
           </p>
-          {elements.length === 0 && images.length === 0 && (
+          {elements.length === 0 && images.length === 0 && signers.length === 0 && (
             <p style={{ margin: 0, color: "#667783", fontSize: 12 }}>Добавьте элементы на холст, чтобы они появились здесь.</p>
           )}
-          {[...elements].reverse().map((el) => {
+          {layerItems.map((item) => {
+            const isLocked = !!item.locked;
+            const isHidden = !!item.hidden;
+            const isActive = item.kind === "image" ? selectedImageId === item.id : selectedElementId === item.id;
+            const selectItem = item.kind === "image" ? handleSelectImage : handleSelectElement;
+            const removeItem = item.kind === "image" ? removeImage : removeEl;
+            return (
+              <div
+                key={`${item.kind}-${item.id}`}
+                className={`tpl-layer-row${isActive ? " is-active" : ""}`}
+                onClick={() => selectItem(item.id)}
+                style={isHidden ? { opacity: 0.5 } : undefined}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ color: item.kind === "image" ? "#004f75" : "#19789c", fontSize: 11, fontWeight: 900 }}>{item.icon}</span>
+                  <span style={{ minWidth: 0 }}>
+                    {item.group ? `Подписант · ${item.label}` : item.label}
+                  </span>
+                </span>
+                <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); moveLayer(item.kind, item.id, "front"); }} title="На передний план" style={{ fontSize: 11 }}>⤒</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); moveLayer(item.kind, item.id, "up"); }} title="Выше">▲</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); moveLayer(item.kind, item.id, "down"); }} title="Ниже">▼</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); moveLayer(item.kind, item.id, "back"); }} title="На задний план" style={{ fontSize: 11 }}>⤓</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); toggleHidden(item.kind, item.id); }} title={isHidden ? "Показать" : "Скрыть"} style={{ color: isHidden ? "#b91c1c" : undefined }}>{isHidden ? "○" : "●"}</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); toggleLocked(item.kind, item.id); }} title={isLocked ? "Разблокировать" : "Заблокировать"} style={{ color: isLocked ? "#b45309" : undefined }}>{isLocked ? "■" : "□"}</button>
+                <button type="button" className="delete-btn" onClick={(e) => { e.stopPropagation(); pushUndo(); removeItem(item.id); }} title="Удалить">×</button>
+              </div>
+            );
+          })}
+          {SHOW_LEGACY_LAYER_SECTIONS && [...elements].reverse().map((el) => {
             const isVar = (el.text || "").includes("{");
             const isLocked = !!el.locked;
             const isHidden = !!el.hidden;
@@ -1928,7 +2665,31 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
               </div>
             );
           })}
-          {[...images].reverse().map((img) => {
+          {SHOW_LEGACY_LAYER_SECTIONS && [...signers].sort((a, b) => (typeof (b.zIndex) === "number" ? b.zIndex : 40) - (typeof (a.zIndex) === "number" ? a.zIndex : 40)).map((signer, index) => {
+            const isLocked = !!signer.locked;
+            const isHidden = !!signer.hidden;
+            return (
+              <div
+                key={`signer-${signer.id}`}
+                className={`tpl-layer-row${selectedSignerId === signer.id ? " is-active" : ""}`}
+                onClick={() => handleSelectSigner(signer.id)}
+                style={isHidden ? { opacity: 0.5 } : undefined}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ color: "#004f75", fontSize: 11, fontWeight: 900 }}>П</span>
+                  {signer.fullName || `Подписант ${index + 1}`}
+                </span>
+                <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); moveSignerLayer(signer.id, "front"); }} title="На передний план" style={{ fontSize: 11 }}>⤒</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); moveSignerLayer(signer.id, "up"); }} title="Выше">▲</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); moveSignerLayer(signer.id, "down"); }} title="Ниже">▼</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); pushUndo(); moveSignerLayer(signer.id, "back"); }} title="На задний план" style={{ fontSize: 11 }}>⤓</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); toggleSignerHidden(signer.id); }} title={isHidden ? "Показать" : "Скрыть"} style={{ color: isHidden ? "#b91c1c" : undefined }}>{isHidden ? "🚫" : "👁"}</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); toggleSignerLocked(signer.id); }} title={isLocked ? "Разблокировать" : "Заблокировать"} style={{ color: isLocked ? "#b45309" : undefined }}>{isLocked ? "🔒" : "🔓"}</button>
+                <button type="button" className="delete-btn" onClick={(e) => { e.stopPropagation(); pushUndo(); removeSigner(signer.id); }} title="Удалить">×</button>
+              </div>
+            );
+          })}
+          {SHOW_LEGACY_LAYER_SECTIONS && [...images].reverse().map((img) => {
             const isLocked = !!img.locked;
             const isHidden = !!img.hidden;
             return (
@@ -2033,13 +2794,72 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
             <button
               type="button"
               className="tpl-element-btn"
-              onClick={() => { pushUndo(); addSignerSlot(); }}
-              disabled={signers.length >= 4}
-              title={signers.length >= 4 ? "Максимум 4 подписанта" : "Добавить подписанта"}
+              onClick={() => {
+                resetSignerDraft();
+                setSignerPresetOpen(true);
+              }}
+              disabled={signerGroupCount >= 4}
+              title={signerGroupCount >= 4 ? "Максимум 4 подписанта" : "Добавить подписанта"}
             >
               <svg viewBox="0 0 24 24"><path d="M4 19c2-3 5-4 8-4s6 1 8 4M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/></svg>
-              Добавить подписанта {signers.length > 0 ? `(${signers.length}/4)` : ""}
+              Добавить подписанта {signerGroupCount > 0 ? `(${signerGroupCount}/4)` : ""}
             </button>
+            {signerPresetOpen && (
+              <div className="tpl-props" style={{ gridColumn: "1 / -1", display: "grid", gap: 10, border: "1px solid var(--tpl-border-soft)", borderRadius: 8, padding: 10, background: "#f8fbfc" }}>
+                <input type="file" accept="image/*" ref={signerFacInputRef} style={{ display: "none" }} onChange={handleSignerPresetFacsimile} />
+                <label>
+                  Должность
+                  <input
+                    value={signerDraft.position}
+                    onChange={(event) => setSignerDraft((prev) => ({ ...prev, position: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  ФИО подписанта
+                  <input
+                    value={signerDraft.fullName}
+                    onChange={(event) => setSignerDraft((prev) => ({ ...prev, fullName: event.target.value }))}
+                  />
+                </label>
+                <div className="tpl-action-grid">
+                  <button type="button" className="tpl-btn" onClick={() => signerFacInputRef.current?.click()}>
+                    {signerDraft.facPreview ? "Заменить факсимиле" : "Загрузить факсимиле"}
+                  </button>
+                  <button
+                    type="button"
+                    className="tpl-btn"
+                    onClick={() => setSignerDraft((prev) => {
+                      if (prev.facPreview && prev.facFile) revokeObjectUrl(prev.facPreview);
+                      return { ...prev, facFile: null, facPreview: null };
+                    })}
+                    disabled={!signerDraft.facPreview}
+                  >
+                    Убрать факсимиле
+                  </button>
+                </div>
+                {signerDraft.facPreview && (
+                  <div style={{ display: "flex", justifyContent: "center", padding: 6, borderRadius: 6, background: "#fff", border: "1px solid var(--tpl-border-soft)" }}>
+                    <img src={signerDraft.facPreview} alt="Факсимиле" style={{ maxWidth: 150, maxHeight: 54, objectFit: "contain" }} />
+                  </div>
+                )}
+                <label className="tpl-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={!!signerDraft.includeLine}
+                    onChange={(event) => setSignerDraft((prev) => ({ ...prev, includeLine: event.target.checked }))}
+                  />
+                  Добавить линию подписи
+                </label>
+                <div className="tpl-action-grid">
+                  <button type="button" className="tpl-btn primary" onClick={addSignerPreset}>
+                    Добавить на холст
+                  </button>
+                  <button type="button" className="tpl-btn" onClick={() => { resetSignerDraft(); setSignerPresetOpen(false); }}>
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -2071,7 +2891,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
                 <div key={s.id} style={{ border: "1px solid var(--tpl-border-soft)", borderRadius: 8, padding: 10, display: "grid", gap: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <strong style={{ color: "var(--tpl-primary-dark)", fontSize: 12, fontWeight: 900 }}>Подписант №{i + 1}</strong>
-                    <button type="button" className="tpl-block-delete" onClick={() => setSigners((prev) => prev.filter((x) => x.id !== s.id))} title="Удалить подписанта" aria-label="Удалить подписанта">×</button>
+                    <button type="button" className="tpl-block-delete" onClick={() => removeSigner(s.id)} title="Удалить подписанта" aria-label="Удалить подписанта">×</button>
                   </div>
                   <label>
                     Должность
@@ -2108,8 +2928,8 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         )}
 
         <div className="tpl-section">
-          <h3>Блоки на холсте ({elements.length + images.length})</h3>
-          {elements.length === 0 && images.length === 0 ? (
+          <h3>Блоки на холсте ({elements.length + images.length + signers.length})</h3>
+          {elements.length === 0 && images.length === 0 && signers.length === 0 ? (
             <p style={{ margin: 0, color: "var(--tpl-muted)", fontSize: 12 }}>Добавьте элементы, чтобы они появились в списке.</p>
           ) : (
             <div className="tpl-block-list">
@@ -2152,12 +2972,37 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
                   >×</button>
                 </div>
               ))}
+              {signers.map((signer, index) => (
+                <div
+                  key={`bs-${signer.id}`}
+                  className={`tpl-block-row${selectedSignerId === signer.id ? " is-active" : ""}`}
+                  onClick={() => handleSelectSigner(signer.id)}
+                >
+                  <span className="tpl-block-kind">П</span>
+                  <span className="tpl-block-label">{signer.fullName || `Подписант №${index + 1}`}</span>
+                  <span className="tpl-block-tag">Подписант</span>
+                  <button
+                    type="button"
+                    className="tpl-block-delete"
+                    onClick={(e) => { e.stopPropagation(); removeSigner(signer.id); }}
+                    title="Удалить подписанта"
+                    aria-label="Удалить подписанта"
+                  >×</button>
+                </div>
+              ))}
             </div>
           )}
         </div>
       </aside>
 
-      <div className="tpl-canvas-area">
+      <div
+        className="tpl-canvas-area"
+        onPointerDown={(event) => {
+          if (event.button !== 0) return;
+          if (event.target.closest?.("[data-canvas-item='true']")) return;
+          clearCanvasSelection();
+        }}
+      >
         <div className="tpl-canvas-frame" style={{ "--tpl-zoom": zoom / 100 }}>
           <div className="tpl-canvas-sheet">
             <AccuratePreview
@@ -2176,6 +3021,11 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
               onElementInlineEdit={handleInlineEdit}
               onElementResize={handleElementResize}
               onSignersMove={handleSignersMove}
+              selectedSignerId={selectedSignerId}
+              onSignerSelect={handleSelectSigner}
+              onSignerMove={handleSignerMove}
+              onSignerResize={handleSignerResize}
+              onCanvasDeselect={clearCanvasSelection}
               showGrid={editorMode === "edit" && showGrid}
               showSafeZone={editorMode === "edit" && showGrid}
               showRulers={editorMode === "edit" && showGrid}
@@ -2198,7 +3048,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           {selectedImage ? (
             <div className="tpl-props">
               <p className="tpl-hint" style={{ margin: 0 }}>
-                {selectedImage.kind === "stamp" ? "Печать организации" : selectedImage.kind === "signature" ? "Подпись" : "Изображение"} · {selectedImage.file?.name || "изображение"}
+                {selectedImage.kind === "line" ? "Линия подписи" : selectedImage.kind === "stamp" ? "Печать организации" : selectedImage.kind === "signature" ? "Подпись" : "Изображение"} · {selectedImage.file?.name || selectedImage.label || "элемент"}
               </p>
               <div className="tpl-prop-grid-2">
                 <label>
@@ -2213,11 +3063,11 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
               <div className="tpl-prop-grid-2">
                 <label>
                   Ширина (мм)
-                  <input type="number" min={5} max={210} value={selectedImage.widthMm} onChange={(e) => updateImage(selectedImage.id, { widthMm: Number(e.target.value) })} />
+                  <input type="number" min={selectedImage.kind === "line" ? 10 : 5} max={210} value={selectedImage.widthMm} onChange={(e) => updateImage(selectedImage.id, { widthMm: Number(e.target.value) })} />
                 </label>
                 <label>
                   Высота (мм)
-                  <input type="number" min={5} max={297} value={selectedImage.heightMm} onChange={(e) => updateImage(selectedImage.id, { heightMm: Number(e.target.value) })} />
+                  <input type="number" min={selectedImage.kind === "line" ? 0.2 : 5} max={297} step={selectedImage.kind === "line" ? 0.1 : 1} value={selectedImage.heightMm} onChange={(e) => updateImage(selectedImage.id, { heightMm: Number(e.target.value) })} />
                 </label>
               </div>
               <label>
@@ -2225,31 +3075,156 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
                 <input type="range" min={0.2} max={1} step={0.05} value={selectedImage.opacity ?? 1} onChange={(e) => updateImage(selectedImage.id, { opacity: Number(e.target.value) })} />
               </label>
               <input type="file" accept="image/*" ref={imageReplaceInputRef} style={{ display: "none" }} onChange={handleReplaceImageFile} />
-              <div className="tpl-prop-grid-2">
-                <button type="button" className="tpl-btn" onClick={() => imageReplaceInputRef.current?.click()}>
-                  Заменить
-                </button>
-                <button type="button" className="tpl-btn" onClick={() => toggleLocked("image", selectedImage.id)}>
-                  {selectedImage.locked ? "Разблокировать" : "Заблокировать"}
-                </button>
+              <div className="tpl-action-section">
+                <div className="tpl-action-title">Порядок и видимость</div>
+                <div className="tpl-action-grid">
+                  <button type="button" className="tpl-btn" onClick={() => moveLayer("image", selectedImage.id, "front")}>На передний план</button>
+                  <button type="button" className="tpl-btn" onClick={() => moveLayer("image", selectedImage.id, "back")}>На задний план</button>
+                  <button type="button" className="tpl-btn" onClick={() => toggleHidden("image", selectedImage.id)}>{selectedImage.hidden ? "Показать" : "Скрыть"}</button>
+                  <button type="button" className="tpl-btn" onClick={() => toggleLocked("image", selectedImage.id)}>{selectedImage.locked ? "Разблокировать" : "Заблокировать"}</button>
+                </div>
               </div>
-              <div className="tpl-prop-grid-2">
-                <button type="button" className="tpl-btn" onClick={() => toggleHidden("image", selectedImage.id)}>
-                  {selectedImage.hidden ? "Показать" : "Скрыть"}
-                </button>
-                <button type="button" className="tpl-btn" onClick={() => moveLayer("image", selectedImage.id, "front")}>
-                  На передний план
-                </button>
+              <div className="tpl-action-section">
+                <div className="tpl-action-title">Действия</div>
+                <div className="tpl-action-grid">
+                  {selectedImage.kind !== "line" && (
+                    <button type="button" className="tpl-btn" onClick={() => imageReplaceInputRef.current?.click()}>Заменить</button>
+                  )}
+                  <button type="button" className="tpl-btn danger" onClick={() => removeImage(selectedImage.id)}>{selectedImage.kind === "line" ? "Удалить линию" : "Удалить изображение"}</button>
+                </div>
               </div>
-              <button type="button" className="tpl-btn" onClick={() => moveLayer("image", selectedImage.id, "back")}>
-                На задний план
-              </button>
-              <button type="button" className="tpl-btn danger" onClick={() => removeImage(selectedImage.id)}>
-                Удалить изображение
-              </button>
+            </div>
+          ) : selectedSigner ? (
+            <div className="tpl-props">
               <p className="tpl-hint" style={{ margin: 0 }}>
-                Изображение видно только в конструкторе. Для применения печати в PDF используйте загрузку факсимиле подписанта.
+                Подписант · {selectedSigner.fullName || "ФИО не заполнено"}
               </p>
+              <label>
+                Должность
+                <input value={selectedSigner.position || ""} onChange={(event) => updateSelectedSignerField("position", event.target.value)} />
+              </label>
+              <label>
+                ФИО
+                <input value={selectedSigner.fullName || ""} onChange={(event) => updateSelectedSignerField("fullName", event.target.value)} />
+              </label>
+              <div className="tpl-prop-grid-2">
+                <label>
+                  Позиция X (мм)
+                  <input type="number" min={0} max={210} value={Math.round(signersLayout.x_mm)} onChange={(event) => updateSelectedSignerLayout("x_mm", Number(event.target.value))} />
+                </label>
+                <label>
+                  Позиция Y (мм)
+                  <input type="number" min={0} max={297} value={Math.round(selectedSignerYmm)} onChange={(event) => updateSelectedSignerLayout("y_mm", Number(event.target.value))} />
+                </label>
+              </div>
+              <div className="tpl-prop-grid-2">
+                <label>
+                  Ширина (мм)
+                  <input type="number" min={25} max={210} value={Math.round(signersLayout.band_mm)} onChange={(event) => updateSelectedSignerLayout("band_mm", Number(event.target.value))} />
+                </label>
+                <label>
+                  Высота (мм)
+                  <input type="number" min={10} max={160} value={Math.round(signersLayout.row_h_mm)} onChange={(event) => updateSelectedSignerLayout("row_h_mm", Number(event.target.value))} />
+                </label>
+              </div>
+              <label>
+                Шрифт
+                <select value={signersLayout.font_family || DEFAULT_FONT_FAMILY} onChange={(event) => updateSelectedSignerLayout("font_family", event.target.value)}>
+                  {availableFonts.map((font) => (
+                    <option key={font.font_family} value={font.font_family}>{font.font_family}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="tpl-prop-grid-2">
+                <label>
+                  Размер
+                  <input type="number" min={5} max={36} value={signersLayout.font_size} onChange={(event) => updateSelectedSignerLayout("font_size", Number(event.target.value))} />
+                </label>
+                <label>
+                  Цвет
+                  <div className="tpl-prop-color">
+                    <input type="color" value={signersLayout.text_color} onChange={(event) => updateSelectedSignerLayout("text_color", event.target.value)} />
+                    <input value={signersLayout.text_color} onChange={(event) => updateSelectedSignerLayout("text_color", event.target.value)} />
+                  </div>
+                </label>
+              </div>
+              <label>
+                Выравнивание
+                <div className="tpl-toggle-row tpl-toggle-row-4">
+                  {[["split", "Колонки"], ["left", "Слева"], ["center", "Центр"], ["right", "Справа"]].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={(selectedSigner.align || "split") === value ? "is-active" : ""}
+                      onClick={() => updateSelectedSignerField("align", value)}
+                    >{label}</button>
+                  ))}
+                </div>
+              </label>
+              <label className="tpl-checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={selectedSigner.showLine !== false}
+                  onChange={(event) => updateSelectedSignerField("showLine", event.target.checked)}
+                />
+                Линия подписи
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                id={`fac-props-${selectedSigner.id}`}
+                style={{ display: "none" }}
+                onChange={(event) => handleFacsimile(selectedSigner.id, event)}
+              />
+              <div className="tpl-action-section">
+                <div className="tpl-action-title">Факсимиле</div>
+                <div className="tpl-action-grid">
+                  <button type="button" className="tpl-btn" onClick={() => document.getElementById(`fac-props-${selectedSigner.id}`)?.click()}>
+                    {selectedSigner.facPreview ? "Заменить" : "Загрузить"}
+                  </button>
+                  <button type="button" className="tpl-btn danger" onClick={() => clearFacsimile(selectedSigner.id)} disabled={!selectedSigner.facPreview}>
+                    Удалить
+                  </button>
+                </div>
+              </div>
+              {selectedSigner.facPreview && (
+                <>
+                  <div style={{ display: "flex", justifyContent: "center", padding: 8, background: "#f4f7f9", borderRadius: 8 }}>
+                    <img src={selectedSigner.facPreview} alt="факсимиле" style={{ maxWidth: 160, maxHeight: 58, objectFit: "contain" }} />
+                  </div>
+                  <div className="tpl-prop-grid-2">
+                    <label>
+                      Факсимиле X (мм)
+                      <input type="number" min={-80} max={80} step={0.5} value={selectedSigner.facOffsetX || 0} onChange={(event) => updateSelectedSignerField("facOffsetX", Number(event.target.value))} />
+                    </label>
+                    <label>
+                      Факсимиле Y (мм)
+                      <input type="number" min={-80} max={80} step={0.5} value={selectedSigner.facOffsetY || 0} onChange={(event) => updateSelectedSignerField("facOffsetY", Number(event.target.value))} />
+                    </label>
+                  </div>
+                  <label>
+                    Размер факсимиле
+                    <input type="range" min={0.2} max={3} step={0.05} value={selectedSigner.facScale || 1} onChange={(event) => updateSelectedSignerField("facScale", Number(event.target.value))} />
+                  </label>
+                </>
+              )}
+              <div className="tpl-divider" />
+              <div className="tpl-action-section">
+                <div className="tpl-action-title">Порядок и видимость</div>
+                <div className="tpl-action-grid">
+                  <button type="button" className="tpl-btn" onClick={() => { pushUndo(); moveSignerLayer(selectedSigner.id, "front"); }}>На передний план</button>
+                  <button type="button" className="tpl-btn" onClick={() => { pushUndo(); moveSignerLayer(selectedSigner.id, "back"); }}>На задний план</button>
+                  <button type="button" className="tpl-btn" onClick={() => { pushUndo(); toggleSignerHidden(selectedSigner.id); }}>{selectedSigner.hidden ? "Показать" : "Скрыть"}</button>
+                  <button type="button" className="tpl-btn" onClick={() => { pushUndo(); toggleSignerLocked(selectedSigner.id); }}>{selectedSigner.locked ? "Разблокировать" : "Заблокировать"}</button>
+                </div>
+              </div>
+              <div className="tpl-action-section">
+                <div className="tpl-action-title">Действия</div>
+                <div className="tpl-action-grid">
+                  <button type="button" className="tpl-btn" onClick={() => { pushUndo(); duplicateSigner(selectedSigner.id); }}>Дублировать блок</button>
+                  <button type="button" className="tpl-btn danger" onClick={() => { pushUndo(); removeSigner(selectedSigner.id); }}>Удалить подписанта</button>
+                </div>
+              </div>
             </div>
           ) : selectedElement ? (
             <div className="tpl-props">
@@ -2312,41 +3287,25 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
                 <div className="tpl-toggle-row">
                   <button
                     type="button"
-                    className={selectedElement.weight === "400" ? "is-active" : ""}
-                    onClick={() => updateSelectedElement("weight", "400")}
-                  >Обычный</button>
-                  <button
-                    type="button"
-                    className={selectedElement.weight === "600" ? "is-active" : ""}
-                    onClick={() => updateSelectedElement("weight", "600")}
-                  >Полу­жирный</button>
-                  <button
-                    type="button"
-                    className={selectedElement.weight === "700" ? "is-active" : ""}
-                    onClick={() => updateSelectedElement("weight", "700")}
-                  >Жирный</button>
-                </div>
-              </label>
-              <label>
-                Стиль
-                <div className="tpl-toggle-row">
+                    className={selectedElement.weight !== "400" ? "is-active" : ""}
+                    onClick={() => updateSelectedElement("weight", selectedElement.weight !== "400" ? "400" : "700")}
+                    title="Жирный"
+                    aria-pressed={selectedElement.weight !== "400"}
+                  ><strong>B</strong></button>
                   <button
                     type="button"
                     className={selectedElement.italic ? "is-active" : ""}
                     onClick={() => updateSelectedElement("italic", !selectedElement.italic)}
                     title="Курсив"
+                    aria-pressed={!!selectedElement.italic}
                   ><i>I</i></button>
                   <button
                     type="button"
                     className={selectedElement.underline ? "is-active" : ""}
                     onClick={() => updateSelectedElement("underline", !selectedElement.underline)}
                     title="Подчёркивание"
+                    aria-pressed={!!selectedElement.underline}
                   ><u>U</u></button>
-                  <button
-                    type="button"
-                    onClick={() => { updateSelectedElement("italic", false); updateSelectedElement("underline", false); }}
-                    title="Сбросить стиль"
-                  >—</button>
                 </div>
               </label>
               <label>
@@ -2395,28 +3354,22 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
                 </label>
               )}
               <div className="tpl-divider" />
-              <div className="tpl-prop-grid-2">
-                <button type="button" className="tpl-btn" onClick={() => { pushUndo(); toggleHidden("element", selectedElement.id); }}>
-                  {selectedElement.hidden ? "Показать" : "Скрыть"}
-                </button>
-                <button type="button" className="tpl-btn" onClick={() => { pushUndo(); toggleLocked("element", selectedElement.id); }}>
-                  {selectedElement.locked ? "Разблокировать" : "Заблокировать"}
-                </button>
+              <div className="tpl-action-section">
+                <div className="tpl-action-title">Порядок и видимость</div>
+                <div className="tpl-action-grid">
+                  <button type="button" className="tpl-btn" onClick={() => { pushUndo(); moveElementZ(selectedElement.id, "front"); }}>На передний план</button>
+                  <button type="button" className="tpl-btn" onClick={() => { pushUndo(); moveElementZ(selectedElement.id, "back"); }}>На задний план</button>
+                  <button type="button" className="tpl-btn" onClick={() => { pushUndo(); toggleHidden("element", selectedElement.id); }}>{selectedElement.hidden ? "Показать" : "Скрыть"}</button>
+                  <button type="button" className="tpl-btn" onClick={() => { pushUndo(); toggleLocked("element", selectedElement.id); }}>{selectedElement.locked ? "Разблокировать" : "Заблокировать"}</button>
+                </div>
               </div>
-              <div className="tpl-prop-grid-2">
-                <button type="button" className="tpl-btn" onClick={() => { pushUndo(); moveElementZ(selectedElement.id, "front"); }}>
-                  На передний план
-                </button>
-                <button type="button" className="tpl-btn" onClick={() => { pushUndo(); moveElementZ(selectedElement.id, "back"); }}>
-                  На задний план
-                </button>
+              <div className="tpl-action-section">
+                <div className="tpl-action-title">Действия</div>
+                <div className="tpl-action-grid">
+                  <button type="button" className="tpl-btn" onClick={() => { pushUndo(); duplicateEl(selectedElement.id); }}>Дублировать блок</button>
+                  <button type="button" className="tpl-btn danger" onClick={() => { pushUndo(); removeEl(selectedElement.id); }}>Удалить блок</button>
+                </div>
               </div>
-              <button type="button" className="tpl-btn" onClick={() => { pushUndo(); duplicateEl(selectedElement.id); }}>
-                Дублировать блок
-              </button>
-              <button type="button" className="tpl-btn danger" onClick={() => { pushUndo(); removeEl(selectedElement.id); }}>
-                Удалить блок
-              </button>
             </div>
           ) : (
             <div className="tpl-empty-props">

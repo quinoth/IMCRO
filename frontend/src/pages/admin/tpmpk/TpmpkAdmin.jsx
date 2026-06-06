@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { API_BASE } from "../../../constants/index.js";
 import { authHeaders, getStoredAccessToken } from "../../../utils/authHeaders.js";
 
@@ -280,7 +280,6 @@ function Field({ label, children, error, hint, className = "" }) {
 }
 
 export default function TpmpkAdmin({ currentUser, onLogout }) {
-  const navigate = useNavigate();
   const heroRef = useRef(null);
   const didMountRef = useRef(false);
   const modules = useMemo(() => [
@@ -381,20 +380,24 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
 
   useEffect(() => {
     loadData(activeModule);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeModule]);
 
   useEffect(() => {
     if (activeModule === "day") loadData("day");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
   useEffect(() => {
     if (activeModule !== "template" || !showCustomDaySettings) return;
     loadCustomDay(customDayDate);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeModule, customDayDate, showCustomDaySettings]);
 
   useEffect(() => {
     if (activeModule !== "manual") return;
     loadManualSlots(manual.date);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeModule, manual.date]);
 
   useEffect(() => {
@@ -650,7 +653,7 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         <div className="tp-stat-grid">
           <StatCard label="Записей сегодня" value={dashboard?.today_count ?? 0} hint="Только текущая дата" />
           <StatCard label="Ближайший свободный слот" value={formatTime(dashboard?.nearest_slot) || "-"} hint="Сегодня" />
-          <StatCard label="Новых заявок" value={dashboard?.new_count ?? 0} hint="За последние дни" />
+          <StatCard label="Новых заявок" value={dashboard?.new_24h ?? 0} hint="За последние дни" />
         </div>
         <div className="tp-panel">
           <div className="tp-panel-head">
@@ -1070,13 +1073,20 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
     <div className="tp-admin-page">
       <style>{`
         .tp-admin-page {
+          --tp-primary: #19789c;
+          --tp-primary-dark: #004f75;
+          --tp-primary-soft: #edf6f8;
+          --tp-primary-softest: #f8fbfc;
+          --tp-primary-line: #b8d4dd;
+          --tp-primary-line-strong: #8fc4d4;
+          --tp-primary-shadow: rgba(25, 120, 156, .18);
           min-height: 100vh;
           display: flex;
           flex-direction: column;
           color: #0f172a;
           background:
-            radial-gradient(circle at 8% 4%, rgba(20, 184, 166, .10), transparent 28%),
-            linear-gradient(135deg, #ffffff 0%, #eff6ff 56%, #f0fdf4 100%);
+            radial-gradient(circle at 8% 4%, rgba(25, 120, 156, .10), transparent 28%),
+            linear-gradient(135deg, #ffffff 0%, var(--tp-primary-soft) 58%, var(--tp-primary-softest) 100%);
         }
 
         .tp-admin-bar {
@@ -1155,12 +1165,12 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
 
         .tp-tab.active {
           background: #fff;
-          color: #19789c;
-          box-shadow: 0 10px 24px rgba(30, 64, 175, .08);
+          color: var(--tp-primary);
+          box-shadow: 0 10px 24px rgba(25, 120, 156, .1);
         }
 
         .tp-tab.active small {
-          color: #3b82f6;
+          color: var(--tp-primary-dark);
         }
 
         .tp-exit {
@@ -1223,12 +1233,62 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         .tp-date-chip {
           padding: 10px 15px;
           border-radius: 999px;
-          border: 1px solid #dbeafe;
+          border: 1px solid var(--tp-primary-line);
           background: #fff;
-          color: #19789c;
+          color: var(--tp-primary-dark);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           font-size: 13px;
           font-weight: 850;
-          box-shadow: 0 12px 30px rgba(30, 64, 175, .07);
+          box-shadow: 0 12px 30px rgba(25, 120, 156, .1);
+        }
+
+        .tp-hero-actions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .tp-site-link {
+          min-height: 42px;
+          padding: 0 15px;
+          border-radius: 8px;
+          border: 1px solid var(--tp-primary);
+          background: linear-gradient(135deg, var(--tp-primary), var(--tp-primary-dark));
+          color: #fff;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          text-decoration: none;
+          font-size: 13px;
+          font-weight: 900;
+          box-shadow: 0 12px 24px rgba(25, 120, 156, .18);
+          transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+        }
+
+        .tp-site-link:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 16px 30px rgba(25, 120, 156, .24);
+        }
+
+        .tp-tab:focus-visible,
+        .tp-exit:focus-visible,
+        .tp-site-link:focus-visible,
+        .tp-link-btn:focus-visible,
+        .tp-primary:focus-visible,
+        .tp-datebar button:focus-visible,
+        .tp-date-picker:focus-within,
+        .tp-record-row:focus-visible,
+        .tp-slot:focus-visible,
+        .tp-manual-slot:focus-visible,
+        .tp-secondary:focus-visible,
+        .tp-danger:focus-visible,
+        .tp-modal-head button:focus-visible {
+          outline: 3px solid rgba(25, 120, 156, .2);
+          outline-offset: 2px;
         }
 
         .tp-admin-bar {
@@ -1295,15 +1355,15 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         }
 
         .tp-side-tabs .tp-tab:hover {
-          color: #004f75;
+          color: var(--tp-primary-dark);
           background: #f8fafc;
           transform: translateX(2px);
         }
 
         .tp-side-tabs .tp-tab.active {
-          color: #19789c;
-          background: linear-gradient(135deg, #eff6ff, #f5f3ff);
-          box-shadow: inset 3px 0 0 #19789c;
+          color: var(--tp-primary);
+          background: linear-gradient(135deg, var(--tp-primary-soft), #f8fbfc);
+          box-shadow: inset 3px 0 0 var(--tp-primary);
         }
 
         .tp-tab-icon {
@@ -1324,9 +1384,9 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         .tp-psych-card {
           padding: 16px;
           border-radius: 8px;
-          background: linear-gradient(135deg, #0f172a, #004f75 62%, #19789c);
+          background: linear-gradient(135deg, #0f172a, var(--tp-primary-dark) 62%, var(--tp-primary));
           color: #fff;
-          box-shadow: 0 20px 46px rgba(30, 58, 138, .18);
+          box-shadow: 0 20px 46px var(--tp-primary-shadow);
         }
 
         .tp-psych-card span {
@@ -1410,15 +1470,15 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         }
 
         .tp-link-btn {
-          background: linear-gradient(135deg, #eff6ff, #ecfeff);
-          color: #19789c;
-          box-shadow: inset 0 0 0 1px #dbeafe;
+          background: linear-gradient(135deg, var(--tp-primary-soft), #f8fbfc);
+          color: var(--tp-primary-dark);
+          box-shadow: inset 0 0 0 1px var(--tp-primary-line);
         }
 
         .tp-primary {
-          background: linear-gradient(135deg, #19789c, #004f75);
+          background: linear-gradient(135deg, var(--tp-primary), var(--tp-primary-dark));
           color: #fff;
-          box-shadow: 0 14px 28px rgba(29, 78, 216, .18);
+          box-shadow: 0 14px 28px var(--tp-primary-shadow);
         }
 
         .tp-primary:disabled {
@@ -1454,7 +1514,7 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         .tp-stat {
           min-height: 138px;
           padding: 20px;
-          border: 1px solid #dbeafe;
+          border: 1px solid var(--tp-primary-line);
           border-radius: 8px;
           background: #fff;
           display: grid;
@@ -1476,7 +1536,7 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         }
 
         .tp-stat small {
-          color: #19789c;
+          color: var(--tp-primary);
           font-weight: 800;
         }
 
@@ -1487,9 +1547,9 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         .tp-help-card {
           margin-bottom: 14px;
           padding: 14px 16px;
-          border: 1px solid #bfdbfe;
+          border: 1px solid var(--tp-primary-line);
           border-radius: 8px;
-          background: linear-gradient(135deg, #eff6ff, #f8fafc);
+          background: linear-gradient(135deg, var(--tp-primary-soft), #f8fbfc);
           color: #334155;
           display: grid;
           gap: 6px;
@@ -1499,7 +1559,7 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         }
 
         .tp-help-card strong {
-          color: #19789c;
+          color: var(--tp-primary-dark);
           font-size: 14px;
         }
 
@@ -1531,7 +1591,7 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         }
 
         .tp-day-group {
-          border: 1px solid #dbeafe;
+          border: 1px solid var(--tp-primary-line);
           border-radius: 8px;
           background: rgba(255, 255, 255, .94);
           box-shadow: 0 18px 44px rgba(15, 23, 42, .06);
@@ -1541,7 +1601,7 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         .tp-day-group-head {
           padding: 16px 18px;
           border-bottom: 1px solid #e2e8f0;
-          background: linear-gradient(135deg, #eff6ff, #f8fafc);
+          background: linear-gradient(135deg, var(--tp-primary-soft), #f8fafc);
         }
 
         .tp-day-group-head strong {
@@ -1554,7 +1614,7 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         .tp-day-group-head span {
           display: block;
           margin-top: 4px;
-          color: #19789c;
+          color: var(--tp-primary-dark);
           font-size: 13px;
           font-weight: 900;
         }
@@ -1582,8 +1642,8 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
 
         .tp-record-row:hover {
           transform: translateY(-1px);
-          border-color: #bfdbfe;
-          box-shadow: 0 14px 30px rgba(30, 64, 175, .08);
+          border-color: var(--tp-primary-line);
+          box-shadow: 0 14px 30px rgba(25, 120, 156, .1);
         }
 
         .tp-record-row:active {
@@ -1592,7 +1652,7 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
 
         .tp-record-time,
         .tp-slot-time {
-          color: #19789c;
+          color: var(--tp-primary);
           font-size: 20px;
           font-weight: 950;
         }
@@ -1604,7 +1664,7 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         }
 
         .tp-record-time strong {
-          color: #19789c;
+          color: var(--tp-primary);
           font-size: 20px;
         }
 
@@ -1638,8 +1698,8 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         .tp-status {
           padding: 7px 10px;
           border-radius: 999px;
-          background: #eff6ff;
-          color: #19789c;
+          background: var(--tp-primary-soft);
+          color: var(--tp-primary-dark);
           font-size: 12px;
           font-weight: 950;
           white-space: nowrap;
@@ -1647,7 +1707,7 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
 
         .tp-status.done { background: #ecfdf5; color: #047857; }
         .tp-status.cancelled { background: #fef2f2; color: #b91c1c; }
-        .tp-status.confirmed { background: #f5f3ff; color: #6d28d9; }
+        .tp-status.confirmed { background: var(--tp-primary-soft); color: var(--tp-primary-dark); }
 
         .tp-datebar {
           margin-bottom: 18px;
@@ -1664,7 +1724,7 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
 
         .tp-datebar button {
           min-height: 42px;
-          border: 1px solid #dbeafe;
+          border: 1px solid var(--tp-primary-line);
           border-radius: 8px;
           background: #fff;
           color: #004f75;
@@ -1676,8 +1736,8 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
 
         .tp-datebar button:hover {
           transform: translateY(-1px);
-          border-color: #93c5fd;
-          box-shadow: 0 10px 18px rgba(30, 64, 175, .08);
+          border-color: var(--tp-primary-line-strong);
+          box-shadow: 0 10px 18px rgba(25, 120, 156, .1);
         }
 
         .tp-datebar button:active {
@@ -1685,9 +1745,9 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         }
 
         .tp-datebar button.active {
-          background: #19789c;
+          background: var(--tp-primary);
           color: #fff;
-          border-color: #19789c;
+          border-color: var(--tp-primary);
         }
 
         .tp-datebar strong {
@@ -1704,10 +1764,10 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         .tp-date-picker {
           min-height: 42px;
           padding: 0 11px;
-          border: 1px solid #bfdbfe;
+          border: 1px solid var(--tp-primary-line);
           border-radius: 8px;
           background: #fff;
-          color: #19789c;
+          color: var(--tp-primary-dark);
           display: flex;
           align-items: center;
           gap: 8px;
@@ -1716,8 +1776,8 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
 
         .tp-date-picker:hover {
           transform: translateY(-1px);
-          border-color: #60a5fa;
-          box-shadow: 0 10px 20px rgba(30, 64, 175, .08);
+          border-color: var(--tp-primary-line-strong);
+          box-shadow: 0 10px 20px rgba(25, 120, 156, .1);
         }
 
         .tp-date-picker input {
@@ -1776,7 +1836,7 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
 
         .tp-slot.occupied:hover {
           transform: translateY(-1px);
-          box-shadow: 0 14px 26px rgba(30, 64, 175, .08);
+          box-shadow: 0 14px 26px rgba(25, 120, 156, .1);
         }
 
         .tp-slot:active {
@@ -1784,7 +1844,7 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         }
 
         .tp-slot.occupied {
-          border-color: #bfdbfe;
+          border-color: var(--tp-primary-line);
           background: #f8fbff;
           cursor: pointer;
         }
@@ -1836,8 +1896,8 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
 
         .tp-field input:focus,
         .tp-field select:focus {
-          outline: 3px solid rgba(29, 78, 216, .14);
-          border-color: #60a5fa;
+          outline: 3px solid rgba(25, 120, 156, .16);
+          border-color: var(--tp-primary);
         }
 
         .tp-field.has-error {
@@ -1875,9 +1935,9 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
           display: grid;
           gap: 10px;
           padding: 16px;
-          border: 1px solid #dbeafe;
+          border: 1px solid var(--tp-primary-line);
           border-radius: 8px;
-          background: #f8fbff;
+          background: var(--tp-primary-softest);
         }
 
         .tp-slot-picker.has-error {
@@ -1912,10 +1972,10 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
 
         .tp-manual-slot {
           min-height: 42px;
-          border: 1px solid #bfdbfe;
+          border: 1px solid var(--tp-primary-line);
           border-radius: 8px;
           background: #fff;
-          color: #19789c;
+          color: var(--tp-primary-dark);
           font-family: inherit;
           font-weight: 950;
           cursor: pointer;
@@ -1924,14 +1984,15 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
 
         .tp-manual-slot:hover {
           transform: translateY(-1px);
-          box-shadow: 0 10px 20px rgba(29, 78, 216, .10);
+          border-color: var(--tp-primary-line-strong);
+          box-shadow: 0 10px 20px rgba(25, 120, 156, .12);
         }
 
         .tp-manual-slot.active {
-          background: linear-gradient(135deg, #19789c, #004f75);
+          background: linear-gradient(135deg, var(--tp-primary), var(--tp-primary-dark));
           color: #fff;
           border-color: transparent;
-          box-shadow: 0 12px 24px rgba(29, 78, 216, .18);
+          box-shadow: 0 12px 24px var(--tp-primary-shadow);
         }
 
         .tp-checks {
@@ -1985,7 +2046,7 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         }
 
         .tp-week-card.active {
-          border-color: #bfdbfe;
+          border-color: var(--tp-primary-line);
         }
 
         .tp-week-card:hover {
@@ -2046,8 +2107,8 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
         }
 
         .tp-switch input:checked + span {
-          background: linear-gradient(135deg, #19789c, #004f75);
-          box-shadow: 0 8px 18px rgba(29, 78, 216, .20);
+          background: linear-gradient(135deg, var(--tp-primary), var(--tp-primary-dark));
+          box-shadow: 0 8px 18px var(--tp-primary-shadow);
         }
 
         .tp-switch input:checked + span::after {
@@ -2091,8 +2152,8 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
           margin-top: 12px;
           padding: 12px 14px;
           border-radius: 8px;
-          background: #eff6ff;
-          color: #19789c;
+          background: var(--tp-primary-soft);
+          color: var(--tp-primary-dark);
           font-weight: 850;
         }
 
@@ -2113,9 +2174,9 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
 
         .tp-warning {
           grid-column: 1 / -1;
-          background: #fff7ed;
-          color: #9a3412;
-          border: 1px solid #fed7aa;
+          background: var(--tp-primary-soft);
+          color: var(--tp-primary-dark);
+          border: 1px solid var(--tp-primary-line);
         }
 
         .tp-audit-list {
@@ -2181,8 +2242,8 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
           border-radius: 999px;
           display: grid;
           place-items: center;
-          background: #fff7ed;
-          color: #c2410c;
+          background: var(--tp-primary-soft);
+          color: var(--tp-primary-dark);
           font-weight: 950;
           font-size: 20px;
         }
@@ -2283,8 +2344,8 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
 
         .tp-secondary {
           background: #fff;
-          color: #19789c;
-          border-color: #bfdbfe;
+          color: var(--tp-primary-dark);
+          border-color: var(--tp-primary-line);
         }
 
         .tp-danger {
@@ -2310,13 +2371,13 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
           right: 0;
           z-index: 5;
           padding: 10px 14px;
-          border: 1px solid #bfdbfe;
+          border: 1px solid var(--tp-primary-line);
           border-radius: 8px;
           background: rgba(255, 255, 255, .94);
-          color: #19789c;
+          color: var(--tp-primary-dark);
           font-size: 13px;
           font-weight: 900;
-          box-shadow: 0 14px 30px rgba(30, 64, 175, .10);
+          box-shadow: 0 14px 30px rgba(25, 120, 156, .12);
           animation: tpFade .18s ease-out;
         }
 
@@ -2397,6 +2458,13 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
           .tp-side-tabs {
             grid-template-columns: repeat(3, minmax(150px, 1fr));
           }
+          .tp-hero-actions {
+            justify-content: stretch;
+          }
+          .tp-date-chip,
+          .tp-site-link {
+            width: 100%;
+          }
           .tp-sidebar-meta {
             grid-template-columns: 1fr;
           }
@@ -2438,7 +2506,10 @@ export default function TpmpkAdmin({ currentUser, onLogout }) {
               <p>Личный кабинет психолога ТПМПК</p>
               <h1>{activeLabel}</h1>
             </div>
-            <span className="tp-date-chip">{currentDateLabel}</span>
+            <div className="tp-hero-actions">
+              <span className="tp-date-chip">{currentDateLabel}</span>
+              <Link className="tp-site-link" to="/">Перейти на сайт</Link>
+            </div>
           </div>
           <div className="tp-workspace">
             <aside className="tp-sidebar" aria-label="Разделы личного кабинета ТПМПК">

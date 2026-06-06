@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE } from "../../constants/index.js";
 import { getApiErrorMessage } from "../../utils/apiError.js";
 import { authHeaders } from "../../utils/authHeaders.js";
+import { getDownloadFilename } from "../../utils/contentDisposition.js";
 import AlertBanner from "./shared/AlertBanner.jsx";
-import CertificateSheetPreview from "./shared/CertificateSheetPreview.jsx";
+import TemplateLivePreview from "./shared/TemplateLivePreview.jsx";
 
 const FIO_ALIASES = new Set(["фио", "fio", "full_name", "fullname", "полноеимя", "фамилияимяотчество", "name", "участник", "фиоучастника"]);
 
@@ -103,7 +104,6 @@ export default function GenerateBatch({ templates }) {
     };
   }, [templateId]);
 
-  const selectedTemplate = templates.find((template) => String(template.id) === String(templateId));
   const tableColumns = useMemo(() => {
     if (preview?.templateVariables?.length) return preview.templateVariables;
     if (templateVariables.length) return templateVariables;
@@ -111,7 +111,8 @@ export default function GenerateBatch({ templates }) {
     return ["ФИО участника", "Название мероприятия", "Достижение", "Дата"];
   }, [preview, templateVariables]);
   const missingExtra = Object.keys(extraVariables).filter((key) => !String(extraVariables[key] || "").trim());
-  const canGenerate = Boolean(templateId && file && preview && !parseError && missingExtra.length === 0 && !loading);
+  const hasMissingColumns = (preview?.missingColumns || []).length > 0;
+  const canGenerate = Boolean(templateId && file && preview && !parseError && !hasMissingColumns && missingExtra.length === 0 && !loading);
 
   const inspectFile = async (nextFile) => {
     if (!nextFile) return;
@@ -150,16 +151,12 @@ export default function GenerateBatch({ templates }) {
         templateVariables: data.template_variables || [],
         matchedColumns: data.matched_columns || [],
         missingColumns: data.missing_columns || [],
+        warnings: data.warnings || [],
+        processedPreview: data.processed_preview || [],
       };
       setPreview(nextPreview);
       setArchiveName((prev) => prev || buildArchiveName());
-
-      const excelNorms = new Set((data.matched_columns || []).map(normalize));
-      const covered = new Set([...FIO_ALIASES, "дата", "date", ...excelNorms]);
-      setExtraVariables((prev) => (data.missing_columns || []).reduce((result, key) => {
-        if (!covered.has(normalize(key))) result[key] = prev[key] ?? "";
-        return result;
-      }, {}));
+      setExtraVariables({});
     } catch (error) {
       setParseError(error.message || "Не удалось проверить Excel");
       setFile(null);
@@ -198,6 +195,7 @@ export default function GenerateBatch({ templates }) {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("template_id", String(templateId));
+      fd.append("response_mode", "json");
       if (archiveName.trim()) fd.append("archive_name", archiveName.trim());
       if (Object.keys(extraVariables).length > 0) {
         fd.append("extra_variables", JSON.stringify(addCommonAliases(extraVariables)));
@@ -211,12 +209,21 @@ export default function GenerateBatch({ templates }) {
       window.clearInterval(progressRef.current);
       setProgress(100);
       if (!res.ok) throw new Error(await getApiErrorMessage(res, "Ошибка на сервере"));
-      const blob = await res.blob();
-      const cd = res.headers.get("Content-Disposition");
-      const match = cd && /filename="?([^";]+)"?/i.exec(cd);
-      const filename = match ? match[1] : `${archiveName.trim() || buildArchiveName()}.zip`;
-      const blobUrl = URL.createObjectURL(blob);
-      setGeneratedArchive({ url: blobUrl, filename, count: preview?.rowCount || 0 });
+      const contentType = res.headers.get("Content-Type") || "";
+      if (contentType.includes("application/json")) {
+        const data = await res.json();
+        setGeneratedArchive({
+          url: `${API_BASE}${data.file_url}`,
+          filename: data.filename || `${archiveName.trim() || buildArchiveName()}.zip`,
+          count: data.count || preview?.rowCount || 0,
+        });
+      } else {
+        const blob = await res.blob();
+        const cd = res.headers.get("Content-Disposition");
+        const filename = getDownloadFilename(cd, `${archiveName.trim() || buildArchiveName()}.zip`);
+        const blobUrl = URL.createObjectURL(blob);
+        setGeneratedArchive({ url: blobUrl, filename, count: preview?.rowCount || 0 });
+      }
       setMsg(`Сформировано грамот: ${preview?.rowCount || 0}. Архив готов к скачиванию.`);
       setMsgType("success");
     } catch (error) {
@@ -251,9 +258,10 @@ export default function GenerateBatch({ templates }) {
   };
 
   const firstPreviewValues = useMemo(() => {
-    const row = preview?.rows?.[0] || {};
+    const row = preview?.processedPreview?.[0] || preview?.rows?.[0] || {};
     return addCommonAliases({ ...row, ...extraVariables });
-  }, [extraVariables, preview?.rows]);
+  }, [extraVariables, preview?.processedPreview, preview?.rows]);
+  const previewRowsForTable = preview?.processedPreview?.length ? preview.processedPreview : (preview?.rows || []);
 
   return (
     <section className="batch-certificate">
@@ -557,7 +565,7 @@ export default function GenerateBatch({ templates }) {
 
         {preview && !parseError && preview.missingColumns.length > 0 && (
           <AlertBanner type="error">
-            В Excel не найдены столбцы: {preview.missingColumns.join(", ")}. Переименуйте столбцы в Excel или укажите значения ниже.
+            В Excel не найдены обязательные столбцы: {preview.missingColumns.join(", ")}.
           </AlertBanner>
         )}
 
@@ -577,7 +585,7 @@ export default function GenerateBatch({ templates }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {preview.rows.slice(0, 5).map((row, index) => (
+                  {previewRowsForTable.slice(0, 5).map((row, index) => (
                     <tr key={`${index}-${JSON.stringify(row)}`}>
                       {tableColumns.map((column) => <td key={column}>{rowValue(row, column) || "—"}</td>)}
                     </tr>
@@ -585,8 +593,16 @@ export default function GenerateBatch({ templates }) {
                 </tbody>
               </table>
             </div>
-            {preview.rowCount > preview.rows.length && (
-              <p>Показаны первые {preview.rows.length} строк из {preview.rowCount}.</p>
+            {preview.rowCount > previewRowsForTable.length && (
+              <p>Показаны первые {previewRowsForTable.length} строк из {preview.rowCount}.</p>
+            )}
+            {preview.processedPreview?.length > 0 && (
+              <p>Предпросмотр показывает обработанные значения с учётом склонений и override-колонок.</p>
+            )}
+            {preview.warnings?.length > 0 && (
+              <AlertBanner type="info">
+                {preview.warnings.slice(0, 4).join(" ")}
+              </AlertBanner>
             )}
           </div>
         )}
@@ -644,9 +660,9 @@ export default function GenerateBatch({ templates }) {
 
       <aside className="batch-card batch-preview">
         <h3>Предпросмотр одной грамоты</h3>
-        <CertificateSheetPreview
+        <TemplateLivePreview
+          templateId={templateId}
           values={firstPreviewValues}
-          templateName={selectedTemplate?.name}
           empty={!preview}
         />
       </aside>

@@ -18,7 +18,6 @@ export default function DomUchitelyaAdmin({
   deleteArticle,
   changeArticleStatus,
   onArticlesChanged,
-  onLogout,
 }) {
   const domuArticles = articles.filter((article) =>
     ["both", "dom_uchitelya_only"].includes(article.publishing_scope || "imcro_only")

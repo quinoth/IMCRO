@@ -3,6 +3,22 @@ import { API_BASE } from "../../constants/index.js";
 import { getStoredAccessToken } from "../../utils/authHeaders.js";
 import { isObjectUrl, revokeObjectUrl, revokeObjectUrls, stripObjectUrls } from "../../utils/objectUrls.js";
 import { buildPendingAttachments } from "./articleAttachments.js";
+import {
+  articleToEditorHtml,
+  blocksToEditorHtml,
+  editorHtmlToBlocks,
+  getEditorTextStats,
+  htmlToPlainText,
+} from "./articleEditorContent.js";
+import {
+  applyArticleSectionSelection,
+  buildArticleSectionTree,
+  filterArticleSectionTree,
+  getArticleSectionSelection,
+  getSectionNodeSelectionState,
+  isHomeSectionSelected,
+  sectionChipsFromKeys,
+} from "./articlePlacements.js";
 import { generateSlug, genId } from "./adminStore.js";
 import {
   ARCHIV_SECTIONS,
@@ -48,6 +64,7 @@ const EMPTY_ARTICLE = {
   duplicate_to_main: false,
   duplicate_to_events: false,
   publishing_scope: "imcro_only",
+  sections: [],
   tags: [],
   methodika_subject: "",
   dom_uchitelya_section: "",
@@ -125,7 +142,7 @@ function normalizeBlock(block) {
   return defaultBlock();
 }
 
-function parseBodyBlocks(article) {
+function _parseBodyBlocks(article) {
   if (Array.isArray(article.blocks) && article.blocks.length) return article.blocks.map(normalizeBlock);
   if (typeof article.body === "string" && article.body.trim()) {
     try {
@@ -139,19 +156,24 @@ function parseBodyBlocks(article) {
 }
 
 function normalizeArticle(article, defaultScope) {
-  const blocks = parseBodyBlocks(article);
+  const bodyHtml = articleToEditorHtml(article);
+  const blocks = editorHtmlToBlocks(bodyHtml);
   const firstParagraph = blocks.find((block) => block.type === "paragraph");
   const firstImage = blocks.find((block) => block.type === "image");
+  const sectionKeys = getArticleSectionSelection(article);
+  const sectionState = applyArticleSectionSelection(article, sectionKeys);
   return {
     ...EMPTY_ARTICLE,
     ...article,
+    ...sectionState,
     lead: article.lead ?? article.excerpt ?? "",
     blocks,
-    body: typeof article.body === "string" ? article.body : JSON.stringify(blocks),
+    body: bodyHtml,
     attachments: Array.isArray(article.attachments) ? article.attachments : [],
     cover_image_url: article.cover_image_url ?? article.image ?? firstImage?.data?.url ?? "",
     published_at: toDateInputValue(article.published_at ?? article.publishedAt),
     publishing_scope: article.publishing_scope || defaultScope,
+    sections: sectionState.sections || [],
     tags: Array.isArray(article.tags) ? article.tags : [],
     methodika_subject: article.methodika_subject || "",
     dom_uchitelya_section: article.dom_uchitelya_section || "",
@@ -165,7 +187,7 @@ function normalizeArticle(article, defaultScope) {
   };
 }
 
-function plainTextFromBlocks(blocks) {
+function _plainTextFromBlocks(blocks) {
   return blocks
     .map((block) => {
       if (block.type === "heading") return block.data.text || "";
@@ -192,12 +214,10 @@ function getCategoryLabel(article) {
 }
 
 function getPlacementLabels(article) {
-  const labels = [];
-  if (article.duplicate_to_main || isHomePlacement(article)) labels.push("Главная страница");
-  if (article.duplicate_to_events) labels.push("Мероприятия");
+  const chips = sectionChipsFromKeys(getArticleSectionSelection(article), 8).all.map((chip) => chip.label);
+  if (chips.length) return chips;
   const location = resolveArticleLocation(article);
-  labels.push(location.sectionLabel || getCategoryLabel(article));
-  return labels;
+  return [location.sectionLabel || getCategoryLabel(article)];
 }
 
 function getAuthorLabel(article) {
@@ -210,6 +230,7 @@ function getUserFullName(user) {
 }
 
 function isHomePlacement(article) {
+  if (Array.isArray(article.sections) && article.sections.length) return isHomeSectionSelected(article);
   return !article.methodika_subject && !article.dom_uchitelya_section && !article.noko_section && !article.hub_kind;
 }
 
@@ -251,7 +272,8 @@ function makeUniqueSlug(value, articles = [], currentId = null) {
 function toPayload(form, nextStatus = form.status, scheduleEnabled = Boolean(form.published_at), articles = [], currentId = null) {
   const lead = form.lead.trim();
   const cover = form.cover_image_url.trim();
-  const blocks = (form.blocks || []).map(normalizeBlock);
+  const body = String(form.body || "").trim();
+  const blocks = editorHtmlToBlocks(body);
   const publishedAt = nextStatus === "published"
     ? (scheduleEnabled ? fromDateInputValue(form.published_at) : new Date().toISOString())
     : fromDateInputValue(form.published_at);
@@ -262,7 +284,7 @@ function toPayload(form, nextStatus = form.status, scheduleEnabled = Boolean(for
     status: nextStatus,
     lead,
     excerpt: lead,
-    body: JSON.stringify(blocks),
+    body,
     blocks,
     cover_image_url: cover || null,
     image: cover || null,
@@ -272,6 +294,7 @@ function toPayload(form, nextStatus = form.status, scheduleEnabled = Boolean(for
     duplicate_to_events: Boolean(form.duplicate_to_events),
     attachments: form.attachments || [],
     publishing_scope: form.publishing_scope,
+    sections: form.sections || [],
     tags: form.tags || [],
     categories: form.categories || [],
     methodika_subject: form.methodika_subject || null,
@@ -289,6 +312,20 @@ function sortArticles(items) {
     const rightDate = Date.parse(right.published_at || right.updated_at || right.updatedAt || right.created_at || right.createdAt || "");
     return (Number.isNaN(rightDate) ? 0 : rightDate) - (Number.isNaN(leftDate) ? 0 : leftDate);
   });
+}
+
+function formatFileSize(size) {
+  const bytes = Number(size || 0);
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
+}
+
+function getFileExtension(file = {}) {
+  const name = String(file.name || file.url || "");
+  const extension = name.split(".").pop();
+  return extension && extension !== name ? extension.slice(0, 4).toUpperCase() : "FILE";
 }
 
 function ChipInput({ value, onChange }) {
@@ -337,6 +374,392 @@ function InfoNote({ title, children }) {
         <span>{title || "Подсказка"}</span>
       </button>
       {open && <p>{children}</p>}
+    </div>
+  );
+}
+
+function ToolbarButton({ active, children, label, onClick, disabled = false }) {
+  return (
+    <button
+      type="button"
+      className={active ? "is-active" : ""}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+    >
+      {children}
+    </button>
+  );
+}
+
+function saveStateKind(value = "") {
+  if (value.startsWith("Ошибка")) return "error";
+  if (value.includes("Сохранение")) return "saving";
+  if (value.includes("несохран")) return "dirty";
+  return "saved";
+}
+
+function SaveStateIndicator({ state, onRetry, compact = false }) {
+  const kind = saveStateKind(state);
+  return (
+    <div className={`article-save-state ${compact ? "side" : ""} is-${kind}`}>
+      <span>{state}</span>
+      {kind === "error" && onRetry && (
+        <button type="button" onClick={onRetry}>
+          Повторить
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ArticleBodyEditor({ value, onChange, uploadImage, createObjectUrl, saveState }) {
+  const editorRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const savedRangeRef = useRef(null);
+  const [format, setFormat] = useState("p");
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const stats = useMemo(() => getEditorTextStats(value), [value]);
+  const isEmpty = stats.words === 0 && !/<(img|table|hr)\b/i.test(value || "");
+
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== (value || "")) {
+      editorRef.current.innerHTML = value || "";
+    }
+  }, [value]);
+
+  const emitChange = () => onChange(editorRef.current?.innerHTML || "");
+
+  const saveSelection = () => {
+    const selection = window.getSelection?.();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    if (editorRef.current?.contains(range.commonAncestorContainer)) {
+      savedRangeRef.current = range.cloneRange();
+      const block = range.startContainer?.parentElement?.closest?.("h2,h3,blockquote,p,li");
+      if (block?.tagName === "H2") setFormat("h2");
+      else if (block?.tagName === "H3") setFormat("h3");
+      else setFormat("p");
+    }
+  };
+
+  const restoreSelection = () => {
+    const selection = window.getSelection?.();
+    if (!selection || !savedRangeRef.current) return;
+    selection.removeAllRanges();
+    selection.addRange(savedRangeRef.current);
+  };
+
+  const command = (name, arg = null) => {
+    editorRef.current?.focus();
+    restoreSelection();
+    document.execCommand(name, false, arg);
+    emitChange();
+    saveSelection();
+  };
+
+  const applyBlock = (tag) => {
+    setFormat(tag);
+    command("formatBlock", tag);
+  };
+
+  const addLink = () => {
+    const href = window.prompt("Введите адрес ссылки");
+    if (!href) return;
+    command("createLink", href);
+  };
+
+  const insertHtml = (html) => command("insertHTML", html);
+
+  const insertTable = () => {
+    insertHtml(
+      '<table><tbody><tr><td>Ячейка</td><td>Ячейка</td></tr><tr><td>Ячейка</td><td>Ячейка</td></tr></tbody></table><p><br></p>',
+    );
+  };
+
+  const handleImageFile = async (file) => {
+    if (!file || !file.type?.startsWith("image/")) return;
+    setUploadingImage(true);
+    const localUrl = createObjectUrl?.(file);
+    let url = localUrl || "";
+    try {
+      const uploaded = await uploadImage(file);
+      url = uploaded || localUrl || "";
+    } finally {
+      setUploadingImage(false);
+    }
+    if (url) insertHtml(`<figure><img src="${url}" alt=""><figcaption>Подпись к изображению</figcaption></figure><p><br></p>`);
+  };
+
+  return (
+    <section className="article-wysiwyg-card">
+      <div className="article-wysiwyg-head">
+        <div>
+          <strong>Содержание статьи</strong>
+        </div>
+        {uploadingImage && <span className="article-save-state">Загрузка изображения...</span>}
+      </div>
+      <div className="article-wysiwyg">
+        <div className="article-wysiwyg-toolbar" aria-label="Панель форматирования">
+          <select value={format} onChange={(event) => applyBlock(event.target.value)} aria-label="Тип текста">
+            <option value="p">Абзац</option>
+            <option value="h2">Заголовок 2</option>
+            <option value="h3">Заголовок 3</option>
+          </select>
+          <span className="toolbar-divider" aria-hidden="true" />
+          <ToolbarButton label="Отменить" onClick={() => command("undo")}>↶</ToolbarButton>
+          <ToolbarButton label="Повторить" onClick={() => command("redo")}>↷</ToolbarButton>
+          <span className="toolbar-divider" aria-hidden="true" />
+          <ToolbarButton label="Жирный" onClick={() => command("bold")}><b>B</b></ToolbarButton>
+          <ToolbarButton label="Курсив" onClick={() => command("italic")}><i>I</i></ToolbarButton>
+          <ToolbarButton label="Подчёркивание" onClick={() => command("underline")}><u>U</u></ToolbarButton>
+          <span className="toolbar-divider" aria-hidden="true" />
+          <ToolbarButton label="Маркированный список" onClick={() => command("insertUnorderedList")}>•</ToolbarButton>
+          <ToolbarButton label="Нумерованный список" onClick={() => command("insertOrderedList")}>1.</ToolbarButton>
+          <ToolbarButton label="Цитата" onClick={() => applyBlock("blockquote")}>“”</ToolbarButton>
+          <span className="toolbar-divider" aria-hidden="true" />
+          <ToolbarButton label="Добавить ссылку" onClick={addLink}>↗</ToolbarButton>
+          <ToolbarButton label="Вставить изображение" onClick={() => imageInputRef.current?.click()}>▧</ToolbarButton>
+          <ToolbarButton label="Вставить таблицу" onClick={insertTable}>▦</ToolbarButton>
+          <input
+            ref={imageInputRef}
+            className="article-file"
+            type="file"
+            accept="image/*"
+            onChange={async (event) => {
+              await handleImageFile(event.target.files?.[0]);
+              event.target.value = "";
+            }}
+          />
+        </div>
+        <div className={`article-wysiwyg-canvas${isEmpty ? " is-empty" : ""}`}>
+          {isEmpty && (
+            <div className="article-wysiwyg-placeholder" aria-hidden="true">
+              <strong>Начните писать текст статьи...</strong>
+              <span>Используйте панель выше для форматирования текста, вставки ссылок и изображений.</span>
+            </div>
+          )}
+          <div
+            ref={editorRef}
+            className="article-wysiwyg-area article-md"
+            contentEditable
+            role="textbox"
+            aria-multiline="true"
+            data-placeholder="Начните писать текст статьи..."
+            onInput={emitChange}
+            onBlur={() => {
+              saveSelection();
+              emitChange();
+            }}
+            onKeyUp={saveSelection}
+            onMouseUp={saveSelection}
+            onPaste={(event) => {
+              event.preventDefault();
+              const html = event.clipboardData.getData("text/html");
+              const text = event.clipboardData.getData("text/plain");
+              insertHtml(html || text.replace(/\n/g, "<br>"));
+            }}
+            suppressContentEditableWarning
+          />
+        </div>
+        <div className="article-wysiwyg-status">
+          <span>{stats.words} слов · {stats.characters} символов</span>
+          <span>{saveState}</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HighlightedLabel({ label, query }) {
+  const normalized = String(query || "").trim();
+  if (!normalized) return label;
+  const index = label.toLowerCase().indexOf(normalized.toLowerCase());
+  if (index < 0) return label;
+  return (
+    <>
+      {label.slice(0, index)}
+      <mark>{label.slice(index, index + normalized.length)}</mark>
+      {label.slice(index + normalized.length)}
+    </>
+  );
+}
+
+function SectionTreeRow({ item, selectedKeys, setSelectedKeys, expandedKeys, toggleExpanded, query, pathParts = [] }) {
+  const hasChildren = Boolean(item.children?.length);
+  const checkboxRef = useRef(null);
+  const { checked, indeterminate } = getSectionNodeSelectionState(item, selectedKeys);
+  const selectable = item.selectable !== false;
+  const fullPathLabel = [...pathParts, item.label].filter(Boolean).join(" / ");
+  useEffect(() => {
+    if (checkboxRef.current) checkboxRef.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  const toggleChecked = () => {
+    setSelectedKeys((current) => current.includes(item.key)
+      ? current.filter((key) => key !== item.key)
+      : [...new Set([...current, item.key])]);
+  };
+  return (
+    <div className="section-tree-node">
+      <div
+        className={`section-tree-row${hasChildren ? " is-parent" : ""}${checked ? " is-selected" : ""}${indeterminate ? " is-indeterminate" : ""}`}
+        onClick={selectable ? toggleChecked : undefined}
+      >
+        {hasChildren ? (
+          <button
+            type="button"
+            className="section-tree-toggle"
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleExpanded(item.key);
+            }}
+            aria-label={expandedKeys.includes(item.key) ? "Свернуть" : "Развернуть"}
+          >
+            {expandedKeys.includes(item.key) ? "−" : "+"}
+          </button>
+        ) : <span className="section-tree-spacer" aria-hidden="true" />}
+        {selectable ? (
+          <span className="section-tree-label">
+            <input
+              ref={checkboxRef}
+              type="checkbox"
+              aria-label={fullPathLabel}
+              checked={checked}
+              onClick={(event) => event.stopPropagation()}
+              onChange={toggleChecked}
+            />
+            <span><HighlightedLabel label={item.label} query={query} /></span>
+          </span>
+        ) : <strong><HighlightedLabel label={item.label} query={query} /></strong>}
+      </div>
+      {hasChildren && expandedKeys.includes(item.key) && (
+        <div className="section-tree-children">
+          {item.children.map((child) => (
+            <SectionTreeRow
+              key={child.key}
+              item={child}
+              selectedKeys={selectedKeys}
+              setSelectedKeys={setSelectedKeys}
+              expandedKeys={expandedKeys}
+              toggleExpanded={toggleExpanded}
+              query={query}
+              pathParts={[...pathParts, item.label]}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function filterSectionTreeByKeys(nodes = [], keys = []) {
+  const selected = new Set(keys);
+  return nodes
+    .map((item) => {
+      const children = filterSectionTreeByKeys(item.children || [], keys);
+      if (!selected.has(item.key) && !children.length) return null;
+      return { ...item, children };
+    })
+    .filter(Boolean);
+}
+
+function expandedBranchKeys(nodes = []) {
+  return nodes.flatMap((item) => item.children?.length ? [item.key, ...expandedBranchKeys(item.children)] : []);
+}
+
+function SectionSelectorModal({ open, selectedKeys, onApply, onClose, allowedSubjects, isDomuMode, allowedScopes }) {
+  const [draftKeys, setDraftKeys] = useState(selectedKeys);
+  const [query, setQuery] = useState("");
+  const [onlySelected, setOnlySelected] = useState(false);
+  const tree = useMemo(() => buildArticleSectionTree({ allowedSubjects, isDomuMode }), [allowedSubjects, isDomuMode]);
+  const [expandedKeys, setExpandedKeys] = useState([]);
+
+  useEffect(() => {
+    if (!open) return;
+    setDraftKeys(selectedKeys);
+    setQuery("");
+    setOnlySelected(false);
+    setExpandedKeys(tree.map((item) => item.key));
+  }, [open, selectedKeys, tree]);
+
+  if (!open) return null;
+
+  const searchedTree = query ? filterArticleSectionTree(tree, query) : tree;
+  const displayTree = onlySelected ? filterSectionTreeByKeys(searchedTree, draftKeys) : searchedTree;
+  const activeExpandedKeys = query || onlySelected
+    ? [...new Set([...expandedKeys, ...expandedBranchKeys(displayTree)])]
+    : expandedKeys;
+  const chips = sectionChipsFromKeys(draftKeys, 20, { allowedSubjects, isDomuMode });
+  const toggleExpanded = (key) => setExpandedKeys((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
+
+  return (
+    <div className="section-selector-backdrop" role="dialog" aria-modal="true" aria-labelledby="section-selector-title">
+      <div className="section-selector-panel">
+        <div className="section-selector-head">
+          <div>
+            <span className="article-label">Размещение на сайте</span>
+            <h3 id="section-selector-title">Выберите разделы</h3>
+          </div>
+          <button type="button" className="section-selector-close" onClick={onClose} aria-label="Закрыть">×</button>
+        </div>
+        <div className="section-selector-tools">
+          <div className="section-search-field">
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск по названию или пути" />
+            {query && <button type="button" onClick={() => setQuery("")} aria-label="Очистить поиск">×</button>}
+          </div>
+          <label className="section-only-selected">
+            <input type="checkbox" checked={onlySelected} onChange={(event) => setOnlySelected(event.target.checked)} />
+            <span>Только выбранные</span>
+          </label>
+        </div>
+        <div className="section-selector-body">
+          {displayTree.length ? (
+            <div className="section-tree">
+              {displayTree.map((item) => (
+                <SectionTreeRow
+                  key={item.key}
+                  item={item}
+                  selectedKeys={draftKeys}
+                  setSelectedKeys={setDraftKeys}
+                  expandedKeys={activeExpandedKeys}
+                  toggleExpanded={toggleExpanded}
+                  query={query}
+                />
+              ))}
+            </div>
+          ) : <div className="section-selector-empty">Разделы не найдены</div>}
+        </div>
+        <div className="section-selected-box">
+          <div className="section-selected-head">
+            <strong>Выбрано: {draftKeys.length}</strong>
+            <button type="button" onClick={() => setDraftKeys([])} disabled={!draftKeys.length}>Очистить выбор</button>
+          </div>
+          <div className="article-chip-list">
+            {chips.all.length ? chips.all.map((chip) => (
+              <span className="article-chip section-selected-chip" key={chip.key} title={chip.label}>
+                {chip.label}
+                <button type="button" onClick={() => setDraftKeys((current) => current.filter((key) => key !== chip.key))} aria-label={`Убрать раздел ${chip.label}`}>×</button>
+              </span>
+            )) : <span className="muted-text">Пока ничего не выбрано</span>}
+          </div>
+        </div>
+        <div className="section-selector-actions">
+          <span>Выбрано: {draftKeys.length}</span>
+          <button type="button" className="article-btn article-btn-muted" onClick={onClose}>Отмена</button>
+          <button
+            type="button"
+            className="article-btn article-btn-primary"
+            onClick={() => {
+              onApply(draftKeys, { allowedSubjects, isDomuMode, allowedScopes });
+              onClose();
+            }}
+          >
+            Применить
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -810,6 +1233,7 @@ function ArticlePreview({ article, expanded = false }) {
   const title = article.title.trim() || "Заголовок статьи";
   const lead = article.lead.trim() || "Лид появится здесь и поможет читателю понять, о чем материал.";
   const date = article.published_at ? new Date(article.published_at).toLocaleString("ru-RU") : "Дата публикации не выбрана";
+  const bodyHtml = article.body || blocksToEditorHtml(article.blocks || []);
   return (
     <aside className={expanded ? "article-preview expanded" : "article-preview"} aria-label="Предпросмотр статьи">
       <section className="article-preview-card">
@@ -822,10 +1246,7 @@ function ArticlePreview({ article, expanded = false }) {
         <h1>{title}</h1>
         <p>{lead}</p>
         <div className="block-preview-stack">
-          {(article.blocks || []).length
-            ? article.blocks.map((block) => <BlockPreview key={block.id} block={block} />)
-            : <div className="article-preview-empty">Добавьте блоки, чтобы увидеть статью.</div>
-          }
+          {bodyHtml ? <div className="article-md article-preview-body" dangerouslySetInnerHTML={{ __html: bodyHtml }} /> : <div className="article-preview-empty">Напишите текст статьи, чтобы увидеть предпросмотр.</div>}
         </div>
         {Boolean(article.attachments?.length) && (
           <div className="article-attachments-preview">
@@ -858,6 +1279,7 @@ function ArticlePreviewV2({ article, expanded = false }) {
   const date = article.published_at ? new Date(article.published_at).toLocaleString("ru-RU") : "Дата публикации не выбрана";
   const sectionLabel = getCategoryLabel(article);
   const location = resolveArticleLocation(article);
+  const bodyHtml = article.body || blocksToEditorHtml(article.blocks || []);
   const breadcrumbs = [
     "Главная",
     location.parentLabel,
@@ -895,10 +1317,7 @@ function ArticlePreviewV2({ article, expanded = false }) {
           <h1>{title}</h1>
           <p>{lead}</p>
           <div className="block-preview-stack">
-            {(article.blocks || []).length
-              ? article.blocks.map((block) => <BlockPreview key={block.id} block={block} />)
-              : <div className="article-preview-empty">Добавьте блоки, чтобы увидеть статью.</div>
-            }
+            {bodyHtml ? <div className="article-md article-preview-body" dangerouslySetInnerHTML={{ __html: bodyHtml }} /> : <div className="article-preview-empty">Напишите текст статьи, чтобы увидеть предпросмотр.</div>}
           </div>
           {Boolean(article.attachments?.length) && (
             <div className="article-attachments-preview">
@@ -948,7 +1367,7 @@ function ArticleCardPreview({ article }) {
   const title = article.title.trim() || "Заголовок статьи";
   const lead = article.lead.trim() || "Краткое описание появится здесь после заполнения лида.";
   const date = article.published_at ? new Date(article.published_at).toLocaleDateString("ru-RU") : "Дата не выбрана";
-  const sectionLabel = getCategoryLabel(article);
+  const sectionLabel = sectionChipsFromKeys(getArticleSectionSelection(article), 1).visible[0]?.label || getCategoryLabel(article);
   const author = article.author || "Редакция ИМЦРО";
 
   return (
@@ -991,18 +1410,21 @@ function ArticleForm({
   const [saving, setSaving] = useState(false);
   const [draftNotice, setDraftNotice] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [sectionSelectorOpen, setSectionSelectorOpen] = useState(false);
   const [coverDragActive, setCoverDragActive] = useState(false);
   const [attachmentDragActive, setAttachmentDragActive] = useState(false);
-  const [rootSection, setRootSection] = useState(() => isDomuMode ? "domu" : getRootSection(normalizeArticle(article || { publishing_scope: defaultScope }, defaultScope)));
+  const [_rootSection, _setRootSection] = useState(() => isDomuMode ? "domu" : getRootSection(normalizeArticle(article || { publishing_scope: defaultScope }, defaultScope)));
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [saveState, setSaveState] = useState("Сохранено");
   const [attemptedSave, setAttemptedSave] = useState(false);
   const [touchedFields, setTouchedFields] = useState({});
   const formRef = useRef(form);
+  const lastSaveStatusRef = useRef("draft");
   const objectUrlsRef = useRef([]);
   const draftKey = `mky_article_block_draft_${article?.id || "new"}_${isDomuMode ? "domu" : "common"}`;
   const role = currentUser?.role?.role_name || currentUser?.role || "user";
   const currentAuthorName = getUserFullName(currentUser);
-  const canDuplicateMain = role === "admin" || role === "methodist" || role === "metodist_editor";
+  const _canDuplicateMain = role === "admin" || role === "methodist" || role === "metodist_editor";
   const previewArticle = useMemo(() => {
     const authorName = form.author || form.author_name || form.full_name || currentAuthorName;
     return { ...form, author: authorName, author_name: authorName, full_name: authorName, author_id: form.author_id || currentUser?.id || null };
@@ -1034,7 +1456,7 @@ function ArticleForm({
       if (window.sessionStorage.getItem(`${draftKey}_seen`) === "1") return;
       const draft = JSON.parse(raw);
       const serverTime = Date.parse(article?.updated_at || article?.updatedAt || 0);
-      if (Date.parse(draft.savedAt || 0) > serverTime && draft.form && JSON.stringify(draft.form) !== JSON.stringify(form)) {
+      if (Date.parse(draft.savedAt || 0) > serverTime && draft.form && JSON.stringify(draft.form) !== JSON.stringify(formRef.current)) {
         setDraftNotice("Найден локальный черновик.");
         window.sessionStorage.setItem(`${draftKey}_seen`, "1");
       }
@@ -1046,7 +1468,7 @@ function ArticleForm({
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
-        if (!form.title.trim() && !form.lead.trim() && !(form.blocks || []).length && !(form.attachments || []).length) return;
+        if (!form.title.trim() && !form.lead.trim() && !htmlToPlainText(form.body) && !(form.attachments || []).length) return;
         window.localStorage.setItem(draftKey, JSON.stringify({ savedAt: new Date().toISOString(), form: stripObjectUrls(form) }));
       } catch {
         // Autosave is best-effort; explicit save remains primary.
@@ -1055,16 +1477,21 @@ function ArticleForm({
     return () => window.clearTimeout(timer);
   }, [draftKey, form]);
 
-  const set = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const set = (field, value) => {
+    setSaveState("Есть несохранённые изменения");
+    setForm((current) => ({ ...current, [field]: value }));
+  };
   const updateTitle = (value) => {
+    setSaveState("Есть несохранённые изменения");
     setForm((current) => ({
       ...current,
       title: value,
       slug: slugLocked ? current.slug : makeUniqueSlug(value, articles, article?.id),
     }));
   };
-  const updateRootSection = (section) => {
-    setRootSection(section);
+  const _updateRootSection = (section) => {
+    setSaveState("Есть несохранённые изменения");
+    _setRootSection(section);
     const meta = ROOT_SECTIONS.find((item) => item.value === section);
     setForm((current) => ({
       ...current,
@@ -1082,6 +1509,7 @@ function ArticleForm({
       const draft = JSON.parse(window.localStorage.getItem(draftKey) || "{}");
       if (draft.form) {
         setForm(stripObjectUrls(draft.form));
+        setSaveState("Локальный черновик восстановлен");
         setDraftNotice("");
       }
     } catch {
@@ -1146,20 +1574,20 @@ function ArticleForm({
   };
   const markTouched = (field) => setTouchedFields((current) => ({ ...current, [field]: true }));
   const showFieldError = (field) => Boolean(attemptedSave || touchedFields[field]);
-  const hasText = plainTextFromBlocks(form.blocks).length > 0 || form.blocks.some((block) => block.type === "image" && block.data.url);
+  const selectedSectionKeys = getArticleSectionSelection(form);
+  const placementChips = sectionChipsFromKeys(selectedSectionKeys, 3, { allowedSubjects, isDomuMode });
+  const hasText = htmlToPlainText(form.body).length > 0 || /<img\b/i.test(form.body || "");
   const fieldError = (field) => {
     if (!showFieldError(field)) return "";
     if (field === "title" && !form.title.trim()) return "Заполните заголовок статьи.";
-    if (field === "slug" && !form.slug.trim()) return "Заполните slug.";
-    if (field === "lead" && !form.lead.trim()) return "Добавьте лид или краткое описание.";
-    if (field === "blocks" && !hasText) return "Добавьте тело статьи: текстовый блок или изображение.";
+    if (field === "slug" && !form.slug.trim()) return "Заполните адрес страницы.";
+    if (field === "lead" && !form.lead.trim()) return "Добавьте краткое описание.";
+    if (field === "blocks" && !hasText) return "Добавьте текст статьи или изображение.";
     if (field === "placement") {
+      if (!selectedSectionKeys.length) return "Выберите хотя бы один раздел размещения.";
       if (!allowedScopes.includes(form.publishing_scope)) return "Выберите допустимую область публикации.";
       if (form.publishing_scope === "dom_uchitelya_only" && !form.dom_uchitelya_section) return "Для Дома учителя нужен раздел.";
       if (isDomuMode && !form.dom_uchitelya_section) return "Для админки Дома учителя раздел обязателен.";
-      if (rootSection === "methodika" && !form.methodika_subject && !form.hub_path) return "Выберите предмет или подраздел Методического пространства.";
-      if (rootSection === "noko" && !form.noko_section) return "Выберите подраздел НОКО.";
-      if ((rootSection === "konkursy" || rootSection === "deyatelnost" || rootSection === "archiv") && !form.hub_path) return "Укажите подраздел выбранного раздела.";
     }
     return "";
   };
@@ -1167,22 +1595,16 @@ function ArticleForm({
   const errors = useMemo(() => {
     const list = [];
     if (!form.title.trim()) list.push("Заполните заголовок.");
-    if (!form.slug.trim()) list.push("Заполните slug.");
-    if (!form.lead.trim()) list.push("Добавьте лид/анонс.");
-    if (!hasText) list.push("Добавьте хотя бы один содержательный блок.");
+    if (!form.slug.trim()) list.push("Заполните адрес страницы.");
+    if (!form.lead.trim()) list.push("Добавьте краткое описание.");
+    if (!hasText) list.push("Добавьте текст статьи.");
+    if (!selectedSectionKeys.length) list.push("Выберите хотя бы один раздел размещения.");
     if (!allowedScopes.includes(form.publishing_scope)) list.push("Выберите допустимую область публикации.");
-    if (!canDuplicateMain && form.duplicate_to_main) list.push("Дублирование на главную доступно только admin, methodist и metodist_editor.");
     if (form.publishing_scope === "dom_uchitelya_only" && !form.dom_uchitelya_section) list.push("Для Дома учителя нужен раздел.");
     if (isDomuMode && !form.dom_uchitelya_section) list.push("Для админки Дома учителя раздел обязателен.");
-    if (rootSection === "methodika" && !form.methodika_subject && !form.hub_path) {
-      list.push("Для Методического пространства выберите предмет или подраздел.");
-    }
-    if (role === "methodist" && rootSection === "methodika" && !form.methodika_subject) {
+    const hasMethodikaSelection = selectedSectionKeys.some((key) => key.startsWith("methodika"));
+    if (role === "methodist" && hasMethodikaSelection && !form.methodika_subject) {
       list.push("Методисту доступно размещение только внутри назначенного предмета.");
-    }
-    if (rootSection === "noko" && !form.noko_section) list.push("Для НОКО выберите подраздел.");
-    if ((rootSection === "konkursy" || rootSection === "deyatelnost" || rootSection === "archiv") && !form.hub_path) {
-      list.push("Для выбранного хаба укажите подраздел.");
     }
     if (form.methodika_subject && !allowedSubjects.includes(form.methodika_subject)) list.push("Этот предмет недоступен текущему методисту.");
 
@@ -1201,12 +1623,14 @@ function ArticleForm({
       }
     }
     return list;
-  }, [allowedScopes, allowedSubjects, article?.id, articles, canDuplicateMain, form, hasText, isDomuMode, role, rootSection]);
+  }, [allowedScopes, allowedSubjects, article?.id, articles, form, hasText, isDomuMode, role, selectedSectionKeys]);
 
   const handleSave = async (nextStatus) => {
     setAttemptedSave(true);
     if (errors.length) return;
+    lastSaveStatusRef.current = nextStatus;
     setSaving(true);
+    setSaveState("Сохранение...");
     try {
       const nextForm = {
         ...form,
@@ -1224,34 +1648,39 @@ function ArticleForm({
         author_id: nextForm.author_id || currentUser?.id || null,
       }, article?.id);
       window.localStorage.removeItem(draftKey);
+      setSaveState(nextStatus === "draft" ? "Черновик сохранён" : "Сохранено");
       onCancel();
     } catch {
+      setSaveState("Ошибка сохранения. Повторить");
       // Error text is shown by the parent module; keep the local draft in place.
     } finally {
       setSaving(false);
     }
   };
 
-  const availableRootSections = isDomuMode
+  const _availableRootSections = isDomuMode
     ? ROOT_SECTIONS.filter((section) => section.value === "domu")
     : ROOT_SECTIONS.filter((section) => section.value !== "domu" || allowedScopes.includes("dom_uchitelya_only") || allowedScopes.includes("both"));
-  const publishLabel = isNew ? "Опубликовать" : form.status === "published" ? "Сохранить опубликованной" : "Опубликовать";
+  const publishLabel = isNew ? "Опубликовать" : form.status === "published" ? "Обновить публикацию" : "Опубликовать";
 
   return (
     <div className="article-editor-shell">
       <div className="article-editor-topbar">
         <button type="button" className="article-btn article-btn-muted" onClick={onCancel}>Назад</button>
         <div className="article-editor-title">
-          <span>Статьи /</span>
-          <h2>{isNew ? "Создать новую" : "Редактирование статьи"}</h2>
+          <span>Статьи</span>
+          <h2>{isNew ? "Создание статьи" : "Редактирование статьи"}</h2>
+          <SaveStateIndicator state={saveState} onRetry={() => handleSave(lastSaveStatusRef.current)} />
         </div>
-        <button type="button" className="article-btn article-btn-muted" onClick={() => setPreviewOpen(true)} title="Открыть крупный предпросмотр статьи перед публикацией">Предпросмотр</button>
-        <button type="button" className="article-btn article-btn-muted" onClick={() => handleSave("draft")} disabled={saving}>
-          В черновик
-        </button>
-        <button type="button" className="article-btn article-btn-primary" onClick={() => handleSave("published")} disabled={saving}>
-          {saving ? "Сохраняю..." : publishLabel}
-        </button>
+        <div className="article-editor-actions">
+          <button type="button" className="article-btn article-btn-muted" onClick={() => setPreviewOpen(true)}>Предпросмотр</button>
+          <button type="button" className="article-btn article-btn-muted" onClick={() => handleSave("draft")} disabled={saving}>
+            {isNew || form.status !== "published" ? "Сохранить черновик" : "Сохранить изменения"}
+          </button>
+          <button type="button" className="article-btn article-btn-primary" onClick={() => handleSave("published")} disabled={saving}>
+            {saving ? "Сохранение..." : publishLabel}
+          </button>
+        </div>
       </div>
 
       {draftNotice && (
@@ -1266,136 +1695,127 @@ function ArticleForm({
 
       <div className="article-editor-grid">
         <main className="article-editor-main">
-          <section className="article-panel">
-            <label className="article-label" htmlFor="article-title">Заголовок</label>
-            <input
-              id="article-title"
-              className="article-title-input"
-              value={form.title}
-              onChange={(event) => updateTitle(event.target.value)}
-              onBlur={() => markTouched("title")}
-              placeholder="Например: Городской семинар для педагогов"
-            />
-            {fieldError("title") && <div className="article-field-error">{fieldError("title")}</div>}
-            <label className="article-slug-row">
-              <span>URL-адрес / slug</span>
-              <input
-                value={form.slug}
-                onChange={(event) => { setSlugLocked(true); set("slug", generateSlug(event.target.value) || event.target.value); }}
-                onBlur={() => { markTouched("slug"); set("slug", makeUniqueSlug(form.slug || form.title, articles, article?.id)); }}
-                placeholder="slug-materiala"
-              />
-              <button type="button" onClick={() => { setSlugLocked(false); set("slug", makeUniqueSlug(form.title, articles, article?.id)); }}>Сгенерировать</button>
-            </label>
-            {fieldError("slug") && <div className="article-field-error">{fieldError("slug")}</div>}
+          <section className="article-panel article-basic-panel">
+            <div className="article-section-head">
+              <div>
+                <div className="article-label">Основная информация</div>
+                <p>Название, адрес страницы и краткое описание материала.</p>
+              </div>
+            </div>
+            <div className="article-basic-fields">
+              <div className="article-field-group">
+                <label className="article-label" htmlFor="article-title">Заголовок статьи</label>
+                <input
+                  id="article-title"
+                  className="article-title-input"
+                  value={form.title}
+                  onChange={(event) => updateTitle(event.target.value)}
+                  onBlur={() => markTouched("title")}
+                  placeholder="Введите заголовок статьи"
+                />
+                <p className="article-field-hint">Например: «Городской семинар для педагогов»</p>
+                {fieldError("title") && <div className="article-field-error">{fieldError("title")}</div>}
+              </div>
+
+              <div className="article-field-group article-slug-field">
+                <label className="article-label" htmlFor="article-slug">Адрес страницы</label>
+                <div className="article-slug-control">
+                  <span>/articles/</span>
+                  <input
+                    id="article-slug"
+                    value={form.slug}
+                    onChange={(event) => { setSlugLocked(true); set("slug", generateSlug(event.target.value) || event.target.value); }}
+                    onBlur={() => { markTouched("slug"); set("slug", makeUniqueSlug(form.slug || form.title, articles, article?.id)); }}
+                    placeholder="gorodskoy-seminar-dlya-pedagogov"
+                  />
+                  <button type="button" onClick={() => { setSlugLocked(false); set("slug", makeUniqueSlug(form.title, articles, article?.id)); }}>Сгенерировать</button>
+                </div>
+                {fieldError("slug") && <div className="article-field-error">{fieldError("slug")}</div>}
+              </div>
+
+              <div className="article-field-group">
+                <label className="article-label" htmlFor="article-lead">Краткое описание</label>
+                <textarea
+                  id="article-lead"
+                  className="article-lead-input"
+                  rows={3}
+                  value={form.lead}
+                  onChange={(event) => set("lead", event.target.value)}
+                  onBlur={() => markTouched("lead")}
+                  placeholder="Коротко опишите, о чём эта статья"
+                />
+                <p className="article-field-hint">Используется в карточке статьи и в предпросмотре на сайте.</p>
+                {fieldError("lead") && <div className="article-field-error">{fieldError("lead")}</div>}
+              </div>
+            </div>
           </section>
 
-          <section className="article-panel">
-            <label className="article-label" htmlFor="article-lead">Лид</label>
-            <textarea
-              id="article-lead"
-              className="article-lead-input"
-              rows={3}
-              value={form.lead}
-              onChange={(event) => set("lead", event.target.value)}
-              onBlur={() => markTouched("lead")}
-              placeholder="Короткий анонс для карточки и предпросмотра на сайте"
-            />
-            {fieldError("lead") && <div className="article-field-error">{fieldError("lead")}</div>}
-          </section>
-
-          <BlockWorkspace blocks={form.blocks || []} onChange={(blocks) => set("blocks", blocks)} uploadImage={uploadCover} createObjectUrl={createLocalObjectUrl} />
+          <ArticleBodyEditor
+            value={form.body}
+            onChange={(body) => {
+              setSaveState("Есть несохранённые изменения");
+              setForm((current) => ({ ...current, body, blocks: editorHtmlToBlocks(body) }));
+            }}
+            uploadImage={uploadCover}
+            createObjectUrl={createLocalObjectUrl}
+            saveState={saveState}
+          />
           {fieldError("blocks") && <div className="article-field-error">{fieldError("blocks")}</div>}
 
-          <section className="article-panel">
-            <div className="article-label">Обложка</div>
-            <InfoNote title="Подсказка">
-              Обложка показывается в карточках и в начале статьи. Можно перетащить изображение или вставить готовую ссылку.
-            </InfoNote>
-            <label
-              className={`article-cover-drop${coverDragActive ? " is-active" : ""}${form.cover_image_url ? " has-image" : ""}`}
-              onDragEnter={(event) => {
-                event.preventDefault();
-                setCoverDragActive(true);
-              }}
-              onDragOver={(event) => {
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "copy";
-                setCoverDragActive(true);
-              }}
-              onDragLeave={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget)) setCoverDragActive(false);
-              }}
-              onDrop={handleCoverDrop}
-            >
-              <input className="article-file" type="file" accept="image/*" onChange={handleCoverUpload} />
-              {form.cover_image_url ? (
-                <>
-                  <img className="article-cover-preview" src={form.cover_image_url} alt="" />
-                  <span className="article-cover-overlay">Перетащите новое изображение или нажмите для замены</span>
-                </>
-              ) : (
-                <>
-                  <span className="article-file-drop-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                      <path d="M4 17.5 8.5 13l3.2 3.2 2.4-2.4L20 19.7M6 5h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm10 4.5h.01" />
-                    </svg>
-                  </span>
-                  <strong>Перетащите главное изображение сюда</strong>
-                  <small>или нажмите, чтобы выбрать файл</small>
-                </>
-              )}
-            </label>
-            <input className="article-select" value={form.cover_image_url} onChange={(event) => set("cover_image_url", event.target.value)} placeholder="/images/news1.jpg" />
-          </section>
-
-          <section className="article-panel">
-            <div className="article-label">Файлы</div>
-            <InfoNote title="Подсказка">
-              Добавьте документы, которые читатель должен скачать вместе со статьей. Поддерживаются PDF, Word, PowerPoint и Excel.
-            </InfoNote>
-            <label
-              className={`article-file-drop${attachmentDragActive ? " is-active" : ""}`}
-              onDragEnter={(event) => {
-                event.preventDefault();
-                setAttachmentDragActive(true);
-              }}
-              onDragOver={(event) => {
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "copy";
-                setAttachmentDragActive(true);
-              }}
-              onDragLeave={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget)) setAttachmentDragActive(false);
-              }}
-              onDrop={handleAttachmentDrop}
-            >
+          <section
+            className={`article-panel article-files-panel${attachmentDragActive ? " is-active" : ""}`}
+            onDragEnter={(event) => {
+              event.preventDefault();
+              setAttachmentDragActive(true);
+            }}
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "copy";
+              setAttachmentDragActive(true);
+            }}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setAttachmentDragActive(false);
+            }}
+            onDrop={handleAttachmentDrop}
+          >
+            <div className="article-files-head">
+              <div>
+                <div className="article-label">Прикреплённые файлы</div>
+                <p className="article-field-hint">Документы будут отображаться в конце статьи.</p>
+              </div>
+              <label className="article-file-add">
+                <input className="article-file" type="file" multiple accept={ATTACHMENT_ACCEPT} onChange={handleAttachmentUpload} />
+                <span aria-hidden="true">+</span>
+                Добавить файл
+              </label>
+            </div>
+            <label className={`article-file-dropzone${attachmentDragActive ? " is-active" : ""}`}>
               <input className="article-file" type="file" multiple accept={ATTACHMENT_ACCEPT} onChange={handleAttachmentUpload} />
-              <span className="article-file-drop-icon" aria-hidden="true">
+              <span className="article-file-dropzone-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24">
-                  <path d="M12 3v12m0-12 4.2 4.2M12 3 7.8 7.2M5 14.5V18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3.5" />
+                  <path d="M12 16V5" />
+                  <path d="m7 10 5-5 5 5" />
+                  <path d="M5 19h14" />
                 </svg>
               </span>
-              <strong>Перетащите файлы сюда</strong>
-              <small>или нажмите, чтобы выбрать PDF, DOC, PPT, XLS</small>
+              <span className="article-file-dropzone-copy">
+                <strong>Перетащите файлы сюда</strong>
+                <small>или нажмите, чтобы выбрать документы · PDF, DOC, PPT, XLS</small>
+              </span>
             </label>
             <div className="article-attachment-list">
               {(form.attachments || []).map((file, index) => (
                 <div className="article-attachment-item" key={`${file.url || file.name}-${index}`}>
-                  <a href={file.url || undefined} target="_blank" rel="noreferrer">{file.name || "Документ"}</a>
-                  <span>{file.uploading ? "Загрузка..." : file.type || "Файл"}</span>
+                  <span className="article-file-type" aria-hidden="true">{getFileExtension(file)}</span>
+                  <div className="article-attachment-main">
+                    <a href={file.url || undefined} target="_blank" rel="noreferrer">{file.name || "Документ"}</a>
+                    <span>{file.uploading ? "Загрузка..." : [file.type, formatFileSize(file.size)].filter(Boolean).join(" · ") || "Файл"}</span>
+                  </div>
+                  {file.url && <a className="article-attachment-open" href={file.url} target="_blank" rel="noreferrer">Открыть</a>}
                   <button type="button" onClick={() => removeAttachment(index)} aria-label="Удалить файл">×</button>
                 </div>
               ))}
             </div>
-          </section>
-
-          <section className="article-panel">
-            <div className="article-label">Теги</div>
-            <InfoNote title="Подсказка">
-              Введите слово или короткую фразу и нажмите Enter. Теги помогают быстро находить материалы по теме.
-            </InfoNote>
-            <ChipInput value={form.tags} onChange={(value) => set("tags", value)} />
           </section>
 
           {attemptedSave && <ValidationPanel errors={errors} modeLabel={isDomuMode ? "Дома учителя" : "общей админки"} />}
@@ -1403,147 +1823,150 @@ function ArticleForm({
 
         <aside className="article-editor-side">
           <div className="article-side-sticky">
-            <ArticleCardPreview article={previewArticle} />
-          </div>
-          <section className="article-panel article-panel-compact">
-            <div className="article-label">Публикация</div>
-            <InfoNote title="Статус и дата">
-              Черновик виден только в редакторе. Для публикации сразу оставьте дату выключенной, для отложенной публикации включите планирование.
-            </InfoNote>
-            <label className="article-stack-label">
-              <span>Статус</span>
-              <select value={form.status} onChange={(event) => set("status", event.target.value)}>
-                <option value="draft">Черновик</option>
-                <option value="published">Опубликовано</option>
-                <option value="scheduled">Запланировано</option>
-                <option value="archive">Архив</option>
-              </select>
-            </label>
-            <label className="article-check">
-              <input type="checkbox" checked={form.is_pinned} onChange={(event) => set("is_pinned", event.target.checked)} />
-              <span>Закрепить в начале ленты</span>
-            </label>
-            {canDuplicateMain && rootSection !== "home" && (
+            <section className="article-panel article-panel-compact">
+              <div className="article-side-card-head">
+                <div className="article-label">Публикация</div>
+                <span className={`article-status-pill ${form.status}`}>{STATUS_LABELS[form.status] || form.status}</span>
+              </div>
+              <label className="article-stack-label">
+                <span>Статус</span>
+                <select value={form.status} onChange={(event) => set("status", event.target.value)}>
+                  <option value="draft">Черновик</option>
+                  <option value="published">Опубликовано</option>
+                  <option value="archive">Архив</option>
+                </select>
+              </label>
               <label className="article-check">
                 <input
                   type="checkbox"
-                  checked={Boolean(form.duplicate_to_main)}
-                  onChange={(event) => set("duplicate_to_main", event.target.checked)}
+                  checked={scheduleEnabled}
+                  onChange={(event) => {
+                    setScheduleEnabled(event.target.checked);
+                    if (!event.target.checked) set("published_at", "");
+                  }}
                 />
-                <span>Дублировать на главной странице (Новости)</span>
+                <span>Запланировать дату публикации</span>
               </label>
-            )}
-            <label className="article-check">
-              <input
-                type="checkbox"
-                checked={Boolean(form.duplicate_to_events)}
-                onChange={(event) => set("duplicate_to_events", event.target.checked)}
-              />
-              <span>Дублировать в мероприятиях</span>
-            </label>
-            <label className="article-check">
-              <input
-                type="checkbox"
-                checked={scheduleEnabled}
-                onChange={(event) => {
-                  setScheduleEnabled(event.target.checked);
-                  if (!event.target.checked) set("published_at", "");
-                }}
-              />
-              <span>Запланировать дату публикации</span>
-            </label>
-            {scheduleEnabled && (
-              <label className="article-stack-label">
-                <span>Дата публикации</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={form.published_at}
-                  onChange={(event) => set("published_at", event.target.value)}
-                  placeholder="24.11.2026, 10:00"
-                />
-              </label>
-            )}
-          </section>
+              {scheduleEnabled && (
+                <label className="article-stack-label">
+                  <span>Дата публикации</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={form.published_at}
+                    onChange={(event) => set("published_at", event.target.value)}
+                    placeholder="24.11.2026, 10:00"
+                  />
+                </label>
+              )}
+              <SaveStateIndicator state={saveState} onRetry={() => handleSave(lastSaveStatusRef.current)} compact />
+            </section>
 
-          <section className="article-panel article-panel-compact">
-            <div className="article-label">Область и разделы</div>
-            <InfoNote title="Где появится статья">
-              Выберите основной раздел публикации. Дополнительные подразделы уточняют место материала на сайте.
-            </InfoNote>
-            <label className="article-stack-label">
-              <span>Раздел</span>
-              <select value={rootSection} onChange={(event) => { markTouched("placement"); updateRootSection(event.target.value); }}>
-                {availableRootSections.map((section) => <option key={section.value} value={section.value}>{section.label}</option>)}
-              </select>
-            </label>
-            {rootSection === "domu" && (
-              <label className="article-stack-label">
-                <span>Подраздел Дома учителя</span>
-                <select value={form.dom_uchitelya_section} onChange={(event) => set("dom_uchitelya_section", event.target.value)}>
-                  <option value="">Выберите раздел</option>
-                  {DOMU_SECTIONS.map((section) => <option key={section.value} value={section.value}>{section.label}</option>)}
-                </select>
+            <section className="article-panel article-panel-compact">
+              <div className="article-side-card-head">
+                <div className="article-label">Размещение на сайте</div>
+                <span className="article-counter">Выбрано: {selectedSectionKeys.length}</span>
+              </div>
+              <div className="article-chip-list article-chip-list-compact">
+                {placementChips.visible.length ? placementChips.visible.map((chip) => (
+                  <span className="article-chip" key={chip.key}>{chip.label}</span>
+                )) : <span className="muted-text">Разделы не выбраны</span>}
+                {placementChips.hiddenCount > 0 && <span className="article-chip muted">+ ещё {placementChips.hiddenCount}</span>}
+              </div>
+              <button
+                type="button"
+                className="article-btn article-btn-muted article-wide-btn"
+                onClick={() => {
+                  markTouched("placement");
+                  setSectionSelectorOpen(true);
+                }}
+              >
+                Выбрать разделы
+              </button>
+              {fieldError("placement") && <div className="article-field-error">{fieldError("placement")}</div>}
+            </section>
+
+            <section className="article-panel article-panel-compact">
+              <div className="article-label">Обложка статьи</div>
+              <label
+                className={`article-cover-drop article-cover-drop-side${coverDragActive ? " is-active" : ""}${form.cover_image_url ? " has-image" : ""}`}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  setCoverDragActive(true);
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "copy";
+                  setCoverDragActive(true);
+                }}
+                onDragLeave={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) setCoverDragActive(false);
+                }}
+                onDrop={handleCoverDrop}
+              >
+                <input className="article-file" type="file" accept="image/*" onChange={handleCoverUpload} />
+                {form.cover_image_url ? (
+                  <span className="article-cover-thumb">
+                    <img className="article-cover-preview" src={form.cover_image_url} alt="" />
+                  </span>
+                ) : (
+                  <span className="article-cover-empty">
+                    <span className="article-cover-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24">
+                        <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v13A2.5 2.5 0 0 1 17.5 21h-11A2.5 2.5 0 0 1 4 18.5v-13Z" />
+                        <path d="m6.8 16.5 3.4-3.4 2.4 2.4 1.8-1.8 2.8 2.8" />
+                        <path d="M15.5 8.5h.01" />
+                      </svg>
+                    </span>
+                    <strong>Загрузить</strong>
+                  </span>
+                )}
               </label>
-            )}
-            {rootSection === "methodika" && (
-              <>
-                <label className="article-stack-label">
-                  <span>Предмет Методического пространства</span>
-                  <select value={form.methodika_subject} onChange={(event) => { set("methodika_subject", event.target.value); if (event.target.value) set("hub_path", ""); }}>
-                    <option value="">Не выбран</option>
-                    {allowedSubjects.map((subject) => <option key={subject} value={subject}>{subject}</option>)}
-                  </select>
+              <div className="article-side-actions">
+                <label className="article-btn article-btn-muted">
+                  {form.cover_image_url ? "Заменить" : "Загрузить"}
+                  <input className="article-file" type="file" accept="image/*" onChange={handleCoverUpload} />
                 </label>
-                <label className="article-stack-label">
-                  <span>Спецподраздел Методики</span>
-                  <select value={form.hub_path} onChange={(event) => { set("hub_kind", "methodika"); set("hub_path", event.target.value); if (event.target.value) set("methodika_subject", ""); }}>
-                    <option value="">Не выбран</option>
-                    {METHODIKA_SECTIONS.map((section) => <option key={section.value} value={section.value}>{section.label}</option>)}
-                  </select>
-                </label>
-              </>
-            )}
-            {rootSection === "noko" && (
+                {form.cover_image_url && <button type="button" className="article-btn article-btn-muted danger-soft" onClick={() => set("cover_image_url", "")}>Удалить</button>}
+              </div>
+              <p className="article-field-hint">Рекомендуемый размер: 1200×628, JPG или PNG.</p>
+            </section>
+
+            <section className="article-panel article-panel-compact">
+              <div className="article-label">Теги</div>
+              <ChipInput value={form.tags} onChange={(value) => set("tags", value)} />
+            </section>
+
+            <details className="article-panel article-panel-compact article-extra-panel">
+              <summary>Дополнительно</summary>
               <label className="article-stack-label">
-                <span>Подраздел НОКО</span>
-                <select value={form.noko_section} onChange={(event) => set("noko_section", event.target.value)}>
-                  <option value="">Выберите подраздел</option>
-                  {NOKO_SECTIONS.map((section) => <option key={section.value} value={section.value}>{section.label}</option>)}
-                </select>
+                <span>Адрес страницы</span>
+                <input value={form.slug} onChange={(event) => { setSlugLocked(true); set("slug", generateSlug(event.target.value) || event.target.value); }} />
               </label>
-            )}
-            {rootSection === "konkursy" && (
               <label className="article-stack-label">
-                <span>Подраздел конкурсов</span>
-                <select value={form.hub_path} onChange={(event) => { set("hub_kind", "konkursy"); set("hub_path", event.target.value); }}>
-                  <option value="">Выберите подраздел</option>
-                  {KONKURSY_SECTIONS.map((section) => <option key={section.value} value={section.value}>{section.label}</option>)}
-                </select>
+                <span>Заголовок для поисковых систем</span>
+                <input value={form.title} onChange={(event) => updateTitle(event.target.value)} />
               </label>
-            )}
-            {rootSection === "deyatelnost" && (
               <label className="article-stack-label">
-                <span>Подраздел деятельности</span>
-                <select value={form.hub_path} onChange={(event) => { set("hub_kind", "deyatelnost"); set("hub_path", event.target.value); }}>
-                  <option value="">Выберите подраздел</option>
-                  {DEYATELNOST_SECTIONS.map((section) => <option key={section.value} value={section.value}>{section.label}</option>)}
-                </select>
+                <span>Описание для поисковых систем</span>
+                <textarea value={form.lead} onChange={(event) => set("lead", event.target.value)} rows={3} />
               </label>
-            )}
-            {rootSection === "archiv" && (
-              <label className="article-stack-label">
-                <span>Подраздел архива</span>
-                <select value={form.hub_path} onChange={(event) => { set("hub_kind", "archiv"); set("hub_path", event.target.value); }}>
-                  <option value="">Выберите подраздел</option>
-                  {ARCHIV_SECTIONS.map((section) => <option key={section.value} value={section.value}>{section.label}</option>)}
-                </select>
-              </label>
-            )}
-            {fieldError("placement") && <div className="article-field-error">{fieldError("placement")}</div>}
-          </section>
+            </details>
+          </div>
         </aside>
       </div>
+      <SectionSelectorModal
+        open={sectionSelectorOpen}
+        selectedKeys={selectedSectionKeys}
+        onClose={() => setSectionSelectorOpen(false)}
+        onApply={(keys, options) => {
+          setSaveState("Есть несохранённые изменения");
+          setForm((current) => applyArticleSectionSelection(current, keys, options));
+        }}
+        allowedSubjects={allowedSubjects}
+        isDomuMode={isDomuMode}
+        allowedScopes={allowedScopes}
+      />
       {previewOpen && <ArticlePreviewModal article={previewArticle} onClose={() => setPreviewOpen(false)} />}
     </div>
   );
@@ -1906,7 +2329,7 @@ const ARTICLE_CSS = `
 .article-list-head p { margin: 8px 0 0; color: #52636d; font-size: 15px; line-height: 1.45; font-weight: 650; }
 .article-editor-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
 .article-editor-main, .article-editor-side { display: grid; gap: 14px; min-width: 0; }
-.article-panel, .block-workspace { border: 1px solid #dbe6f5; border-radius: 8px; background: #fff; padding: 18px; box-shadow: 0 10px 28px rgba(15, 23, 42, .055); }
+.article-panel, .block-workspace { border: 1px solid #dbe6f5; border-radius: 16px; background: #fff; padding: 18px; box-shadow: 0 10px 28px rgba(15, 23, 42, .055); }
 .article-panel-compact { padding: 16px; }
 .article-info-note { margin: 0 0 12px; }
 .article-info-trigger { min-height: 32px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid #cfe0e7; border-radius: 8px; background: #f8fbfc; color: var(--article-primary-dark); padding: 0 10px; font: inherit; font-size: 12px; font-weight: 900; cursor: pointer; }
@@ -1936,7 +2359,7 @@ const ARTICLE_CSS = `
 .block-picker small { color: #64748b; font-size: 12px; }
 .block-empty { width: 100%; border: 1.5px dashed #bfdbfe; border-radius: 8px; background: #f8fbff; color: #475569; padding: 28px; display: grid; gap: 6px; text-align: center; margin-bottom: 12px; cursor: pointer; font: inherit; transition: transform .18s ease, background .18s ease, border-color .18s ease; }
 .block-empty:hover, .block-empty:focus-visible { background: #edf6f8; border-color: var(--article-primary); transform: translateY(-1px); outline: 0; }
-.block-card { border: 1px solid #dbe6f5; border-radius: 8px; background: #fff; margin-bottom: 10px; overflow: hidden; transition: transform .24s cubic-bezier(.2,.8,.2,1), box-shadow .24s ease, border-color .24s ease; }
+.block-card { border: 1px solid #dbe6f5; border-radius: 14px; background: #fff; margin-bottom: 10px; overflow: hidden; transition: transform .24s cubic-bezier(.2,.8,.2,1), box-shadow .24s ease, border-color .24s ease; }
 .block-card.is-moving { animation: block-reorder .26s cubic-bezier(.2,.8,.2,1); border-color: #8fc4d4; box-shadow: 0 14px 30px rgba(25, 120, 156, .12); }
 .block-card.is-dragging { opacity: .62; transform: scale(.985); box-shadow: 0 18px 36px rgba(15, 23, 42, .18); }
 .block-card.is-drag-over { border-color: var(--article-primary); box-shadow: inset 0 0 0 2px rgba(25,120,156,.12); }
@@ -1976,7 +2399,7 @@ const ARTICLE_CSS = `
 .image-drop label input { display: none; }
 .divider-editor { color: #64748b; font-size: 13px; padding: 10px 0; }
 .article-preview { display: grid; gap: 12px; position: static; min-width: 0; }
-.article-preview-card, .seo-preview, .feed-preview { border: 1px solid #dbe6f5; border-radius: 8px; background: #fff; padding: 18px; box-shadow: 0 18px 46px rgba(15, 23, 42, .08); }
+.article-preview-card, .seo-preview, .feed-preview { border: 1px solid #dbe6f5; border-radius: 16px; background: #fff; padding: 18px; box-shadow: 0 18px 46px rgba(15, 23, 42, .08); }
 .article-preview-card img, .article-cover-preview { width: 100%; border-radius: 8px; object-fit: cover; background: #e2e8f0; }
 .article-preview-card img { aspect-ratio: 16 / 9; margin-bottom: 14px; }
 .article-real-preview { background: #f8fafc; }
@@ -1987,9 +2410,9 @@ const ARTICLE_CSS = `
 .article-preview-hero img { display: block; width: 100%; max-height: 460px; aspect-ratio: 16 / 9; object-fit: cover; margin: 0; border-radius: 0; }
 .article-preview-pin { position: absolute; top: 14px; right: 14px; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 999px; color: #fff; background: rgba(15, 23, 42, .78); border: 1px solid rgba(255,255,255,.5); box-shadow: 0 12px 30px rgba(15,23,42,.28); backdrop-filter: blur(10px); }
 .article-preview-pin svg { width: 21px; height: 21px; fill: currentColor; }
-.article-preview-content-card { border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; padding: 22px; }
+.article-preview-content-card { border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; padding: 22px; }
 .article-cover-preview { aspect-ratio: 16 / 9; margin-bottom: 0; }
-.article-cover-drop { position: relative; min-height: 156px; display: grid; place-items: center; gap: 7px; text-align: center; border: 1.5px dashed #bfdbfe; border-radius: 8px; background: linear-gradient(180deg, #f8fbff 0%, #eff6ff 100%); color: #334155; padding: 18px; cursor: pointer; margin-bottom: 12px; overflow: hidden; transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease; }
+.article-cover-drop { position: relative; min-height: 156px; display: grid; place-items: center; gap: 7px; text-align: center; border: 1.5px dashed #bfdbfe; border-radius: 14px; background: linear-gradient(180deg, #f8fbff 0%, #eff6ff 100%); color: #334155; padding: 18px; cursor: pointer; margin-bottom: 12px; overflow: hidden; transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease; }
 .article-cover-drop:hover, .article-cover-drop.is-active { transform: translateY(-1px); border-color: var(--article-primary); background: #edf6f8; box-shadow: 0 14px 30px rgba(25, 120, 156, .12); }
 .article-cover-drop.has-image { padding: 0; border-style: solid; background: #e2e8f0; }
 .article-cover-drop.has-image .article-cover-preview { width: 100%; height: 100%; min-height: 156px; border-radius: 8px; object-fit: cover; display: block; }
@@ -2110,8 +2533,182 @@ const ARTICLE_CSS = `
 .preview-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .preview-modal-head button { min-height: 38px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #334155; padding: 0 12px; cursor: pointer; font: inherit; font-weight: 800; }
 .article-preview.expanded { position: static; max-width: 820px; margin: 0 auto; }
+.article-editor-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.article-panel, .block-workspace, .article-wysiwyg-card { border-radius: 8px; }
+.article-title-panel { padding: 16px 18px; }
+.article-title-input { min-height: 50px; border: 1.5px solid #d7e4ea; border-radius: 8px; background: #fff; padding: 0 14px; font-size: 22px; font-weight: 800; line-height: 1.25; }
+.article-title-input::placeholder { color: #94a3b8; font-weight: 700; }
+.article-field-hint { margin: 7px 0 0; color: #64748b; font-size: 12px; line-height: 1.45; font-weight: 700; }
+.article-slug-control { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; border: 1.5px solid #d7e4ea; border-radius: 8px; background: #f8fafc; padding: 6px 8px 6px 12px; }
+.article-slug-control span { color: #64748b; font-size: 13px; font-weight: 850; }
+.article-slug-control input { min-width: 0; border: 0; outline: 0; background: transparent; color: #0f172a; font: inherit; font-size: 14px; }
+.article-slug-control button { min-height: 34px; border: 1px solid #b8d4dd; border-radius: 8px; background: #fff; color: var(--article-primary-dark); padding: 0 10px; font: inherit; font-size: 12px; font-weight: 900; cursor: pointer; }
+.article-wysiwyg-card { border: 1px solid #dbe6f5; background: #fff; box-shadow: 0 10px 28px rgba(15, 23, 42, .055); overflow: hidden; }
+.article-wysiwyg-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 18px 12px; border-bottom: 1px solid #e2e8f0; }
+.article-wysiwyg-head strong { display: block; color: #0f172a; font-size: 18px; line-height: 1.2; }
+.article-wysiwyg { background: #fff; }
+.article-wysiwyg-toolbar { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; padding: 8px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+.article-wysiwyg-toolbar select { min-height: 34px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #0f172a; padding: 0 10px; font: inherit; font-size: 13px; font-weight: 800; }
+.article-wysiwyg-toolbar button { width: 34px; height: 34px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #334155; font: inherit; font-size: 13px; font-weight: 900; cursor: pointer; }
+.article-wysiwyg-toolbar button:hover, .article-wysiwyg-toolbar button.is-active { border-color: #9bc8d4; background: #edf6f8; color: var(--article-primary-dark); }
+.toolbar-divider { width: 1px; height: 24px; background: #dbe6f5; margin: 0 2px; }
+.article-wysiwyg-area { min-height: 520px; padding: 28px min(36px, 5vw); outline: 0; color: #1f2937; background: #fff; }
+.article-wysiwyg-area:empty::before { content: attr(data-placeholder); color: #94a3b8; }
+.article-md h2 { margin: 26px 0 10px; color: #0f172a; font-size: 24px; line-height: 1.25; }
+.article-md h3 { margin: 22px 0 8px; color: #0f172a; font-size: 20px; line-height: 1.3; }
+.article-md p { margin: 0 0 14px; }
+.article-md blockquote { margin: 18px 0; border-left: 4px solid var(--article-primary); background: #edf6f8; color: #0f3f58; padding: 14px 16px; border-radius: 0 8px 8px 0; }
+.article-md figure { margin: 20px 0; }
+.article-md figcaption { margin-top: 7px; color: #64748b; font-size: 13px; text-align: center; }
+.article-md table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+.article-md td, .article-md th { border: 1px solid #cbd5e1; padding: 8px 10px; }
+.article-md a { color: var(--article-primary-dark); font-weight: 800; }
+.article-files-panel { display: grid; gap: 12px; }
+.article-file-drop-compact { min-height: 74px; grid-template-columns: auto minmax(0, 1fr); justify-items: start; text-align: left; margin-bottom: 0; }
+.article-chip-list { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.article-chip-list-compact { margin: 8px 0 12px; }
+.article-chip.muted { background: #f1f5f9; color: #64748b; }
+.muted-text { color: #64748b; font-size: 13px; font-weight: 750; }
+.article-side-sticky { display: grid; gap: 14px; }
+.article-side-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.article-counter { color: #64748b; font-size: 12px; font-weight: 850; }
+.article-status-pill { display: inline-flex; align-items: center; min-height: 24px; border-radius: 999px; padding: 0 9px; background: #f1f5f9; color: #475569; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+.article-status-pill.published { background: #dcfce7; color: #15803d; }
+.article-status-pill.draft { background: #f1f5f9; color: #475569; }
+.article-status-pill.archive { background: #fee2e2; color: #991b1b; }
+.article-save-state { margin-top: 7px; color: #52636d; font-size: 12px; font-weight: 850; }
+.article-save-state.side { margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+.article-save-state.is-error { color: #b91c1c; }
+.article-wide-btn { width: 100%; justify-content: center; }
+.article-cover-drop-side { min-height: 126px; margin-bottom: 10px; border-radius: 8px; }
+.article-cover-drop-side.has-image .article-cover-preview { min-height: 126px; border-radius: 8px; }
+.article-side-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.article-side-actions .article-btn { display: inline-flex; align-items: center; justify-content: center; }
+.danger-soft { border-color: #fecaca; background: #fffafa; color: #b91c1c; }
+.article-extra-panel summary { cursor: pointer; color: #0f172a; font-weight: 900; }
+.article-extra-panel textarea { width: 100%; border: 1.5px solid #cbd5e1; border-radius: 8px; background: #f8fafc; color: #0f172a; padding: 10px 12px; font: inherit; resize: vertical; }
+.section-selector-backdrop { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; padding: 18px; background: rgba(15, 23, 42, .52); }
+.section-selector-panel { width: min(760px, 100%); max-height: 90vh; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto auto; overflow: hidden; border-radius: 8px; background: #fff; box-shadow: 0 24px 70px rgba(15, 23, 42, .24); }
+.section-selector-head, .section-selector-tools, .section-selected-box, .section-selector-actions { padding: 14px 16px; border-bottom: 1px solid #e2e8f0; }
+.section-selector-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.section-selector-head h3 { margin: 0; color: #0f172a; font-size: 22px; line-height: 1.2; }
+.section-selector-close { width: 34px; height: 34px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #334155; font: inherit; font-size: 20px; cursor: pointer; }
+.section-selector-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.section-selector-tools input { width: 100%; min-height: 40px; border: 1.5px solid #cbd5e1; border-radius: 8px; background: #f8fafc; color: #0f172a; padding: 0 12px; font: inherit; }
+.section-selector-body { overflow: auto; padding: 12px 16px; }
+.section-tree, .section-search-results { display: grid; gap: 4px; }
+.section-tree-row, .section-result-row { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 6px; min-height: 36px; border-radius: 8px; padding: 2px 6px; }
+.section-result-row { grid-template-columns: auto minmax(0, 1fr); border: 1px solid #e2e8f0; background: #f8fafc; }
+.section-tree-row:hover { background: #f8fafc; }
+.section-tree-row label, .section-result-row { color: #1f2937; font-size: 14px; font-weight: 800; cursor: pointer; }
+.section-tree-row label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.section-tree-row strong { color: #64748b; font-size: 12px; text-transform: uppercase; }
+.section-tree-toggle { width: 28px; height: 28px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: var(--article-primary-dark); font: inherit; font-weight: 900; cursor: pointer; }
+.section-tree-spacer { width: 28px; height: 28px; }
+.section-tree-children { margin-left: 34px; border-left: 1px solid #e2e8f0; padding-left: 8px; }
+.section-selected-box { display: grid; gap: 8px; border-top: 1px solid #e2e8f0; }
+.section-selected-box strong { color: #0f172a; font-size: 13px; }
+.section-selector-actions { display: flex; justify-content: flex-end; gap: 8px; border-bottom: 0; }
+.section-selector-empty { color: #64748b; padding: 18px; text-align: center; }
+.section-selector-panel mark { background: #dff1f5; color: var(--article-primary-dark); padding: 0 2px; border-radius: 3px; }
+
+/* Article editor refinement */
+.article-editor-shell { max-width: 1480px; margin: 0 auto; }
+.article-editor-actions { flex-wrap: nowrap; }
+.article-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
+.article-section-head p { margin: 4px 0 0; color: #64748b; font-size: 13px; line-height: 1.45; font-weight: 700; }
+.article-basic-panel { padding: 18px; }
+.article-basic-fields { display: grid; gap: 16px; }
+.article-field-group { display: grid; gap: 6px; }
+.article-title-panel { padding: 18px; }
+.article-title-input { min-height: 46px; font-size: 21px; }
+.article-lead-input { min-height: 92px; }
+.article-slug-field { padding-top: 2px; }
+.article-slug-control { min-height: 44px; padding: 5px 6px 5px 11px; }
+.article-slug-control span { white-space: nowrap; }
+.article-slug-control button { min-height: 30px; border-color: #cfe0e7; background: #fff; }
+.article-save-state { width: fit-content; display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; border: 1px solid #dbe6f5; border-radius: 999px; background: #f8fafc; color: #52636d; padding: 5px 9px; font-size: 12px; font-weight: 850; line-height: 1.2; }
+.article-save-state.is-saved { border-color: #cfe8d9; background: #f6fdf8; color: #047857; }
+.article-save-state.is-dirty { border-color: #f6d99b; background: #fffaf0; color: #8a5a0a; }
+.article-save-state.is-saving { border-color: #b8d4dd; background: #edf6f8; color: var(--article-primary-dark); }
+.article-save-state.is-error { border-color: #fecaca; background: #fffafa; color: #b91c1c; }
+.article-save-state button { border: 0; border-left: 1px solid currentColor; background: transparent; color: inherit; padding: 0 0 0 8px; font: inherit; cursor: pointer; }
+.article-save-state.side { width: 100%; justify-content: space-between; border-radius: 8px; border-top: 1px solid #dbe6f5; padding: 9px 10px; }
+.article-wysiwyg-card { border-color: #cfe0e7; box-shadow: 0 14px 34px rgba(15, 23, 42, .06); }
+.article-wysiwyg-head { padding: 15px 18px 13px; background: #fff; }
+.article-wysiwyg-head strong { font-size: 19px; }
+.article-wysiwyg-toolbar { gap: 6px; padding: 9px 10px; background: #f7fbfc; }
+.article-wysiwyg-toolbar select { min-width: 142px; }
+.article-wysiwyg-toolbar button { position: relative; }
+.article-wysiwyg-canvas { position: relative; background: #fff; }
+.article-wysiwyg-canvas.is-empty { background: linear-gradient(180deg, #ffffff 0%, #fbfdfe 100%); }
+.article-wysiwyg-placeholder { position: absolute; inset: 28px min(36px, 5vw) auto; z-index: 1; max-width: 420px; display: grid; gap: 6px; color: #94a3b8; pointer-events: none; }
+.article-wysiwyg-placeholder strong { color: #52636d; font-size: 16px; }
+.article-wysiwyg-placeholder span { font-size: 13px; line-height: 1.5; }
+.article-wysiwyg-area { position: relative; z-index: 2; min-height: 540px; background: transparent; }
+.article-wysiwyg-area:empty::before { content: ""; }
+.article-wysiwyg-status { min-height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; padding: 0 14px; font-size: 12px; font-weight: 850; }
+.article-files-panel { gap: 10px; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
+.article-files-panel.is-active { border-color: var(--article-primary); background: #f8fcfd; box-shadow: 0 12px 30px rgba(25,120,156,.12); }
+.article-files-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.article-file-add { min-height: 36px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid #b8d4dd; border-radius: 8px; background: #edf6f8; color: var(--article-primary-dark); padding: 0 12px; cursor: pointer; font-size: 13px; font-weight: 900; }
+.article-file-add span { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 999px; background: #fff; }
+.article-files-hint { color: #64748b; font-size: 12px; font-weight: 800; }
+.article-file-dropzone { min-height: 72px; display: grid; grid-template-columns: 42px minmax(0, 1fr); align-items: center; gap: 12px; border: 1.5px dashed #b8d4dd; border-radius: 10px; background: linear-gradient(180deg, #fbfdfe 0%, #f1f8fa 100%); color: #334155; padding: 12px 14px; cursor: pointer; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s ease; }
+.article-file-dropzone:hover, .article-file-dropzone.is-active { transform: translateY(-1px); border-color: var(--article-primary); background: #edf6f8; box-shadow: 0 12px 26px rgba(25,120,156,.12); }
+.article-file-dropzone-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 10px; background: #fff; color: var(--article-primary-dark); box-shadow: inset 0 0 0 1px #d8eaf0; }
+.article-file-dropzone-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.article-file-dropzone-copy { min-width: 0; display: grid; gap: 3px; }
+.article-file-dropzone-copy strong { color: #0f172a; font-size: 14px; line-height: 1.25; }
+.article-file-dropzone-copy small { color: #64748b; font-size: 12px; font-weight: 800; line-height: 1.35; }
+.article-attachment-list { max-height: 300px; overflow: auto; }
+.article-attachment-item { grid-template-columns: 42px minmax(0, 1fr) auto 32px; padding: 8px; }
+.article-file-type { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 8px; background: #e7f3f6; color: var(--article-primary-dark); font-size: 10px; font-weight: 950; }
+.article-attachment-main { min-width: 0; display: grid; gap: 2px; }
+.article-attachment-main a { color: #0f172a; }
+.article-attachment-open { color: var(--article-primary-dark); font-size: 12px; font-weight: 900; text-decoration: none; }
+.article-cover-drop-side { min-height: 112px; background: #f8fafc; }
+.article-cover-empty { display: grid; justify-items: center; gap: 8px; color: var(--article-primary-dark); }
+.article-cover-icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; background: #e7f3f6; color: var(--article-primary-dark); }
+.article-cover-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.article-cover-thumb { width: 100%; display: block; }
+.article-cover-drop-side.has-image { min-height: auto; }
+.article-cover-drop-side.has-image .article-cover-preview { min-height: 104px; max-height: 150px; }
+.article-chipbox { padding: 7px; }
+.article-chipbox input { min-height: 28px; }
+.section-selector-backdrop { padding: 20px; }
+.section-selector-panel { width: min(860px, 100%); max-height: min(92vh, 820px); grid-template-rows: auto auto minmax(220px, 1fr) auto auto; }
+.section-selector-tools { grid-template-columns: minmax(0, 1fr) auto; background: #fbfdfe; }
+.section-search-field { position: relative; }
+.section-search-field input { padding-right: 40px; }
+.section-search-field button { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; border: 0; border-radius: 7px; background: #e7f3f6; color: var(--article-primary-dark); font-size: 18px; cursor: pointer; }
+.section-only-selected { min-height: 34px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid #dbe6f5; border-radius: 999px; background: #fff; color: #475569; padding: 0 10px; font-size: 12px; font-weight: 850; cursor: pointer; white-space: nowrap; }
+.section-only-selected input, .section-tree-label input, .section-result-row input { accent-color: var(--article-primary); }
+.section-selector-body { background: #fff; }
+.section-tree { gap: 2px; }
+.section-tree-node { position: relative; }
+.section-tree-row { min-height: 40px; grid-template-columns: 30px minmax(0, 1fr); padding: 3px 7px; border: 1px solid transparent; cursor: pointer; }
+.section-tree-row:hover { border-color: #dbe6f5; background: #f8fbfc; }
+.section-tree-row.is-selected { background: #edf6f8; border-color: #b8d4dd; }
+.section-tree-row.is-indeterminate { background: #fbfdfe; border-color: #dbe6f5; }
+.section-tree-row.is-parent > .section-tree-label span:last-child, .section-tree-row.is-parent > strong { color: #0f172a; font-weight: 900; }
+.section-tree-label { display: inline-flex; align-items: center; gap: 9px; min-width: 0; color: #1f2937; font-size: 14px; font-weight: 800; }
+.section-tree-label span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.section-tree-row strong { align-self: center; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: .02em; }
+.section-tree-toggle { border-color: #d7e4ea; background: #fff; }
+.section-tree-toggle:hover { border-color: var(--article-primary); background: #edf6f8; }
+.section-tree-children { margin-left: 22px; border-left: 1px solid #dbe6f5; padding-left: 10px; }
+.section-selected-box { max-height: 170px; overflow: auto; background: #fbfdfe; }
+.section-selected-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.section-selected-head button { border: 0; background: transparent; color: var(--article-primary-dark); font: inherit; font-size: 12px; font-weight: 900; cursor: pointer; }
+.section-selected-head button:disabled { color: #94a3b8; cursor: not-allowed; }
+.section-selected-chip { max-width: 100%; }
+.section-selected-chip { overflow: hidden; }
+.section-selected-chip > button { flex: 0 0 auto; }
+.section-selector-actions { position: sticky; bottom: 0; z-index: 2; align-items: center; background: #fff; box-shadow: 0 -10px 24px rgba(15,23,42,.06); }
+.section-selector-actions span { margin-right: auto; color: #64748b; font-size: 12px; font-weight: 900; }
 @media (min-width: 980px) { .article-editor-grid { grid-template-columns: minmax(0, 1fr) minmax(340px, 390px); } .article-preview { position: static; } }
-@media (max-width: 979px) { .article-editor-side { order: -1; } .article-side-sticky { position: static; } }
+@media (max-width: 979px) { .article-editor-side { order: initial; } .article-side-sticky { position: static; } }
 @media (max-width: 900px) { .article-stat-grid { grid-template-columns: 1fr; } }
-@media (max-width: 640px) { .article-panel, .block-workspace { padding: 14px; } .article-editor-topbar, .article-list-head, .article-draft-banner, .block-toolbar { align-items: stretch; flex-direction: column; } .article-btn { width: 100%; } .block-grid-compact, .block-handle { grid-template-columns: 1fr; } .article-empty-row { text-align: left; } }
+@media (max-width: 640px) { .article-panel, .block-workspace { padding: 14px; } .article-editor-topbar, .article-list-head, .article-draft-banner, .block-toolbar, .article-editor-actions { align-items: stretch; flex-direction: column; } .article-editor-actions { flex-wrap: wrap; } .article-btn { width: 100%; } .article-slug-control, .section-selector-tools, .block-grid-compact, .block-handle { grid-template-columns: 1fr; } .article-empty-row { text-align: left; } .article-wysiwyg-area { min-height: 380px; padding: 20px 16px; } .article-wysiwyg-placeholder { inset: 20px 16px auto; } .article-wysiwyg-status, .article-files-head, .section-selected-head, .section-selector-actions { align-items: stretch; flex-direction: column; } .article-attachment-item { grid-template-columns: 38px minmax(0, 1fr) 32px; } .article-attachment-open { grid-column: 2 / 3; } .section-tree-children { margin-left: 14px; } }
 `;

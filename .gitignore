@@ -1,26 +1,8 @@
-# Python
-backend/venv/
-backend/.venv/
-venv/
-.venv/
-__pycache__/
-*.pyc
-
-# Django
-backend/db.sqlite3
-backend/media/
-backend/staticfiles/
+# Secrets and local configuration — never commit real .env
 .env
-backend/.env
-frontend/.env
+.env.*
+!.env.example
 
-# Node / Vue
-frontend/node_modules/
-frontend/dist/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# IDE
-.idea/
-.vscode/
+# OS
+.DS_Store
+Thumbs.db

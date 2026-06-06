@@ -1,94 +1,171 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { canAccessAdmin, canAccessDomuAdmin, canAccessTpmpkAdmin } from "../../auth.js";
-import { SVEDENIYA_QUICK_LINKS } from "../../pages/svedeniya/svedeniyaData.js";
-import {
-  ARCHIV_ROUTES,
-  DEYATELNOST_ROUTES,
-  DOMU_SECTIONS,
-  KONKURSY_ROUTES,
-  METHODIKA_STATIC_PAGES,
-  NOKO_ROUTES,
-} from "../admin/articleTaxonomy.js";
 
 const link = (label, path) => ({ label, path });
 
-const TPMPK_LINKS = [
-  link("ТПМПК", "/tpmpk/"),
-  link("Запись на обследование", "/tpmpk/zapis"),
-  link("Документы", "/tpmpk/dokumenty/"),
-  link("Бланки и формы", "/tpmpk/blanki/"),
-  link("График работы", "/tpmpk/grafik/"),
-  link("Состав комиссии", "/tpmpk/sostav/"),
-  link("Нормативные акты", "/tpmpk/npa/"),
-  link("Вопросы и ответы", "/tpmpk/faq/"),
-  link("Для родителей", "/tpmpk/dlya-roditeley/"),
-  link("Для педагогов", "/tpmpk/dlya-pedagogov/"),
-  link("Контакты", "/tpmpk/kontakty/"),
+const METHODICAL_LINKS = [
+  link("Дошкольное образование", "/metodicheskoe-prostranstvo/doshkolnoe-obrazovanie/"),
+  link("Начальное общее образование", "/metodicheskoe-prostranstvo/nachalnoe-obshchee-obrazovanie/"),
+  link("Дополнительное образование", "/metodicheskoe-prostranstvo/dopolnitelnoe-obrazovanie/"),
+  link("История", "/metodicheskoe-prostranstvo/istoriya/"),
+  link("История нашего края", "/metodicheskoe-prostranstvo/istoriya-nashego-kraya/"),
+  link("Обществознание", "/metodicheskoe-prostranstvo/obshchestvoznanie/"),
+  link("ДНКР", "/metodicheskoe-prostranstvo/dnkr/"),
+  link("Русский язык", "/metodicheskoe-prostranstvo/russkiy-yazyk/"),
+  link("Иностранные языки", "/metodicheskoe-prostranstvo/inostrannye-yazyki/"),
+  link("Математика", "/metodicheskoe-prostranstvo/matematika/"),
+  link("Информатика", "/metodicheskoe-prostranstvo/informatika/"),
+  link("Химия", "/metodicheskoe-prostranstvo/himiya/"),
+  link("Биология", "/metodicheskoe-prostranstvo/biologiya/"),
+  link("География", "/metodicheskoe-prostranstvo/geografiya/"),
+  link("Байкаловедение", "/metodicheskoe-prostranstvo/baykalovedenie/"),
+  link("Физкультура", "/metodicheskoe-prostranstvo/fizkultura/"),
+  link("ОБЖ", "/metodicheskoe-prostranstvo/obzh/"),
+  link("Технология", "/metodicheskoe-prostranstvo/tehnologiya/"),
+  link("Воспитание", "/metodicheskoe-prostranstvo/vospitanie/"),
+  link("Психологи", "/metodicheskoe-prostranstvo/psihologi/"),
+  link("Социальные педагоги", "/metodicheskoe-prostranstvo/socialnye-pedagogi/"),
+  link("Молодые специалисты", "/metodicheskoe-prostranstvo/molodye-specialisty/"),
+  link("Инновационная деятельность", "/innovacionnaya-deyatelnost/"),
+  link("Методические материалы", "/predmetnye-oblasti/metodicheskie-materialy/"),
+  link("Воспитательное пространство", "/vospitatelnoe-prostranstvo/"),
 ];
 
-const COLUMNS = [
+const MEGA_MENU_GROUPS = [
   {
-    title: "Об организации",
+    id: "quick",
+    groupTitle: "Быстрый переход",
+    description: "Самые востребованные страницы и сервисы портала.",
     links: [
-      link("Основные сведения", "/sveden/common/"),
-      link("Структура и органы управления", "/sveden/struct/"),
+      link("Главная", "/"),
+      link("Новости", "/novosti/"),
+      link("ТПМПК", "/tpmpk/"),
+      link("Записаться на приём", "/tpmpk/zapis"),
+      link("НОКО", "/noko/"),
+      link("Курсы повышения квалификации", "/kpk/"),
+      link("Методическое пространство", "/metodicheskoe-prostranstvo/"),
+      link("Музей", "/deyatelnost/muzey/"),
+    ],
+  },
+  {
+    id: "svedeniya",
+    groupTitle: "Сведения об образовательной организации",
+    description: "Официальная информация об учреждении и обязательные подразделы.",
+    links: [
+      link("Сведения об образовательной организации", "/sveden/"),
       link("Документы", "/sveden/document/"),
       link("Образование", "/sveden/education/"),
       link("Руководство", "/sveden/employees/"),
-      link("Материально-техническое обеспечение", "/sveden/objects/"),
-      link("Платные образовательные услуги", "/sveden/paid_edu/"),
+      link("Финансово-хозяйственная деятельность", "/sveden/budget/"),
       link("Доступная среда", "/sveden/ovz/"),
     ],
   },
   {
-    title: "Подразделения",
+    id: "tpmpk",
+    groupTitle: "ТПМПК",
+    description: "Запись на приём, документы, состав и нормативная база комиссии.",
     links: [
-      link("ТПМПК", "/tpmpk/"),
+      link("Записаться на приём", "/tpmpk/zapis"),
+      link("Перечень документов для прохождения ПМПК", "/tpmpk/dokumenty/"),
+      link("Состав территориальной ПМПК", "/tpmpk/sostav/"),
+      link("Нормативные документы", "/tpmpk/npa/"),
+    ],
+  },
+  {
+    id: "noko",
+    groupTitle: "НОКО",
+    description: "Независимая оценка качества образования и материалы ГИА.",
+    links: [
+      link("Оперативная информация", "/noko/operativnaya-informaciya/"),
+      link("ГИА 9 класс", "/noko/gia-9/"),
+      link("ГИА 11 (12) класс", "/noko/gia-11/"),
+      link("Сборники и альманахи", "/noko/sborniki/"),
+    ],
+  },
+  {
+    id: "courses",
+    groupTitle: "Курсы повышения квалификации",
+    description: "Программы повышения квалификации и мониторинг дефицитов.",
+    links: [
+      link("Список курсов повышения квалификации", "/kpk/spisok-kursov-povysheniya-kvalifikacii/"),
+      link("Мониторинг профессиональных дефицитов педагогических работников города", "/kpk/monitoring-professionalnyh-deficitov/"),
+    ],
+  },
+  {
+    id: "methodical",
+    groupTitle: "Методическое пространство",
+    description: "Предметные и профессиональные направления методического сопровождения.",
+    links: METHODICAL_LINKS,
+  },
+  {
+    id: "contests",
+    groupTitle: "Конкурсы и олимпиады",
+    description: "Конкурсные, олимпиадные и конференционные направления.",
+    links: [
+      link("Конкурсы", "/konkursy/"),
+      link("Для детей", "/konkursy/dlya-detey/"),
+      link("Для педагогов", "/konkursy/dlya-pedagogov/"),
+      link("Олимпиады для детей", "/olimpiady-dlya-detey/"),
+      link("Всероссийская олимпиада школьников", "/olimpiady-dlya-detey/vserossiyskaya-olimpiada-shkolnikov/"),
+      link("Муниципальные и региональные олимпиады", "/olimpiady-dlya-detey/municipalnye-i-regionalnye-olimpiady/"),
+      link("Конференции для детей", "/konferencii-dlya-detey/"),
+      link("Муниципальные конференции", "/konferencii-dlya-detey/municipalnye-konferencii/"),
+      link("Региональные конференции", "/konferencii-dlya-detey/regionalnye-konferencii/"),
+      link("Всероссийские конференции", "/konferencii-dlya-detey/vserossiyskie-konferencii/"),
+      link("Образовательная программа", "/obrazovatelnaya-programma/"),
+    ],
+  },
+  {
+    id: "domu",
+    groupTitle: "Дом учителя",
+    description: "Профессиональные события, клубы и материалы Дома учителя.",
+    links: [
       link("Дом учителя", "/dom-uchitelya/"),
-      link("Методическое пространство", "/metodika/"),
-      link("НОКО", "/noko/"),
-      link("Олимпиады и конкурсы", "/konkursy/"),
-      link("Деятельность", "/deyatelnost/"),
-      link("Архив", "/archiv/"),
+      link("Новости и материалы", "/dom-uchitelya/novosti/"),
+      link("Мероприятия", "/dom-uchitelya/programma/"),
+      link("Мастер-классы", "/dom-uchitelya/master-klassy/"),
+      link("Клуб молодых педагогов", "/dom-uchitelya/molodye-pedagogi/"),
+      link("Наставничество", "/dom-uchitelya/nastavnichestvo/"),
     ],
   },
   {
-    title: "Мероприятия",
+    id: "activity",
+    groupTitle: "Деятельность",
+    description: "Основные направления работы и профессиональные сообщества.",
     links: [
-      link("Новости и события", "/novosti/"),
-      link("Календарь конкурсов", "/konkursy/kalendar/"),
-      link("Итоги конкурсов", "/konkursy/itogi/"),
-      link("Для обучающихся", "/konkursy/students/"),
-      link("Для педагогов", "/konkursy/teachers/"),
-      link("Событийный календарь", "/#calendar"),
+      link("Деятельность", "/deyatelnost/"),
+      link("Предметные области", "/predmetnye-oblasti/"),
+      link("НСУ СКИП", "/nsu-skip/"),
+      link("Наставничество", "/nastavnichestvo/"),
+      link("Молодые педагоги", "/molodye-pedagogi/"),
     ],
   },
   {
-    title: "НОКО",
-    links: [link("НОКО", "/noko/"), ...NOKO_ROUTES.map((item) => link(item.title, item.path))],
+    id: "museum",
+    groupTitle: "Музей",
+    description: "Музейная и краеведческая работа ИМЦРО.",
+    links: [
+      link("Музей", "/deyatelnost/muzey/"),
+    ],
   },
   {
-    title: "Дом учителя",
-    links: [link("Дом учителя", "/dom-uchitelya/"), link("Новости", "/dom-uchitelya/novosti/"), ...DOMU_SECTIONS.map((item) => link(item.label, `/dom-uchitelya/${item.value}/`))],
+    id: "extra",
+    groupTitle: "Дополнительные разделы",
+    description: "Полезные страницы и информационная безопасность.",
+    links: [
+      link("Полезная информация", "/poleznaya-informaciya/"),
+      link("Осторожно, мошенники!", "/poleznaya-informaciya/ostorozhno-moshenniki/"),
+      link("Муниципальный семейный клуб «ФамилиЯ»", "/municipalnyy-semeynyy-klub-familiya/"),
+      link("Безопасность", "/sveden/ovz/"),
+    ],
   },
 ];
 
-const METHODIKA_LINKS = [
-  link("Методическое пространство", "/metodika/"),
-  ...METHODIKA_STATIC_PAGES.map((item) => link(item.title, item.path)),
-];
-
-const ACTIVITY_LINKS = [
-  link("Деятельность", "/deyatelnost/"),
-  ...DEYATELNOST_ROUTES.map((item) => link(item.title, item.path)),
-  link("Архив", "/archiv/"),
-  ...ARCHIV_ROUTES.map((item) => link(item.title, item.path)),
-];
-
-const CONTEST_LINKS = [
-  link("Олимпиады и конкурсы", "/konkursy/"),
-  ...KONKURSY_ROUTES.map((item) => link(item.title, item.path)),
+const ACTION_LINKS = [
+  link("Записаться на приём", "/tpmpk/zapis"),
+  link("Новости", "/novosti/"),
+  link("Методическое пространство", "/metodicheskoe-prostranstvo/"),
 ];
 
 function normalizePath(pathname) {
@@ -100,6 +177,7 @@ export default function MegaMenu({ open, onClose, currentUser }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [query, setQuery] = useState("");
+  const [activeGroupId, setActiveGroupId] = useState(MEGA_MENU_GROUPS[0].id);
 
   const roleLinks = useMemo(() => {
     const items = [];
@@ -117,49 +195,24 @@ export default function MegaMenu({ open, onClose, currentUser }) {
     return items;
   }, [currentUser]);
 
-  const blueLinks = roleLinks.length ? roleLinks : [
-    link("Запись на ТПМПК", "/tpmpk/zapis"),
-    link("Новости", "/novosti/"),
-    link("Дом учителя", "/dom-uchitelya/"),
-  ];
-
   const allLinks = useMemo(
     () => [
-      ...COLUMNS.flatMap((column) => column.links),
-      ...METHODIKA_LINKS,
-      ...ACTIVITY_LINKS,
-      ...CONTEST_LINKS,
-      ...TPMPK_LINKS,
+      ...MEGA_MENU_GROUPS.flatMap((group) => group.links),
+      ...ACTION_LINKS,
       ...roleLinks,
-      ...SVEDENIYA_QUICK_LINKS.map((item) => link(item.label, item.path)),
     ],
     [roleLinks],
   );
 
+  const activeGroup = MEGA_MENU_GROUPS.find((group) => group.id === activeGroupId) || MEGA_MENU_GROUPS[0];
+
   const filteredLinks = useMemo(() => {
     const value = query.trim().toLowerCase();
     if (!value) return [];
-    return allLinks.filter((item) => item.label.toLowerCase().includes(value)).slice(0, 8);
+    return allLinks
+      .filter((item) => item.label.toLowerCase().includes(value))
+      .slice(0, 9);
   }, [allLinks, query]);
-
-  const primaryLinks = [
-    link("Главная", "/"),
-    link("Сведения об организации", "/sveden/"),
-    link("Новости и события", "/novosti/"),
-    link("ТПМПК", "/tpmpk/"),
-    link("Дом учителя", "/dom-uchitelya/"),
-    link("Методическое пространство", "/metodika/"),
-    link("НОКО", "/noko/"),
-    link("Олимпиады и конкурсы", "/konkursy/"),
-  ];
-
-  const compactGroups = [
-    { title: "Сведения", links: SVEDENIYA_QUICK_LINKS.map((item) => link(item.label, item.path)) },
-    { title: "ТПМПК", links: TPMPK_LINKS.slice(1) },
-    { title: "Мероприятия", links: COLUMNS[2].links },
-    { title: "Дом учителя", links: [link("Новости", "/dom-uchitelya/novosti/"), ...DOMU_SECTIONS.slice(0, 6).map((item) => link(item.label, `/dom-uchitelya/${item.value}/`))] },
-    { title: "Материалы", links: [...METHODIKA_LINKS, ...ACTIVITY_LINKS, ...CONTEST_LINKS].slice(0, 12) },
-  ];
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -168,13 +221,19 @@ export default function MegaMenu({ open, onClose, currentUser }) {
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [open, onClose]);
+
   function goPath(path) {
     if (!path) return;
     onClose();
     navigate(path);
-    if (path.includes("#calendar")) {
-      window.setTimeout(() => document.getElementById("calendar")?.scrollIntoView({ behavior: "smooth" }), 50);
-    }
   }
 
   function isActive(path) {
@@ -184,7 +243,7 @@ export default function MegaMenu({ open, onClose, currentUser }) {
     return target === "/" ? current === "/" : current.startsWith(target);
   }
 
-  function renderLinkButton(item, className) {
+  function renderLinkButton(item, className = "mega-link-button") {
     return (
       <button
         className={`${className}${isActive(item.path) ? " is-active" : ""}`}
@@ -204,38 +263,82 @@ export default function MegaMenu({ open, onClose, currentUser }) {
       <style>{`
         .mega-overlay {
           position: fixed;
-          top: 83px;
+          top: 84px;
           left: 0;
           right: 0;
           bottom: 0;
           z-index: 210;
-          background: #f8fafc;
+          padding: 16px 16px 0;
+          background: rgba(71, 119, 153, 0.92);
           overflow-y: auto;
-          padding: 18px 22px;
+          overflow-x: hidden;
           animation: megaFadeIn 0.18s ease-out;
         }
 
         @keyframes megaFadeIn {
-          from { opacity: 0; transform: translateY(-10px); }
+          from { opacity: 0; transform: translateY(-8px); }
           to { opacity: 1; transform: translateY(0); }
         }
 
         .mega-container {
-          max-width: 1280px;
+          width: min(1280px, calc(100% - 32px));
           margin: 0 auto;
+          display: grid;
+          gap: 14px;
+          max-height: calc(100vh - 112px);
+          overflow-y: auto;
+          overflow-x: hidden;
+          padding: 0;
+          border-radius: 0;
+          border: 0;
+          background: transparent;
+          box-shadow: none;
         }
 
         .mega-search-wrap {
           position: relative;
-          background: #fff;
-          border: 1px solid #e2e8f0;
-          border-radius: 12px;
           display: flex;
           align-items: center;
           gap: 12px;
-          padding: 12px 16px;
-          margin-bottom: 14px;
-          box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
+          min-width: 0;
+          padding: 12px 14px;
+          border: 1px solid rgba(31, 80, 115, 0.16);
+          border-radius: 10px;
+          background: #FFFFFF;
+          box-shadow: 0 12px 30px rgba(31, 80, 115, 0.16);
+        }
+
+        .mega-search-wrap svg {
+          flex: 0 0 auto;
+          color: #1F5073;
+        }
+
+        .mega-search-input {
+          flex: 1 1 auto;
+          min-width: 0;
+          border: 0;
+          outline: 0;
+          background: transparent;
+          color: #1F5073;
+          font: 750 14px/1.2 inherit;
+        }
+
+        .mega-search-input::placeholder {
+          color: rgba(31, 80, 115, 0.68);
+        }
+
+        .mega-search-close {
+          width: 36px;
+          height: 36px;
+          flex: 0 0 36px;
+          border: 1px solid rgba(31, 80, 115, 0.16);
+          border-radius: 8px;
+          background: #FFFFFF;
+          color: #1F5073;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .mega-search-results {
@@ -247,229 +350,278 @@ export default function MegaMenu({ open, onClose, currentUser }) {
           display: grid;
           gap: 6px;
           padding: 10px;
-          border: 1px solid #dbe5f1;
+          border: 1px solid rgba(31, 80, 115, 0.16);
           border-radius: 12px;
-          background: #fff;
-          box-shadow: 0 18px 42px rgba(15, 23, 42, 0.14);
+          background: #FFFFFF;
+          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
         }
 
-        .mega-search-result {
-          min-height: 38px;
-          border: 0;
-          border-radius: 8px;
-          background: #f8fbff;
-          color: #0f172a;
-          text-align: left;
-          padding: 0 12px;
-          font: 800 13px/1.25 inherit;
-          cursor: pointer;
-        }
-
-        .mega-compact-grid {
+        .mega-shell {
           display: grid;
-          grid-template-columns: 1.05fr repeat(4, minmax(0, 1fr));
-          gap: 12px;
+          grid-template-columns: 300px minmax(0, 1fr);
+          gap: 14px;
+          min-height: clamp(360px, 58vh, 528px);
           align-items: stretch;
         }
 
-        .mega-hero-card,
-        .mega-group-card {
-          background: #fff;
-          border: 1px solid #dbe5f1;
+        .mega-group-tabs,
+        .mega-content-panel {
+          border: 1px solid rgba(31, 80, 115, 0.16);
           border-radius: 12px;
-          padding: 14px;
-          display: grid;
-          align-content: start;
-          gap: 9px;
-          box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
+          background: #FFFFFF;
+          box-shadow: 0 12px 30px rgba(31, 80, 115, 0.14);
         }
 
-        .mega-hero-card p {
-          color: #475569;
-          font-size: 13px;
-          line-height: 1.5;
+        .mega-group-tabs {
+          display: grid;
+          gap: 5px;
+          align-content: start;
+          height: 100%;
+          min-height: 0;
+          max-height: none;
+          overflow-y: auto;
+          overflow-x: hidden;
+          padding: 10px;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(31, 80, 115, 0.38) transparent;
+        }
+
+        .mega-group-tab {
+          width: 100%;
+          min-height: 42px;
+          border: 1px solid transparent;
+          border-radius: 8px;
+          background: transparent;
+          color: #1F5073;
+          padding: 10px 10px;
+          text-align: left;
+          font: 850 12.5px/1.18 inherit;
+          cursor: pointer;
+        }
+
+        .mega-group-tab:hover,
+        .mega-group-tab.is-active {
+          border-color: rgba(31, 80, 115, 0.16);
+          background: #1F5073;
+          color: #ffffff;
+        }
+
+        .mega-content-panel {
+          min-width: 0;
+          display: grid;
+          grid-template-rows: auto minmax(0, 1fr);
+          gap: 14px;
+          padding: 20px 18px;
+          align-self: stretch;
+          overflow: hidden;
+        }
+
+        .mega-content-head {
+          display: grid;
+          gap: 7px;
+          padding-bottom: 14px;
+          border-bottom: 1px solid rgba(31, 80, 115, 0.16);
+        }
+
+        .mega-content-head h2 {
+          margin: 0;
+          color: #1F5073;
+          font-size: clamp(24px, 2.1vw, 32px);
+          line-height: 1.12;
+          letter-spacing: 0;
+        }
+
+        .mega-content-head p {
+          max-width: 760px;
+          margin: 0;
+          color: #1F5073;
+          font-size: 13.5px;
+          line-height: 1.35;
           font-weight: 650;
         }
 
-        .mega-group-card {
+        .mega-links-grid {
           min-height: 0;
-        }
-
-        .mega-primary-grid,
-        .mega-link-grid {
           display: grid;
-          gap: 7px;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          align-content: start;
+          gap: 9px;
+          max-height: none;
+          overflow-y: auto;
+          overflow-x: hidden;
+          padding-right: 2px;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(31, 80, 115, 0.38) transparent;
         }
 
-        .mega-primary-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .mega-link-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .mega-sveden-open {
-          min-height: 40px;
-          width: fit-content;
-          border: 1px solid #dbe5f1;
-          border-radius: 10px;
-          background: #1e3a8a;
-          color: #fff;
-          padding: 0 14px;
-          font: 900 13px/1 inherit;
-          cursor: pointer;
-        }
-
-        .mega-sveden-link {
-          border: 1px solid #e2e8f0;
-          border-radius: 10px;
-          background: #f8fbff;
-          min-height: 34px;
-          padding: 8px 10px;
-          color: #334155;
-          text-align: left;
-          font: 850 12px/1.3 inherit;
-          cursor: pointer;
-          overflow-wrap: anywhere;
-        }
-
-        .mega-sveden-link:hover,
-        .mega-sveden-link.is-active,
-        .mega-sveden-open:hover,
-        .mega-search-result:hover {
-          background: #0f2f78;
-          color: #fff;
-        }
-
-        .mega-search-input {
-          flex: 1;
+        .mega-link-button,
+        .mega-action-link,
+        .mega-search-result {
           min-width: 0;
-          border: none;
-          outline: none;
-          background: transparent;
-          font: 700 15px/1 inherit;
-          color: #0f172a;
-        }
-
-        .mega-search-close {
-          width: 34px;
-          height: 34px;
-          border: none;
+          min-height: 40px;
+          border: 1px solid rgba(31, 80, 115, 0.16);
           border-radius: 8px;
-          background: #f1f5f9;
-          color: #64748b;
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .mega-search-close:hover {
-          color: #0f172a;
-          background: #e2e8f0;
-        }
-
-        .mega-grid {
-          display: grid;
-          grid-template-columns: repeat(6, minmax(0, 1fr));
-          gap: 16px;
-          align-items: start;
-        }
-
-        .m-card,
-        .m-card-blue {
-          border-radius: 12px;
-          padding: 20px 16px;
-          display: flex;
-          flex-direction: column;
-          gap: 11px;
-          box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
-        }
-
-        .m-card {
-          background: #fff;
-          border: 1px solid #eef2f7;
-        }
-
-        .m-card-blue {
-          background: #1d4ed8;
-          color: #fff;
-          box-shadow: 0 10px 26px rgba(29, 78, 216, 0.24);
-        }
-
-        .m-title {
-          font-size: 11px;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          color: #0f172a;
-        }
-
-        .m-link,
-        .m-bold-link,
-        .m-link-blue {
-          border: 0;
-          background: transparent;
-          padding: 0;
+          background: #FFFFFF;
+          color: #1F5073;
+          padding: 9px 10px;
           text-align: left;
+          font: 800 12.5px/1.22 inherit;
           cursor: pointer;
-          font-family: inherit;
-          line-height: 1.38;
           overflow-wrap: anywhere;
+          transition: transform 0.14s ease, border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
         }
 
-        .m-link {
-          font-size: 12.5px;
-          font-weight: 600;
-          color: #334155;
+        .mega-link-button:hover,
+        .mega-link-button.is-active,
+        .mega-action-link:hover,
+        .mega-action-link.is-active,
+        .mega-search-result:hover,
+        .mega-search-result.is-active,
+        .mega-search-close:hover {
+          border-color: #1F5073;
+          background: #1F5073;
+          color: #ffffff;
+          transform: translateY(-1px);
         }
 
-        .m-bold-link {
-          font-size: 12.5px;
+        .mega-action-panel {
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 12px 14px;
+          border: 1px solid rgba(31, 80, 115, 0.16);
+          border-radius: 12px;
+          background: #FFFFFF;
+          box-shadow: 0 12px 30px rgba(31, 80, 115, 0.14);
+        }
+
+        .mega-action-panel strong {
+          color: #1F5073;
+          font-size: 13px;
+          line-height: 1.2;
           font-weight: 900;
-          color: #0f172a;
-          text-transform: uppercase;
+          white-space: nowrap;
         }
 
-        .m-link-blue {
-          font-size: 12px;
-          font-weight: 900;
-          color: #fff;
-          text-transform: uppercase;
+        .mega-action-links {
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          flex-wrap: wrap;
         }
 
-        .m-link:hover,
-        .m-link.is-active,
-        .m-bold-link:hover,
-        .m-bold-link.is-active {
-          color: #2563eb;
+        .mega-action-link {
+          min-height: 36px;
+          width: auto;
+          flex: 0 0 auto;
+          white-space: nowrap;
         }
 
-        .m-link-blue:hover,
-        .m-link-blue.is-active {
-          opacity: 0.82;
+        body.mky-a11y-mode[data-a11y-scheme="dark"] .mega-overlay,
+        body.mky-a11y-mode[data-a11y-scheme="dark"] .mega-container,
+        body.mky-a11y-mode[data-a11y-scheme="dark"] .mega-search-wrap,
+        body.mky-a11y-mode[data-a11y-scheme="dark"] .mega-search-results,
+        body.mky-a11y-mode[data-a11y-scheme="dark"] .mega-group-tabs,
+        body.mky-a11y-mode[data-a11y-scheme="dark"] .mega-content-panel,
+        body.mky-a11y-mode[data-a11y-scheme="dark"] .mega-action-panel {
+          background: #000000 !important;
+          color: #ffffff !important;
+          border-color: #ffffff !important;
+          box-shadow: none !important;
         }
 
-        @media (max-width: 1200px) {
-          .mega-compact-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-          .mega-hero-card { grid-column: span 3; }
+        body.mky-a11y-mode[data-a11y-scheme="dark"] .mega-content-head h2,
+        body.mky-a11y-mode[data-a11y-scheme="dark"] .mega-content-head p {
+          color: #ffffff !important;
+        }
+
+        @media (max-width: 980px) {
+          .mega-shell {
+            grid-template-columns: 1fr;
+            justify-content: stretch;
+            min-height: 0;
+          }
+
+          .mega-group-tabs {
+            height: auto;
+            max-height: 220px;
+          }
+
+          .mega-content-panel {
+            max-height: none;
+          }
+
+          .mega-links-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            max-height: min(420px, 52vh);
+          }
+
+          .mega-action-panel {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .mega-action-links {
+            width: 100%;
+            justify-content: flex-start;
+          }
         }
 
         @media (max-width: 600px) {
           .mega-overlay {
             top: 67px;
-            padding: 18px 14px;
+            padding: 6px 8px 0;
           }
-          .mega-compact-grid { grid-template-columns: 1fr; }
-          .mega-hero-card { grid-column: auto; }
+
+          .mega-container {
+            width: min(100%, calc(100% - 8px));
+            max-height: calc(100vh - 82px);
+            gap: 10px;
+          }
+
+          .mega-search-wrap {
+            padding: 8px;
+          }
+
+          .mega-shell {
+            gap: 10px;
+          }
+
+          .mega-group-tabs {
+            max-height: 188px;
+            border-radius: 12px;
+          }
+
+          .mega-content-panel {
+            padding: 12px;
+            border-radius: 12px;
+          }
+
+          .mega-links-grid {
+            grid-template-columns: 1fr;
+            max-height: min(430px, 50vh);
+          }
+
+          .mega-action-panel {
+            padding: 10px;
+            gap: 10px;
+          }
+
+          .mega-action-link {
+            width: 100%;
+            white-space: normal;
+          }
         }
       `}</style>
 
       <div className="mega-overlay">
         <div className="mega-container">
           <div className="mega-search-wrap">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.3-4.3" />
             </svg>
@@ -482,7 +634,7 @@ export default function MegaMenu({ open, onClose, currentUser }) {
               autoFocus
             />
             <button className="mega-search-close" onClick={onClose} type="button" title="Закрыть меню" aria-label="Закрыть меню">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                 <path d="M18 6 6 18M6 6l12 12" />
               </svg>
             </button>
@@ -493,26 +645,37 @@ export default function MegaMenu({ open, onClose, currentUser }) {
             )}
           </div>
 
-          <div className="mega-compact-grid">
-            <section className="mega-hero-card">
-              <div className="m-title">Быстрый переход &gt;</div>
-              <p>Основные разделы сайта, личные кабинеты и востребованные сервисы собраны в компактной сетке.</p>
-              <div className="mega-primary-grid">
-                {primaryLinks.map((item) => renderLinkButton(item, "mega-sveden-link"))}
+          <div className="mega-shell">
+            <nav className="mega-group-tabs" aria-label="Группы меню">
+              {MEGA_MENU_GROUPS.map((group) => (
+                <button
+                  key={group.id}
+                  className={`mega-group-tab${group.id === activeGroup.id ? " is-active" : ""}`}
+                  type="button"
+                  aria-pressed={group.id === activeGroup.id}
+                  onClick={() => setActiveGroupId(group.id)}
+                >
+                  {group.groupTitle}
+                </button>
+              ))}
+            </nav>
+
+            <section className="mega-content-panel" aria-labelledby="mega-active-group-title">
+              <div className="mega-content-head">
+                <h2 id="mega-active-group-title">{activeGroup.groupTitle}</h2>
+                <p>{activeGroup.description}</p>
               </div>
-              <div className="m-card-blue">
-                {blueLinks.map((item) => renderLinkButton(item, "m-link-blue"))}
+              <div className="mega-links-grid">
+                {activeGroup.links.map((item) => renderLinkButton(item))}
               </div>
             </section>
+          </div>
 
-            {compactGroups.map((group) => (
-              <section className="mega-group-card" key={group.title}>
-                <div className="m-title">{group.title} &gt;</div>
-                <div className="mega-link-grid">
-                  {group.links.map((item) => renderLinkButton(item, "mega-sveden-link"))}
-                </div>
-              </section>
-            ))}
+          <div className="mega-action-panel" aria-label="Быстрые действия">
+            <strong>Быстрые действия</strong>
+            <div className="mega-action-links">
+              {ACTION_LINKS.map((item) => renderLinkButton(item, "mega-action-link"))}
+            </div>
           </div>
         </div>
       </div>

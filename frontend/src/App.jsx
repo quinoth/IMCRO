@@ -7,13 +7,11 @@ import ArticlePage from "./pages/ArticlePage.jsx";
 import AuthorArticlesPage from "./pages/AuthorArticlesPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import Smart404 from "./pages/Smart404.jsx";
-import TpmpkPage from "./pages/TpmpkPage.jsx";
 import TpmpkZapisPage from "./pages/TpmpkZapisPage.jsx";
 import TpmpkAdmin from "./pages/admin/tpmpk/TpmpkAdmin.jsx";
 import DomUchitelyaAdmin from "./pages/admin/domUchitelya/DomUchitelyaAdmin.jsx";
 import {
   CommonNewsPage,
-  DomUchitelyaHome,
   DomUchitelyaNewsPage,
   DomUchitelyaStaticPage,
 } from "./pages/domUchitelya/DomUchitelyaPages.jsx";
@@ -21,17 +19,16 @@ import { DOMU_SECTIONS } from "./pages/domUchitelya/domuSections.js";
 import {
   ArchivHomePage,
   ArchivSectionPage,
-  DeyatelnostHomePage,
   DeyatelnostSectionPage,
-  KonkursyHomePage,
+  HubHomeRoutePage,
   KonkursySectionPage,
-  MethodikaHomePage,
-  MethodikaStaticPage,
-  MethodikaSubjectPage,
   NokoHomePage,
   NokoSectionPage,
 } from "./pages/hubs/HubPages.jsx";
+import { HUB_HOME_PAGE_ROUTES } from "./pages/hubs/hubHomeConfig.js";
 import { getMethodikaArticleBackPath } from "./pages/hubs/hubUtils.js";
+import { SectionRoutePage } from "./pages/sections/SectionPages.jsx";
+import { SECTION_PAGE_ROUTES } from "./pages/sections/sectionStructure.js";
 import SvedeniyaPage from "./pages/SvedeniyaPage.jsx";
 import BlankiPage from "./pages/tpmpk/BlankiPage.jsx";
 import DlyaPedagogovPage from "./pages/tpmpk/DlyaPedagogovPage.jsx";
@@ -54,6 +51,7 @@ import {
   resolveArticleLocation,
   resolveArticleSectionLabel,
 } from "./features/admin/articleTaxonomy.js";
+import { htmlToPlainText } from "./features/admin/articleEditorContent.js";
 import { canAccessAdmin, canAccessDomuAdmin, canAccessTpmpkAdmin, clearStoredUser, getStoredUser, storeUser } from "./auth.js";
 
 function ScrollToTop() {
@@ -76,7 +74,7 @@ function ScrollToTop() {
 
 const CATEGORY_STYLE = {
   "Мероприятия": { categoryColor: "#fff", categoryBg: "rgba(255,255,255,0.18)" },
-  "Курсы": { categoryColor: "#7C3AED", categoryBg: "#F5F3FF" },
+  "Курсы": { categoryColor: "#1F5073", categoryBg: "rgba(31,80,115,0.08)" },
   "Достижения": { categoryColor: "#059669", categoryBg: "#ECFDF5" },
   "Новости": { categoryColor: "#D97706", categoryBg: "#FFFBEB" },
   "Проекты": { categoryColor: "#2563EB", categoryBg: "#EFF6FF" },
@@ -87,7 +85,7 @@ const CATEGORY_STYLE = {
 CATEGORY_STYLE["Новости"] = CATEGORY_STYLE["Новости"] || { categoryColor: "#D97706", categoryBg: "#FFFBEB" };
 CATEGORY_STYLE["Дом учителя"] = { categoryColor: "#047857", categoryBg: "#ECFDF5" };
 CATEGORY_STYLE["Методическое пространство"] = { categoryColor: "#1D4ED8", categoryBg: "#EFF6FF" };
-CATEGORY_STYLE["НОКО"] = { categoryColor: "#7C3AED", categoryBg: "#F5F3FF" };
+CATEGORY_STYLE["НОКО"] = { categoryColor: "#1F5073", categoryBg: "rgba(31,80,115,0.08)" };
 CATEGORY_STYLE["Олимпиады и конкурсы"] = { categoryColor: "#B45309", categoryBg: "#FEF3C7" };
 CATEGORY_STYLE["Деятельность"] = { categoryColor: "#0369A1", categoryBg: "#E0F2FE" };
 CATEGORY_STYLE["Архив"] = { categoryColor: "#374151", categoryBg: "#F3F4F6" };
@@ -129,6 +127,32 @@ const LEGACY_DEMO_ARTICLE_SLUGS = new Set([
   "kursy-pk-shkolnyy-teatr",
   "otkrytaya-vstrecha-v-dome-uchitelya",
 ]);
+
+function normalizePublicRoute(path) {
+  if (!path) return "";
+  const cleanPath = String(path).split("#")[0].split("?")[0] || "/";
+  return cleanPath === "/" ? "/" : cleanPath.endsWith("/") ? cleanPath : `${cleanPath}/`;
+}
+
+const SECTION_DETAIL_ROUTES = SECTION_PAGE_ROUTES.filter(({ path, node }) => (
+  node.level >= 2
+  && !normalizePublicRoute(path).startsWith("/tpmpk/")
+));
+
+const SECTION_DETAIL_ROUTE_PATHS = new Set(
+  SECTION_DETAIL_ROUTES.map(({ path }) => normalizePublicRoute(path)),
+);
+
+const LEGACY_NOKO_SECTION_ROUTES = NOKO_ROUTES.filter((section) => (
+  !SECTION_DETAIL_ROUTE_PATHS.has(normalizePublicRoute(section.path))
+));
+
+const LEGACY_METHODIKA_REDIRECTS = METHODIKA_STATIC_PAGES.map((page) => ({
+  path: page.path,
+  to: page.path.includes("/rekomendacii/")
+    ? "/predmetnye-oblasti/metodicheskie-materialy/"
+    : "/metodicheskoe-prostranstvo/",
+}));
 
 function simpleSlug(value) {
   return String(value || "")
@@ -208,7 +232,7 @@ function articleToNewsItem(article) {
   const heroBlock = article.blocks?.find((block) => block.type === "hero");
   const paraBlock = article.blocks?.find((block) => block.type === "paragraph");
   const imgBlock = article.blocks?.find((block) => block.type === "image" || block.type === "imagetext");
-  const excerpt = article.lead || heroBlock?.data?.intro || article.excerpt || paraBlock?.data?.text || "";
+  const excerpt = article.lead || heroBlock?.data?.intro || article.excerpt || paraBlock?.data?.text || htmlToPlainText(article.body || "") || "";
   const image = stripMkyPrefix(article.cover_image_url || imgBlock?.data?.url || article.image) || FALLBACK_IMAGES[(article.id - 1) % FALLBACK_IMAGES.length];
 
   return {
@@ -228,6 +252,7 @@ function articleToNewsItem(article) {
     lead: article.lead || article.excerpt || "",
     cover_image_url: stripMkyPrefix(article.cover_image_url || image),
     blocks: article.blocks || [],
+    sections: article.sections || [],
     attachments: article.attachments || [],
     author: getAuthorLabel(article),
     author_id: article.author_id || null,
@@ -430,7 +455,7 @@ function AppRoutes() {
       )
     );
     const article = freshArticle || stateArticle;
-    if (!article) return <Navigate to={`/metodika/${predmetSlug || ""}/`} replace />;
+    if (!article) return <Navigate to="/metodicheskoe-prostranstvo/" replace />;
     return (
       <ArticlePage
         article={article}
@@ -580,24 +605,30 @@ function AppRoutes() {
         />
         <Route path="/article/:id" element={<ArticleRoute />} />
         <Route path="/novosti/" element={<CommonNewsPage {...publicPageProps} newsItems={publishedNews} onOpenArticle={openArticle} onOpenAuthor={openAuthor} />} />
-        <Route path="/dom-uchitelya/" element={<DomUchitelyaHome {...publicPageProps} newsItems={domuNews} onOpenArticle={openArticle} onOpenAuthor={openAuthor} />} />
         <Route path="/dom-uchitelya/novosti/" element={<DomUchitelyaNewsPage {...publicPageProps} newsItems={domuNews} onOpenArticle={openArticle} onOpenAuthor={openAuthor} />} />
         {DOMU_SECTIONS.filter((section) => section.path !== "/dom-uchitelya/novosti/").map((section) => (
           <Route key={section.path} path={section.path} element={<DomUchitelyaStaticPage {...publicPageProps} section={section} />} />
         ))}
-        <Route path="/metodika/" element={<MethodikaHomePage {...publicPageProps} newsItems={publishedNews} />} />
-        {METHODIKA_STATIC_PAGES.map((page) => (
+        {LEGACY_METHODIKA_REDIRECTS.map((page) => (
           <Route
             key={page.path}
             path={page.path}
-            element={<MethodikaStaticPage {...publicPageProps} page={page} newsItems={publishedNews} onOpenArticle={openArticle} onOpenAuthor={openAuthor} />}
+            element={<Navigate to={page.to} replace />}
           />
         ))}
+        <Route path="/metodika/" element={<Navigate to="/metodicheskoe-prostranstvo/" replace />} />
         <Route path="/metodika/:predmetSlug/:articleSlug/" element={<MethodikaArticleRoute />} />
-        <Route path="/metodika/:predmetSlug/" element={<MethodikaSubjectPage {...publicPageProps} newsItems={publishedNews} onOpenAuthor={openAuthor} />} />
+        <Route path="/metodika/:predmetSlug/" element={<Navigate to="/metodicheskoe-prostranstvo/" replace />} />
 
         <Route path="/noko/" element={<NokoHomePage {...publicPageProps} />} />
-        {NOKO_ROUTES.map((section) => (
+        {SECTION_DETAIL_ROUTES.map(({ path, node }) => (
+          <Route
+            key={path}
+            path={path}
+            element={<SectionRoutePage {...publicPageProps} node={node} newsItems={publishedNews} onOpenArticle={openArticle} />}
+          />
+        ))}
+        {LEGACY_NOKO_SECTION_ROUTES.map((section) => (
           <Route
             key={section.path}
             path={section.path}
@@ -605,7 +636,14 @@ function AppRoutes() {
           />
         ))}
 
-        <Route path="/konkursy/" element={<KonkursyHomePage {...publicPageProps} />} />
+        {HUB_HOME_PAGE_ROUTES.filter((route) => route.path !== "/noko/").map((route) => (
+          <Route
+            key={route.path}
+            path={route.path}
+            element={<HubHomeRoutePage {...publicPageProps} config={route.config} />}
+          />
+        ))}
+
         {KONKURSY_ROUTES.map((section) => (
           <Route
             key={section.path}
@@ -614,7 +652,6 @@ function AppRoutes() {
           />
         ))}
 
-        <Route path="/deyatelnost/" element={<DeyatelnostHomePage {...publicPageProps} />} />
         {DEYATELNOST_ROUTES.map((section) => (
           <Route
             key={section.path}
@@ -632,17 +669,6 @@ function AppRoutes() {
           />
         ))}
         <Route path="/authors/:authorKey/" element={<AuthorArticlesPage {...publicPageProps} allNews={allPublicNews} onOpenArticle={openArticle} />} />
-        <Route
-          path="/tpmpk"
-          element={
-            <TpmpkPage
-              currentUser={currentUser}
-              onGoAuth={(tab) => navigate(`/auth?tab=${tab || "login"}`)}
-              onGoAdmin={goAdmin}
-              onGoProfile={() => navigate("/profile")}
-            />
-          }
-        />
         <Route
           path="/tpmpk/zapis"
           element={
