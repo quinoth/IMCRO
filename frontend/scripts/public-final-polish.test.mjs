@@ -7,6 +7,7 @@ const breadcrumbsSource = source("src/components/Breadcrumbs.jsx");
 const indexCss = source("src/index.css");
 const svedeniyaCss = source("src/pages/svedeniya/SvedeniyaPage.css");
 const headerSource = source("src/features/nav/Header.jsx");
+const accessibilitySource = source("src/accessibility.js");
 const hubHomeLayout = source("src/pages/hubs/HubHomePageLayout.jsx");
 const hubSectionLayout = source("src/pages/hubs/HubSectionPageLayout.jsx");
 const tpmpkInfoPage = source("src/pages/tpmpk/TpmpkInfoPage.jsx");
@@ -66,6 +67,14 @@ assert.ok(
   "Svedeniya status chips on the blue background use light text",
 );
 assert.ok(
+  /\.sv-notice-muted\s*\{[^}]*background:\s*var\(--sv-surface\);/s.test(svedeniyaCss),
+  "Svedeniya muted notices remain white cards instead of transparent blue blocks",
+);
+assert.ok(
+  !/\.sv-notice-muted\s*\{[^}]*background:\s*var\(--sv-soft\);/s.test(svedeniyaCss),
+  "Svedeniya muted notices do not put dark text onto the blue page background",
+);
+assert.ok(
   /@media\s*\(max-width:\s*420px\)[\s\S]*\.header-icon-btn,[\s\S]*min-width:\s*44px;[\s\S]*min-height:\s*44px;/s.test(headerSource),
   "Mobile Header keeps icon buttons at accessible 44px touch size on narrow screens",
 );
@@ -77,6 +86,40 @@ assert.ok(
   /@media\s*\(max-width:\s*1279px\)[\s\S]*\.header-actions\s*\{[\s\S]*grid-column:\s*3;/s.test(headerSource),
   "Mobile Header explicitly keeps action buttons in the right grid column",
 );
+
+for (const token of [
+  'fontSize: "large"',
+  'lineHeight: "normal"',
+  'letterSpacing: "normal"',
+  'scheme: "white"',
+  'fontFamily: "sans"',
+  "reduceMotion: true",
+]) {
+  assert.ok(accessibilitySource.includes(token), `accessibility defaults include ${token}`);
+}
+for (const className of [
+  "a11y-enabled",
+  "a11y-font-large",
+  "a11y-font-xlarge",
+  "a11y-font-xxlarge",
+  "a11y-line-large",
+  "a11y-letter-large",
+  "a11y-theme-yellow",
+  "a11y-theme-beige",
+  "a11y-images-hidden",
+  "a11y-serif",
+  "a11y-reduce-motion",
+]) {
+  assert.ok(accessibilitySource.includes(className), `accessibility applies ${className}`);
+  assert.ok(indexCss.includes(className), `global CSS handles ${className}`);
+}
+assert.ok(headerSource.includes("handleA11yButtonClick"), "Header enables a11y mode immediately on first eye-button click");
+assert.ok(headerSource.includes('value: "xxlarge"'), "a11y panel exposes the maximum font size option");
+assert.ok(headerSource.includes('value: "yellow"'), "a11y panel exposes the yellow-black contrast scheme");
+assert.ok(!headerSource.includes("<select"), "a11y panel uses large buttons instead of small select controls");
+assert.ok(headerSource.includes("a11y-choice"), "a11y panel renders large choice buttons");
+assert.ok(headerSource.includes("letterSpacing"), "a11y panel exposes letter spacing controls");
+assert.ok(headerSource.includes("reduceMotion"), "a11y panel exposes reduce-motion settings");
 
 assert.ok(
   hubHomeLayout.includes('import Breadcrumbs from "../../components/Breadcrumbs.jsx";'),

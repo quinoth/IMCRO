@@ -1,0 +1,5 @@
+2026/06/07-05:04:10.365 ddc Creating DB C:\Users\user\Desktop\IMCRO-main\frontend\.codex-audit-cdp-profile\Default\Local Storage\leveldb since it was missing.
+2026/06/07-05:04:10.392 ddc Reusing MANIFEST C:\Users\user\Desktop\IMCRO-main\frontend\.codex-audit-cdp-profile\Default\Local Storage\leveldb/MANIFEST-000001
+2026/06/07-05:06:57.370 4fb8 Level-0 table #5: started
+2026/06/07-05:06:57.375 4fb8 Level-0 table #5: 254576 bytes OK
+2026/06/07-05:06:57.377 4fb8 Delete type=0 #3

@@ -6,6 +6,7 @@ import AdminPage from "./pages/AdminPage.jsx";
 import ArticlePage from "./pages/ArticlePage.jsx";
 import AuthorArticlesPage from "./pages/AuthorArticlesPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
+import SafetyPage from "./pages/SafetyPage.jsx";
 import Smart404 from "./pages/Smart404.jsx";
 import TpmpkZapisPage from "./pages/TpmpkZapisPage.jsx";
 import TpmpkAdmin from "./pages/admin/tpmpk/TpmpkAdmin.jsx";
@@ -424,6 +425,11 @@ function AppRoutes() {
     return <Navigate to={`${targetPath}${location.search}${location.hash}`} replace />;
   }
 
+  function LegacyEducationalEventsRedirect() {
+    const targetPath = location.pathname.replace(/^\/obrazovatelnaya-programma\/?/, "/obrazovatelnye-sobytiya/");
+    return <Navigate to={`${targetPath}${location.search}${location.hash}`} replace />;
+  }
+
   function ArticleNotFoundPage() {
     return (
       <Smart404
@@ -622,6 +628,7 @@ function AppRoutes() {
         />
         <Route path="/article/:id" element={<ArticleRoute />} />
         <Route path="/novosti/" element={<CommonNewsPage {...publicPageProps} newsItems={publishedNews} onOpenArticle={openArticle} onOpenAuthor={openAuthor} />} />
+        <Route path="/bezopasnost/" element={<SafetyPage {...publicPageProps} />} />
         <Route path="/dom-uchitelya/novosti/" element={<DomUchitelyaNewsPage {...publicPageProps} newsItems={domuNews} onOpenArticle={openArticle} onOpenAuthor={openAuthor} />} />
         {DOMU_SECTIONS.filter((section) => section.path !== "/dom-uchitelya/novosti/").map((section) => (
           <Route key={section.path} path={section.path} element={<DomUchitelyaStaticPage {...publicPageProps} section={section} />} />
@@ -709,6 +716,7 @@ function AppRoutes() {
           }
         />
         <Route path="/svedeniya/*" element={<SvedeniyaAliasRedirect />} />
+        <Route path="/obrazovatelnaya-programma/*" element={<LegacyEducationalEventsRedirect />} />
         <Route path="/tpmpk/dokumenty/" element={<DokumentyPage {...tpmpkPublicProps} />} />
         <Route path="/tpmpk/blanki/" element={<BlankiPage {...tpmpkPublicProps} />} />
         <Route path="/tpmpk/grafik/" element={<GrafikPage {...tpmpkPublicProps} />} />

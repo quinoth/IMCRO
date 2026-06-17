@@ -1,0 +1,89 @@
+services:
+
+  # ─── PostgreSQL ───────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${DB_USER:-mky_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB:       ${DB_NAME:-mky_db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-mky_user} -d ${DB_NAME:-mky_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Порт 5432 не пробрасывается наружу — PostgreSQL доступен только внутри
+    # Docker-сети. Для локального подключения утилитами раскомментируйте:
+    # ports:
+    #   - "5432:5432"
+
+  # ─── FastAPI backend ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL:         "postgresql+psycopg2://${DB_USER:-mky_user}:${DB_PASSWORD}@db:5432/${DB_NAME:-mky_db}"
+      DB_USER:              ${DB_USER:-mky_user}
+      DB_PASSWORD:          ${DB_PASSWORD}
+      DB_HOST:              db
+      DB_PORT:              5432
+      DB_NAME:              ${DB_NAME:-mky_db}
+      SECRET_KEY:           ${SECRET_KEY}
+      PD_ENCRYPTION_KEY:    ${PD_ENCRYPTION_KEY}
+      CORS_ORIGINS:         ${CORS_ORIGINS:-}
+      RATE_LIMIT_ENABLED:   ${RATE_LIMIT_ENABLED:-true}
+      ENABLE_DEV_TEST_USERS: ${ENABLE_DEV_TEST_USERS:-false}
+    depends_on:
+      db:
+        condition: service_healthy
+    # Перед стартом — применить миграции Alembic, затем запустить Uvicorn.
+    command: >
+      sh -c "python -m alembic upgrade head &&
+             uvicorn main:app --host 0.0.0.0 --port 8000"
+    # Порт 8000 не пробрасывается наружу — backend доступен через Nginx.
+    # Для прямого отладочного доступа раскомментируйте:
+    # ports:
+    #   - "8000:8000"
+    volumes:
+      # Пользовательские загрузки и сгенерированные файлы сохраняются на хосте
+      # между перезапусками контейнера.
+      - ./backend/static/certificates/backgrounds:/app/static/certificates/backgrounds
+      - ./backend/static/certificates/facsimiles:/app/static/certificates/facsimiles
+      - ./backend/static/certificates/generated:/app/static/certificates/generated
+      - ./backend/static/certificates/images:/app/static/certificates/images
+      - ./backend/static/articles/covers:/app/static/articles/covers
+      - ./backend/static/articles/attachments:/app/static/articles/attachments
+      - ./backend/static/fonts/custom:/app/static/fonts/custom
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ─── React SPA + Nginx (единая точка входа) ───────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      # VITE_API_URL оставляем пустым: в production frontend использует
+      # относительные пути, а Nginx проксирует API на backend:8000.
+      args:
+        VITE_API_URL: ""
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+# ─── Named volumes ────────────────────────────────────────────────────────────
+volumes:
+  pgdata:
+    name: eduirk_pgdata

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./ImcroPublicComponents.css";
 
 function cx(...values) {
@@ -61,6 +61,49 @@ function normalizeContacts(contacts) {
 }
 
 const DRAG_THRESHOLD_PX = 8;
+const PAGED_SWIPE_THRESHOLD_PX = 44;
+
+function getPagedItemsPerPage() {
+  if (typeof window === "undefined") return 10;
+  if (window.matchMedia("(min-width: 1500px)").matches) return 10;
+  if (window.matchMedia("(min-width: 1000px)").matches) return 8;
+  if (window.matchMedia("(min-width: 700px)").matches) return 6;
+  if (window.matchMedia("(min-width: 421px)").matches) return 4;
+  return 3;
+}
+
+function getPagedItemsPerPageFromElement(element) {
+  if (!element || typeof globalThis.getComputedStyle !== "function") {
+    return getPagedItemsPerPage();
+  }
+
+  const styles = globalThis.getComputedStyle(element);
+  const columns = Number.parseInt(styles.getPropertyValue("--activity-columns"), 10);
+  const rows = Number.parseInt(styles.getPropertyValue("--activity-rows"), 10);
+
+  if (Number.isFinite(columns) && columns > 0 && Number.isFinite(rows) && rows > 0) {
+    return columns * rows;
+  }
+
+  return getPagedItemsPerPage();
+}
+
+function chunkItems(items, size) {
+  const chunks = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+function shouldReduceMotion() {
+  if (typeof window === "undefined" || typeof document === "undefined") return false;
+  return (
+    document.body?.classList.contains("a11y-reduce-motion") ||
+    document.body?.dataset.a11yReduceMotion === "true" ||
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+  );
+}
 
 export function ImcroPage({ children, className = "" }) {
   return <div className={cx("imcro-public-page", className)}>{children}</div>;
@@ -70,8 +113,8 @@ export function ImcroContainer({ children, className = "" }) {
   return <div className={cx("imcro-container", className)}>{children}</div>;
 }
 
-export function ImcroSection({ children, className = "" }) {
-  return <section className={cx("imcro-section", className)}>{children}</section>;
+export function ImcroSection({ children, className = "", ...props }) {
+  return <section className={cx("imcro-section", className)} {...props}>{children}</section>;
 }
 
 export function ImcroCard({ children, className = "", hover = false }) {
@@ -240,8 +283,19 @@ export function ImcroActivityCarousel({
   title,
   items = [],
   className = "",
+  variant = "carousel",
 }) {
   const railRef = useRef(null);
+  const carouselRef = useRef(null);
+  const isGrid = variant === "grid";
+  const isPaged = variant === "paged";
+  const [itemsPerPage, setItemsPerPage] = useState(getPagedItemsPerPage);
+  const [pageIndex, setPageIndex] = useState(0);
+  const pagedPointerRef = useRef({
+    pointerId: null,
+    startX: 0,
+    suppressClick: false,
+  });
   const dragRef = useRef({
     hasDragged: false,
     isDragging: false,
@@ -251,6 +305,70 @@ export function ImcroActivityCarousel({
     startX: 0,
     suppressClick: false,
   });
+  const pages = useMemo(
+    () => chunkItems(Array.isArray(items) ? items : [], itemsPerPage),
+    [items, itemsPerPage],
+  );
+  const pageCount = Math.max(pages.length, 1);
+  const activePageIndex = Math.min(pageIndex, pageCount - 1);
+
+  useEffect(() => {
+    if (!isPaged || typeof window === "undefined") return undefined;
+
+    const updateItemsPerPage = () => {
+      setItemsPerPage(getPagedItemsPerPageFromElement(carouselRef.current));
+    };
+
+    updateItemsPerPage();
+    const frameId = globalThis.requestAnimationFrame?.(updateItemsPerPage);
+    const mediaQueries = [
+      "(min-width: 1500px)",
+      "(min-width: 1000px)",
+      "(min-width: 700px)",
+      "(min-width: 421px)",
+      "(max-width: 980px)",
+      "(max-width: 720px)",
+      "(max-width: 420px)",
+    ].map((query) => window.matchMedia(query));
+    const observer = typeof globalThis.ResizeObserver === "function"
+      ? new globalThis.ResizeObserver(updateItemsPerPage)
+      : null;
+
+    if (observer && carouselRef.current) {
+      observer.observe(carouselRef.current);
+      observer.observe(document.documentElement);
+    }
+
+    window.addEventListener("resize", updateItemsPerPage);
+    globalThis.visualViewport?.addEventListener("resize", updateItemsPerPage);
+    mediaQueries.forEach((query) => {
+      if (typeof query.addEventListener === "function") {
+        query.addEventListener("change", updateItemsPerPage);
+      } else {
+        query.addListener?.(updateItemsPerPage);
+      }
+    });
+
+    return () => {
+      if (frameId) {
+        globalThis.cancelAnimationFrame?.(frameId);
+      }
+      observer?.disconnect();
+      window.removeEventListener("resize", updateItemsPerPage);
+      globalThis.visualViewport?.removeEventListener("resize", updateItemsPerPage);
+      mediaQueries.forEach((query) => {
+        if (typeof query.removeEventListener === "function") {
+          query.removeEventListener("change", updateItemsPerPage);
+        } else {
+          query.removeListener?.(updateItemsPerPage);
+        }
+      });
+    };
+  }, [isPaged]);
+
+  useEffect(() => {
+    setPageIndex((current) => Math.min(current, pageCount - 1));
+  }, [pageCount]);
 
   function scrollRail(direction) {
     const rail = railRef.current;
@@ -263,7 +381,7 @@ export function ImcroActivityCarousel({
 
     rail.scrollBy({
       left: direction * Math.round((cardWidth + gap) * 2),
-      behavior: "smooth",
+      behavior: shouldReduceMotion() ? "auto" : "smooth",
     });
   }
 
@@ -325,29 +443,151 @@ export function ImcroActivityCarousel({
   }
 
   function handleClickCapture(event) {
-    if (!dragRef.current.suppressClick) return;
+    if (!dragRef.current.suppressClick && !pagedPointerRef.current.suppressClick) return;
 
     event.preventDefault();
     event.stopPropagation();
     dragRef.current.moved = false;
     dragRef.current.suppressClick = false;
+    pagedPointerRef.current.suppressClick = false;
+  }
+
+  function goToPage(nextIndex) {
+    setPageIndex(Math.max(0, Math.min(pageCount - 1, nextIndex)));
+  }
+
+  function goPaged(direction) {
+    goToPage(activePageIndex + direction);
+  }
+
+  function handlePagedPointerDown(event) {
+    if (!isPaged) return;
+    pagedPointerRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      suppressClick: false,
+    };
+  }
+
+  function handlePagedPointerEnd(event) {
+    if (!isPaged || pagedPointerRef.current.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - pagedPointerRef.current.startX;
+    pagedPointerRef.current.pointerId = null;
+
+    if (Math.abs(deltaX) < PAGED_SWIPE_THRESHOLD_PX) return;
+    pagedPointerRef.current.suppressClick = true;
+    goPaged(deltaX < 0 ? 1 : -1);
+    event.preventDefault();
+    globalThis.setTimeout?.(() => {
+      pagedPointerRef.current.suppressClick = false;
+    }, 0);
+  }
+
+  function renderActivityCard(item, index, isInactivePage = false) {
+    return (
+      <LinkedBox
+        key={`${item.title || "activity"}-${index}`}
+        className="imcro-activity-carousel__card"
+        href={item.href}
+        tabIndex={isInactivePage ? -1 : undefined}
+      >
+        {renderIcon(item.icon, "imcro-activity-carousel__icon")}
+        <span className="imcro-activity-carousel__card-title">{item.title}</span>
+      </LinkedBox>
+    );
+  }
+
+  if (isPaged) {
+    return (
+      <section
+        className={cx("imcro-activity-carousel", "imcro-activity-carousel--paged", className)}
+        ref={carouselRef}
+      >
+        <div className="imcro-activity-carousel__head">
+          {title && <h2 className="imcro-activity-carousel__title">{title}</h2>}
+        </div>
+
+        <div className="imcro-activity-carousel__stage">
+          <button
+            className="imcro-activity-carousel__arrow imcro-activity-carousel__arrow--prev"
+            type="button"
+            onClick={() => goPaged(-1)}
+            disabled={activePageIndex === 0}
+            aria-label="Предыдущие направления"
+          >
+            {"<"}
+          </button>
+          <div
+            className="imcro-activity-carousel__viewport"
+            onClickCapture={handleClickCapture}
+            onPointerCancel={handlePagedPointerEnd}
+            onPointerDown={handlePagedPointerDown}
+            onPointerLeave={handlePagedPointerEnd}
+            onPointerUp={handlePagedPointerEnd}
+          >
+            <div
+              className="imcro-activity-carousel__pages"
+              style={{ transform: `translateX(-${activePageIndex * 100}%)` }}
+            >
+              {pages.map((pageItems, pageNumber) => (
+                <div
+                  className="imcro-activity-carousel__page"
+                  key={`activity-page-${pageNumber}`}
+                  aria-hidden={pageNumber !== activePageIndex}
+                >
+                  {pageItems.map((item, index) => (
+                    renderActivityCard(item, (pageNumber * itemsPerPage) + index, pageNumber !== activePageIndex)
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+          <button
+            className="imcro-activity-carousel__arrow imcro-activity-carousel__arrow--next"
+            type="button"
+            onClick={() => goPaged(1)}
+            disabled={activePageIndex >= pageCount - 1}
+            aria-label="Следующие направления"
+          >
+            {">"}
+          </button>
+        </div>
+
+        {pageCount > 1 && (
+          <div className="imcro-activity-carousel__dots" aria-label="Страницы направлений">
+            {pages.map((_, index) => (
+              <button
+                className={`imcro-activity-carousel__dot${index === activePageIndex ? " is-active" : ""}`}
+                key={`activity-dot-${index}`}
+                type="button"
+                onClick={() => goToPage(index)}
+                aria-label={`Показать страницу ${index + 1}`}
+                aria-pressed={index === activePageIndex}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+    );
   }
 
   return (
-    <section className={cx("imcro-activity-carousel", className)}>
+    <section className={cx("imcro-activity-carousel", isGrid && "imcro-activity-carousel--grid", className)}>
       <div className="imcro-activity-carousel__head">
         {title && <h2 className="imcro-activity-carousel__title">{title}</h2>}
       </div>
 
       <div className="imcro-activity-carousel__stage">
-        <button
-          className="imcro-activity-carousel__arrow imcro-activity-carousel__arrow--prev"
-          type="button"
-          onClick={() => scrollRail(-1)}
-          aria-label="Предыдущие направления"
-        >
-          {"<"}
-        </button>
+        {!isGrid && (
+          <button
+            className="imcro-activity-carousel__arrow imcro-activity-carousel__arrow--prev"
+            type="button"
+            onClick={() => scrollRail(-1)}
+            aria-label="Предыдущие направления"
+          >
+            {"<"}
+          </button>
+        )}
         <div
           className="imcro-activity-carousel__rail"
           ref={railRef}
@@ -358,25 +598,18 @@ export function ImcroActivityCarousel({
           onPointerMove={handlePointerMove}
           onPointerUp={endDrag}
         >
-          {items.map((item, index) => (
-            <LinkedBox
-              key={`${item.title || "activity"}-${index}`}
-              className="imcro-activity-carousel__card"
-              href={item.href}
-            >
-              {renderIcon(item.icon, "imcro-activity-carousel__icon")}
-              <span className="imcro-activity-carousel__card-title">{item.title}</span>
-            </LinkedBox>
-          ))}
+          {items.map((item, index) => renderActivityCard(item, index))}
         </div>
-        <button
-          className="imcro-activity-carousel__arrow imcro-activity-carousel__arrow--next"
-          type="button"
-          onClick={() => scrollRail(1)}
-          aria-label="Следующие направления"
-        >
-          {">"}
-        </button>
+        {!isGrid && (
+          <button
+            className="imcro-activity-carousel__arrow imcro-activity-carousel__arrow--next"
+            type="button"
+            onClick={() => scrollRail(1)}
+            aria-label="Следующие направления"
+          >
+            {">"}
+          </button>
+        )}
       </div>
     </section>
   );

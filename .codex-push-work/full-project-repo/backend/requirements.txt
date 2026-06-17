@@ -1,0 +1,33 @@
+# Backend dependencies
+
+fastapi
+uvicorn[standard]
+
+# Database and migrations
+sqlalchemy
+psycopg2-binary
+alembic
+
+# Authentication and forms
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+bcrypt
+
+# Validation
+pydantic
+pydantic[email]
+
+# Certificates and office files
+reportlab
+Pillow
+pandas
+openpyxl
+pytrovich
+
+# Runtime helpers
+python-dotenv
+httpx
+
+# Tests
+pytest

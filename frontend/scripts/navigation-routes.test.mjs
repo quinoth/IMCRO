@@ -41,6 +41,7 @@ const knownRoutes = new Set([
   "/auth/",
   "/profile/",
   "/novosti/",
+  "/bezopasnost/",
   "/sveden/",
   "/svedeniya/",
   "/dom-uchitelya/",
@@ -103,18 +104,32 @@ const headerSource = readFileSync(new URL("../src/features/nav/Header.jsx", impo
 const headerLinks = [...headerSource.matchAll(/\{\s*label:\s*"([^"]+)",\s*href:\s*"([^"]+)"\s*\}/g)]
   .map((match) => ({ label: match[1], path: match[2] }));
 assert.deepEqual(
-  headerLinks.slice(0, 6),
+  headerLinks.slice(0, 7),
   [
     { label: "Главная", path: "/" },
     { label: "Сведения об образовательной организации", path: "/sveden/" },
     { label: "ТПМПК", path: "/tpmpk/" },
+    { label: "Дом учителя", path: "/dom-uchitelya/" },
     { label: "Новости", path: "/novosti/" },
-    { label: "Безопасность", path: "/sveden/ovz/" },
+    { label: "Безопасность", path: "/bezopasnost/" },
     { label: "Музей", path: "/deyatelnost/muzey/" },
   ],
-  "header keeps only the approved main public nav items",
+  "header keeps the approved main public nav items including Dom Uchitelya",
 );
-headerLinks.slice(0, 6).forEach((item) => assertKnownRoute(item.path, `header ${item.label}`));
+headerLinks.slice(0, 7).forEach((item) => assertKnownRoute(item.path, `header ${item.label}`));
+assert.ok(headerSource.includes("function isActiveNavItem"), "header active state uses an exact route-aware helper");
+assert.ok(
+  !headerSource.includes("currentPath.startsWith(item.href)"),
+  "header active state does not use broad startsWith matching for top-level nav",
+);
+assert.ok(
+  megaMenuSource.includes('link("Безопасность", "/bezopasnost/")'),
+  "mega menu links the standalone security route",
+);
+assert.ok(
+  !megaMenuSource.includes('link("Безопасность", "/sveden/ovz/")'),
+  "mega menu does not point the Security item at the svedeniya accessible-environment subsection",
+);
 assert.ok(!headerLinks.some((item) => item.label === "Об организации"), "header uses full organization information title");
 assert.ok(!headerLinks.some((item) => item.label === "Методика"), "header does not expose old Methodika label");
 assert.ok(headerSource.includes("header-search-submit"), "header search panel has an explicit submit button");
@@ -134,6 +149,7 @@ assert.deepEqual(
     "Курсы повышения квалификации",
     "Методическое пространство",
     "Конкурсы и олимпиады",
+    "Образовательные события",
     "Дом учителя",
     "Деятельность",
     "Музей",
@@ -161,6 +177,7 @@ const footerLinks = [...footerSource.matchAll(/\{\s*label:\s*"([^"]+)",\s*to:\s*
 assert.ok(footerLinks.length > 8, "footer internal links are discoverable");
 footerLinks.forEach((item) => assertKnownRoute(item.path, `footer ${item.label}`));
 assert.ok(!footerLinks.some((item) => item.path === "/metodika/"), "footer does not link the old methodika root route");
+assert.ok(!footerLinks.some((item) => item.label === "Контакты ТПМПК"), "footer does not expose the TPMPK contacts link");
 
 const homePageSource = readFileSync(new URL("../src/pages/HomePage.jsx", import.meta.url), "utf8");
 assert.ok(!megaMenuLinks.some((item) => item.path === "/#calendar"), "mega menu does not link the removed calendar block");

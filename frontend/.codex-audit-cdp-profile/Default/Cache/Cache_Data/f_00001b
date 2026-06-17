@@ -1,0 +1,282 @@
+export const keyEvents = [
+	{
+		title: "Августовские встречи",
+		description: "Ежегодный педагогический совет и профессиональная повестка нового учебного года.",
+		href: "/deyatelnost/",
+		icon: "people",
+		image: "/images/event-august-meetings.png"
+	},
+	{
+		title: "Повышение квалификации",
+		description: "Регистрация на программы ДПО и тематические обучающие семинары.",
+		href: "/kpk/",
+		icon: "certificate",
+		image: "/images/event-training-courses.png"
+	},
+	{
+		title: "Конкурсы и конференции",
+		description: "Подача заявок, положения и материалы для педагогов и обучающихся.",
+		href: "/konkursy/",
+		icon: "award",
+		image: "/images/event-contests-conferences.png"
+	}
+];
+export const demoFeaturedNews = {
+	title: "Иркутские педагогические чтения: горизонты развития современного образования",
+	date: "24 августа 2024",
+	author: "Пресс-служба ИМЦРО",
+	description: "Традиционное мероприятие объединило специалистов образовательных организаций города для обсуждения актуальных направлений развития муниципальной системы образования.",
+	image: "/images/news2.jpg",
+	slug: "irkutskie-pedagogicheskie-chteniya"
+};
+export const mainSections = [
+	{
+		title: "ГИА",
+		description: "Материалы и оперативная информация по государственной итоговой аттестации.",
+		href: "/noko/",
+		icon: "clipboard"
+	},
+	{
+		title: "ВСОШ",
+		description: "Этапы, документы и результаты Всероссийской олимпиады школьников.",
+		href: "/olimpiady-dlya-detey/vserossiyskaya-olimpiada-shkolnikov/",
+		icon: "graduation"
+	},
+	{
+		title: "Конкурсы и конференции для педагогов",
+		description: "Профессиональные конкурсы, конференции и материалы для педагогов.",
+		href: "/konkursy/dlya-pedagogov/",
+		icon: "people"
+	},
+	{
+		title: "Олимпиады и конкурсы для учащихся",
+		description: "Конкурсные направления, положения и результаты для обучающихся.",
+		href: "/konkursy/dlya-detey/",
+		icon: "award"
+	},
+	{
+		title: "Курсы повышения квалификации",
+		description: "Программы повышения квалификации и мониторинг профессиональных дефицитов.",
+		href: "/kpk/",
+		icon: "certificate"
+	},
+	{
+		title: "Инновационная деятельность",
+		description: "Инновационные практики, проектные инициативы и сопровождение развития.",
+		href: "/innovacionnaya-deyatelnost/",
+		icon: "bulb"
+	},
+	{
+		title: "Методические материалы",
+		description: "Подборки, рекомендации и практические материалы для педагогов.",
+		href: "/predmetnye-oblasti/metodicheskie-materialy/",
+		icon: "book"
+	},
+	{
+		title: "Воспитательное пространство",
+		description: "Материалы, события и практики по воспитательной работе.",
+		href: "/vospitatelnoe-prostranstvo/",
+		icon: "care"
+	},
+	{
+		title: "Муниципальный семейный клуб «ФамилиЯ»",
+		description: "Информация о городском семейном клубе, встречах и материалах для семей.",
+		href: "/municipalnyy-semeynyy-klub-familiya/",
+		icon: "spark"
+	}
+];
+export const directions = [
+	{
+		title: "ТПМПК",
+		href: "/tpmpk/",
+		icon: "psychology"
+	},
+	{
+		title: "НОКО",
+		href: "/noko/",
+		icon: "clipboard"
+	},
+	{
+		title: "Курсы повышения квалификации",
+		href: "/kpk/",
+		icon: "certificate"
+	},
+	{
+		title: "Дошкольное образование",
+		href: "/metodicheskoe-prostranstvo/doshkolnoe-obrazovanie/",
+		icon: "book"
+	},
+	{
+		title: "Начальное общее образование",
+		href: "/metodicheskoe-prostranstvo/nachalnoe-obshchee-obrazovanie/",
+		icon: "book"
+	},
+	{
+		title: "Дополнительное образование",
+		href: "/metodicheskoe-prostranstvo/dopolnitelnoe-obrazovanie/",
+		icon: "book"
+	},
+	{
+		title: "История",
+		href: "/metodicheskoe-prostranstvo/istoriya/",
+		icon: "book"
+	},
+	{
+		title: "История нашего края",
+		href: "/metodicheskoe-prostranstvo/istoriya-nashego-kraya/",
+		icon: "book"
+	},
+	{
+		title: "Обществознание",
+		href: "/metodicheskoe-prostranstvo/obshchestvoznanie/",
+		icon: "book"
+	},
+	{
+		title: "ДНКР",
+		href: "/metodicheskoe-prostranstvo/dnkr/",
+		icon: "book"
+	},
+	{
+		title: "Русский язык",
+		href: "/metodicheskoe-prostranstvo/russkiy-yazyk/",
+		icon: "book"
+	},
+	{
+		title: "Иностранные языки",
+		href: "/metodicheskoe-prostranstvo/inostrannye-yazyki/",
+		icon: "book"
+	},
+	{
+		title: "Математика",
+		href: "/metodicheskoe-prostranstvo/matematika/",
+		icon: "book"
+	},
+	{
+		title: "Информатика",
+		href: "/metodicheskoe-prostranstvo/informatika/",
+		icon: "book"
+	},
+	{
+		title: "Химия",
+		href: "/metodicheskoe-prostranstvo/himiya/",
+		icon: "book"
+	},
+	{
+		title: "Биология",
+		href: "/metodicheskoe-prostranstvo/biologiya/",
+		icon: "book"
+	},
+	{
+		title: "География",
+		href: "/metodicheskoe-prostranstvo/geografiya/",
+		icon: "book"
+	},
+	{
+		title: "Байкаловедение",
+		href: "/metodicheskoe-prostranstvo/baykalovedenie/",
+		icon: "book"
+	},
+	{
+		title: "Физкультура",
+		href: "/metodicheskoe-prostranstvo/fizkultura/",
+		icon: "book"
+	},
+	{
+		title: "ОБЖ",
+		href: "/metodicheskoe-prostranstvo/obzh/",
+		icon: "book"
+	},
+	{
+		title: "Технология",
+		href: "/metodicheskoe-prostranstvo/tehnologiya/",
+		icon: "book"
+	},
+	{
+		title: "Воспитание",
+		href: "/metodicheskoe-prostranstvo/vospitanie/",
+		icon: "people"
+	},
+	{
+		title: "Психологи",
+		href: "/metodicheskoe-prostranstvo/psihologi/",
+		icon: "psychology"
+	},
+	{
+		title: "Социальные педагоги",
+		href: "/metodicheskoe-prostranstvo/socialnye-pedagogi/",
+		icon: "people"
+	},
+	{
+		title: "Молодые специалисты",
+		href: "/metodicheskoe-prostranstvo/molodye-specialisty/",
+		icon: "spark"
+	},
+	{
+		title: "Молодые педагоги",
+		href: "/molodye-pedagogi/",
+		icon: "spark"
+	},
+	{
+		title: "Предметные области",
+		href: "/predmetnye-oblasti/",
+		icon: "book"
+	},
+	{
+		title: "Наставничество",
+		href: "/nastavnichestvo/",
+		icon: "people"
+	},
+	{
+		title: "НСУ СКИП",
+		href: "/nsu-skip/",
+		icon: "science"
+	},
+	{
+		title: "Конкурсы",
+		href: "/konkursy/",
+		icon: "award"
+	},
+	{
+		title: "Олимпиады для детей",
+		href: "/olimpiady-dlya-detey/",
+		icon: "graduation"
+	},
+	{
+		title: "Конференции для детей",
+		href: "/konferencii-dlya-detey/",
+		icon: "calendar"
+	},
+	{
+		title: "Образовательная программа",
+		href: "/obrazovatelnaya-programma/",
+		icon: "compass"
+	},
+	{
+		title: "Полезная информация",
+		href: "/poleznaya-informaciya/",
+		icon: "shield"
+	},
+	{
+		title: "Дом учителя",
+		href: "/dom-uchitelya/",
+		icon: "people"
+	},
+	{
+		title: "Деятельность",
+		href: "/deyatelnost/",
+		icon: "compass"
+	},
+	{
+		title: "Методическое пространство",
+		href: "/metodicheskoe-prostranstvo/",
+		icon: "book"
+	}
+];
+export const contactInfo = {
+	address: "Иркутск, ул. Ленина, 26",
+	phone: "+7 (3952) 201 985",
+	email: "irk_imcro@bk.ru",
+	mapHref: "https://yandex.ru/maps/?ll=104.280948%2C52.281732&z=17&pt=104.280948%2C52.281732,pm2rdm"
+};
+
+//# sourceMappingURL=data:application/json;base64,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TTtFQUFtRCxNQUFNO0VBQVU7Q0FDekc7RUFBRSxPQUFPO0VBQXVCLE1BQU07RUFBb0QsTUFBTTtFQUFTO0NBQ3pHO0VBQUUsT0FBTztFQUFvQixNQUFNO0VBQXNCLE1BQU07RUFBUztDQUN4RTtFQUFFLE9BQU87RUFBc0IsTUFBTTtFQUF3QixNQUFNO0VBQVE7Q0FDM0U7RUFBRSxPQUFPO0VBQWtCLE1BQU07RUFBcUIsTUFBTTtFQUFVO0NBQ3RFO0VBQUUsT0FBTztFQUFZLE1BQU07RUFBYyxNQUFNO0VBQVc7Q0FDMUQ7RUFBRSxPQUFPO0VBQVksTUFBTTtFQUFjLE1BQU07RUFBUztDQUN4RDtFQUFFLE9BQU87RUFBdUIsTUFBTTtFQUEwQixNQUFNO0VBQWM7Q0FDcEY7RUFBRSxPQUFPO0VBQXlCLE1BQU07RUFBNEIsTUFBTTtFQUFZO0NBQ3RGO0VBQUUsT0FBTztFQUE2QixNQUFNO0VBQStCLE1BQU07RUFBVztDQUM1RjtFQUFFLE9BQU87RUFBdUIsTUFBTTtFQUEyQixNQUFNO0VBQVU7Q0FDakY7RUFBRSxPQUFPO0VBQWUsTUFBTTtFQUFtQixNQUFNO0VBQVU7Q0FDakU7RUFBRSxPQUFPO0VBQWdCLE1BQU07RUFBaUIsTUFBTTtFQUFXO0NBQ2pFO0VBQUUsT0FBTztFQUE2QixNQUFNO0VBQWdDLE1BQU07RUFBUTtDQUMzRjtBQUVELE9BQU8sTUFBTSxjQUFjO0NBQ3pCLFNBQVM7Q0FDVCxPQUFPO0NBQ1AsT0FBTztDQUNQLFNBQVM7Q0FDViIsIm5hbWVzIjpbXSwic291cmNlcyI6WyJob21lUGFnZURhdGEuanMiXSwidmVyc2lvbiI6Mywic291cmNlc0NvbnRlbnQiOlsiZXhwb3J0IGNvbnN0IGtleUV2ZW50cyA9IFtcbiAge1xuICAgIHRpdGxlOiBcItCQ0LLQs9GD0YHRgtC+0LLRgdC60LjQtSDQstGB0YLRgNC10YfQuFwiLFxuICAgIGRlc2NyaXB0aW9uOiBcItCV0LbQtdCz0L7QtNC90YvQuSDQv9C10LTQsNCz0L7Qs9C40YfQtdGB0LrQuNC5INGB0L7QstC10YIg0Lgg0L/RgNC+0YTQtdGB0YHQuNC+0L3QsNC70YzQvdCw0Y8g0L/QvtCy0LXRgdGC0LrQsCDQvdC+0LLQvtCz0L4g0YPRh9C10LHQvdC+0LPQviDQs9C+0LTQsC5cIixcbiAgICBocmVmOiBcIi9kZXlhdGVsbm9zdC9cIixcbiAgICBpY29uOiBcInBlb3BsZVwiLFxuICAgIGltYWdlOiBcIi9pbWFnZXMvZXZlbnQtYXVndXN0LW1lZXRpbmdzLnBuZ1wiLFxuICB9LFxuICB7XG4gICAgdGl0bGU6IFwi0J/QvtCy0YvRiNC10L3QuNC1INC60LLQsNC70LjRhNC40LrQsNGG0LjQuFwiLFxuICAgIGRlc2NyaXB0aW9uOiBcItCg0LXQs9C40YHRgtGA0LDRhtC40Y8g0L3QsCDQv9GA0L7Qs9GA0LDQvNC80Ysg0JTQn9CeINC4INGC0LXQvNCw0YLQuNGH0LXRgdC60LjQtSDQvtCx0YPRh9Cw0Y7RidC40LUg0YHQtdC80LjQvdCw0YDRiy5cIixcbiAgICBocmVmOiBcIi9rcGsvXCIsXG4gICAgaWNvbjogXCJjZXJ0aWZpY2F0ZVwiLFxuICAgIGltYWdlOiBcIi9pbWFnZXMvZXZlbnQtdHJhaW5pbmctY291cnNlcy5wbmdcIixcbiAgfSxcbiAge1xuICAgIHRpdGxlOiBcItCa0L7QvdC60YPRgNGB0Ysg0Lgg0LrQvtC90YTQtdGA0LXQvdGG0LjQuFwiLFxuICAgIGRlc2NyaXB0aW9uOiBcItCf0L7QtNCw0YfQsCDQt9Cw0Y/QstC+0LosINC/0L7Qu9C+0LbQtdC90LjRjyDQuCDQvNCw0YLQtdGA0LjQsNC70Ysg0LTQu9GPINC/0LXQtNCw0LPQvtCz0L7QsiDQuCDQvtCx0YPRh9Cw0Y7RidC40YXRgdGPLlwiLFxuICAgIGhyZWY6IFwiL2tvbmt1cnN5L1wiLFxuICAgIGljb246IFwiYXdhcmRcIixcbiAgICBpbWFnZTogXCIvaW1hZ2VzL2V2ZW50LWNvbnRlc3RzLWNvbmZlcmVuY2VzLnBuZ1wiLFxuICB9LFxuXTtcblxuZXhwb3J0IGNvbnN0IGRlbW9GZWF0dXJlZE5ld3MgPSB7XG4gIHRpdGxlOiBcItCY0YDQutGD0YLRgdC60LjQtSDQv9C10LTQsNCz0L7Qs9C40YfQtdGB0LrQuNC1INGH0YLQtdC90LjRjzog0LPQvtGA0LjQt9C+0L3RgtGLINGA0LDQt9Cy0LjRgtC40Y8g0YHQvtCy0YDQtdC80LXQvdC90L7Qs9C+INC+0LHRgNCw0LfQvtCy0LDQvdC40Y9cIixcbiAgZGF0ZTogXCIyNCDQsNCy0LPRg9GB0YLQsCAyMDI0XCIsXG4gIGF1dGhvcjogXCLQn9GA0LXRgdGBLdGB0LvRg9C20LHQsCDQmNCc0KbQoNCeXCIsXG4gIGRlc2NyaXB0aW9uOlxuICAgIFwi0KLRgNCw0LTQuNGG0LjQvtC90L3QvtC1INC80LXRgNC+0L/RgNC40Y/RgtC40LUg0L7QsdGK0LXQtNC40L3QuNC70L4g0YHQv9C10YbQuNCw0LvQuNGB0YLQvtCyINC+0LHRgNCw0LfQvtCy0LDRgtC10LvRjNC90YvRhSDQvtGA0LPQsNC90LjQt9Cw0YbQuNC5INCz0L7RgNC+0LTQsCDQtNC70Y8g0L7QsdGB0YPQttC00LXQvdC40Y8g0LDQutGC0YPQsNC70YzQvdGL0YUg0L3QsNC/0YDQsNCy0LvQtdC90LjQuSDRgNCw0LfQstC40YLQuNGPINC80YPQvdC40YbQuNC/0LDQu9GM0L3QvtC5INGB0LjRgdGC0LXQvNGLINC+0LHRgNCw0LfQvtCy0LDQvdC40Y8uXCIsXG4gIGltYWdlOiBcIi9pbWFnZXMvbmV3czIuanBnXCIsXG4gIHNsdWc6IFwiaXJrdXRza2llLXBlZGFnb2dpY2hlc2tpZS1jaHRlbml5YVwiLFxufTtcblxuZXhwb3J0IGNvbnN0IG1haW5TZWN0aW9ucyA9IFtcbiAge1xuICAgIHRpdGxlOiBcItCT0JjQkFwiLFxuICAgIGRlc2NyaXB0aW9uOiBcItCc0LDRgtC10YDQuNCw0LvRiyDQuCDQvtC/0LXRgNCw0YLQuNCy0L3QsNGPINC40L3RhNC+0YDQvNCw0YbQuNGPINC/0L4g0LPQvtGB0YPQtNCw0YDRgdGC0LLQtdC90L3QvtC5INC40YLQvtCz0L7QstC+0Lkg0LDRgtGC0LXRgdGC0LDRhtC40LguXCIsXG4gICAgaHJlZjogXCIvbm9rby9cIixcbiAgICBpY29uOiBcImNsaXBib2FyZFwiLFxuICB9LFxuICB7XG4gICAgdGl0bGU6IFwi0JLQodCe0KhcIixcbiAgICBkZXNjcmlwdGlvbjogXCLQrdGC0LDQv9GLLCDQtNC+0LrRg9C80LXQvdGC0Ysg0Lgg0YDQtdC30YPQu9GM0YLQsNGC0Ysg0JLRgdC10YDQvtGB0YHQuNC50YHQutC+0Lkg0L7Qu9C40LzQv9C40LDQtNGLINGI0LrQvtC70YzQvdC40LrQvtCyLlwiLFxuICAgIGhyZWY6IFwiL29saW1waWFkeS1kbHlhLWRldGV5L3ZzZXJvc3NpeXNrYXlhLW9saW1waWFkYS1zaGtvbG5pa292L1wiLFxuICAgIGljb246IFwiZ3JhZHVhdGlvblwiLFxuICB9LFxuICB7XG4gICAgdGl0bGU6IFwi0JrQvtC90LrRg9GA0YHRiyDQuCDQutC+0L3RhNC10YDQtdC90YbQuNC4INC00LvRjyDQv9C10LTQsNCz0L7Qs9C+0LJcIixcbiAgICBkZXNjcmlwdGlvbjogXCLQn9GA0L7RhNC10YHRgdC40L7QvdCw0LvRjNC90YvQtSDQutC+0L3QutGD0YDRgdGLLCDQutC+0L3RhNC10YDQtdC90YbQuNC4INC4INC80LDRgtC10YDQuNCw0LvRiyDQtNC70Y8g0L/QtdC00LDQs9C+0LPQvtCyLlwiLFxuICAgIGhyZWY6IFwiL2tvbmt1cnN5L2RseWEtcGVkYWdvZ292L1wiLFxuICAgIGljb246IFwicGVvcGxlXCIsXG4gIH0sXG4gIHtcbiAgICB0aXRsZTogXCLQntC70LjQvNC/0LjQsNC00Ysg0Lgg0LrQvtC90LrRg9GA0YHRiyDQtNC70Y8g0YPRh9Cw0YnQuNGF0YHRj1wiLFxuICAgIGRlc2NyaXB0aW9uOiBcItCa0L7QvdC60YPRgNGB0L3Ri9C1INC90LDQv9GA0LDQstC70LXQvdC40Y8sINC/0L7Qu9C+0LbQtdC90LjRjyDQuCDRgNC10LfRg9C70YzRgtCw0YLRiyDQtNC70Y8g0L7QsdGD0YfQsNGO0YnQuNGF0YHRjy5cIixcbiAgICBocmVmOiBcIi9rb25rdXJzeS9kbHlhLWRldGV5L1wiLFxuICAgIGljb246IFwiYXdhcmRcIixcbiAgfSxcbiAge1xuICAgIHRpdGxlOiBcItCa0YPRgNGB0Ysg0L/QvtCy0YvRiNC10L3QuNGPINC60LLQsNC70LjRhNC40LrQsNGG0LjQuFwiLFxuICAgIGRlc2NyaXB0aW9uOiBcItCf0YDQvtCz0YDQsNC80LzRiyDQv9C+0LLRi9GI0LXQvdC40Y8g0LrQstCw0LvQuNGE0LjQutCw0YbQuNC4INC4INC80L7QvdC40YLQvtGA0LjQvdCzINC/0YDQvtGE0LXRgdGB0LjQvtC90LDQu9GM0L3Ri9GFINC00LXRhNC40YbQuNGC0L7Qsi5cIixcbiAgICBocmVmOiBcIi9rcGsvXCIsXG4gICAgaWNvbjogXCJjZXJ0aWZpY2F0ZVwiLFxuICB9LFxuICB7XG4gICAgdGl0bGU6IFwi0JjQvdC90L7QstCw0YbQuNC+0L3QvdCw0Y8g0LTQtdGP0YLQtdC70YzQvdC+0YHRgtGMXCIsXG4gICAgZGVzY3JpcHRpb246IFwi0JjQvdC90L7QstCw0YbQuNC+0L3QvdGL0LUg0L/RgNCw0LrRgtC40LrQuCwg0L/RgNC+0LXQutGC0L3Ri9C1INC40L3QuNGG0LjQsNGC0LjQstGLINC4INGB0L7Qv9GA0L7QstC+0LbQtNC10L3QuNC1INGA0LDQt9Cy0LjRgtC40Y8uXCIsXG4gICAgaHJlZjogXCIvaW5ub3ZhY2lvbm5heWEtZGV5YXRlbG5vc3QvXCIsXG4gICAgaWNvbjogXCJidWxiXCIsXG4gIH0sXG4gIHtcbiAgICB0aXRsZTogXCLQnNC10YLQvtC00LjRh9C10YHQutC40LUg0LzQsNGC0LXRgNC40LDQu9GLXCIsXG4gICAgZGVzY3JpcHRpb246IFwi0J/QvtC00LHQvtGA0LrQuCwg0YDQtdC60L7QvNC10L3QtNCw0YbQuNC4INC4INC/0YDQsNC60YLQuNGH0LXRgdC60LjQtSDQvNCw0YLQtdGA0LjQsNC70Ysg0LTQu9GPINC/0LXQtNCw0LPQvtCz0L7Qsi5cIixcbiAgICBocmVmOiBcIi9wcmVkbWV0bnllLW9ibGFzdGkvbWV0b2RpY2hlc2tpZS1tYXRlcmlhbHkvXCIsXG4gICAgaWNvbjogXCJib29rXCIsXG4gIH0sXG4gIHtcbiAgICB0aXRsZTogXCLQktC+0YHQv9C40YLQsNGC0LXQu9GM0L3QvtC1INC/0YDQvtGB0YLRgNCw0L3RgdGC0LLQvlwiLFxuICAgIGRlc2NyaXB0aW9uOiBcItCc0LDRgtC10YDQuNCw0LvRiywg0YHQvtCx0YvRgtC40Y8g0Lgg0L/RgNCw0LrRgtC40LrQuCDQv9C+INCy0L7RgdC/0LjRgtCw0YLQtdC70YzQvdC+0Lkg0YDQsNCx0L7RgtC1LlwiLFxuICAgIGhyZWY6IFwiL3Zvc3BpdGF0ZWxub2UtcHJvc3RyYW5zdHZvL1wiLFxuICAgIGljb246IFwiY2FyZVwiLFxuICB9LFxuICB7XG4gICAgdGl0bGU6IFwi0JzRg9C90LjRhtC40L/QsNC70YzQvdGL0Lkg0YHQtdC80LXQudC90YvQuSDQutC70YPQsSDCq9Ck0LDQvNC40LvQuNCvwrtcIixcbiAgICBkZXNjcmlwdGlvbjogXCLQmNC90YTQvtGA0LzQsNGG0LjRjyDQviDQs9C+0YDQvtC00YHQutC+0Lwg0YHQtdC80LXQudC90L7QvCDQutC70YPQsdC1LCDQstGB0YLRgNC10YfQsNGFINC4INC80LDRgtC10YDQuNCw0LvQsNGFINC00LvRjyDRgdC10LzQtdC5LlwiLFxuICAgIGhyZWY6IFwiL211bmljaXBhbG55eS1zZW1leW55eS1rbHViLWZhbWlsaXlhL1wiLFxuICAgIGljb246IFwic3BhcmtcIixcbiAgfSxcbl07XG5cbmV4cG9ydCBjb25zdCBkaXJlY3Rpb25zID0gW1xuICB7IHRpdGxlOiBcItCi0J/QnNCf0JpcIiwgaHJlZjogXCIvdHBtcGsvXCIsIGljb246IFwicHN5Y2hvbG9neVwiIH0sXG4gIHsgdGl0bGU6IFwi0J3QntCa0J5cIiwgaHJlZjogXCIvbm9rby9cIiwgaWNvbjogXCJjbGlwYm9hcmRcIiB9LFxuICB7IHRpdGxlOiBcItCa0YPRgNGB0Ysg0L/QvtCy0YvRiNC10L3QuNGPINC60LLQsNC70LjRhNC40LrQsNGG0LjQuFwiLCBocmVmOiBcIi9rcGsvXCIsIGljb246IFwiY2VydGlmaWNhdGVcIiB9LFxuICB7IHRpdGxlOiBcItCU0L7RiNC60L7Qu9GM0L3QvtC1INC+0LHRgNCw0LfQvtCy0LDQvdC40LVcIiwgaHJlZjogXCIvbWV0b2RpY2hlc2tvZS1wcm9zdHJhbnN0dm8vZG9zaGtvbG5vZS1vYnJhem92YW5pZS9cIiwgaWNvbjogXCJib29rXCIgfSxcbiAgeyB0aXRsZTogXCLQndCw0YfQsNC70YzQvdC+0LUg0L7QsdGJ0LXQtSDQvtCx0YDQsNC30L7QstCw0L3QuNC1XCIsIGhyZWY6IFwiL21ldG9kaWNoZXNrb2UtcHJvc3RyYW5zdHZvL25hY2hhbG5vZS1vYnNoY2hlZS1vYnJhem92YW5pZS9cIiwgaWNvbjogXCJib29rXCIgfSxcbiAgeyB0aXRsZTogXCLQlNC+0L/QvtC70L3QuNGC0LXQu9GM0L3QvtC1INC+0LHRgNCw0LfQvtCy0LDQvdC40LVcIiwgaHJlZjogXCIvbWV0b2RpY2hlc2tvZS1wcm9zdHJhbnN0dm8vZG9wb2xuaXRlbG5vZS1vYnJhem92YW5pZS9cIiwgaWNvbjogXCJib29rXCIgfSxcbiAgeyB0aXRsZTogXCLQmNGB0YLQvtGA0LjRj1wiLCBocmVmOiBcIi9tZXRvZGljaGVza29lLXByb3N0cmFuc3R2by9pc3Rvcml5YS9cIiwgaWNvbjogXCJib29rXCIgfSxcbiAgeyB0aXRsZTogXCLQmNGB0YLQvtGA0LjRjyDQvdCw0YjQtdCz0L4g0LrRgNCw0Y9cIiwgaHJlZjogXCIvbWV0b2RpY2hlc2tvZS1wcm9zdHJhbnN0dm8vaXN0b3JpeWEtbmFzaGVnby1rcmF5YS9cIiwgaWNvbjogXCJib29rXCIgfSxcbiAgeyB0aXRsZTogXCLQntCx0YnQtdGB0YLQstC+0LfQvdCw0L3QuNC1XCIsIGhyZWY6IFwiL21ldG9kaWNoZXNrb2UtcHJvc3RyYW5zdHZvL29ic2hjaGVzdHZvem5hbmllL1wiLCBpY29uOiBcImJvb2tcIiB9LFxuICB7IHRpdGxlOiBcItCU0J3QmtCgXCIsIGhyZWY6IFwiL21ldG9kaWNoZXNrb2UtcHJvc3RyYW5zdHZvL2Rua3IvXCIsIGljb246IFwiYm9va1wiIH0sXG4gIHsgdGl0bGU6IFwi0KDRg9GB0YHQutC40Lkg0Y/Qt9GL0LpcIiwgaHJlZjogXCIvbWV0b2RpY2hlc2tvZS1wcm9zdHJhbnN0dm8vcnVzc2tpeS15YXp5ay9cIiwgaWNvbjogXCJib29rXCIgfSxcbiAgeyB0aXRsZTogXCLQmNC90L7RgdGC0YDQsNC90L3Ri9C1INGP0LfRi9C60LhcIiwgaHJlZjogXCIvbWV0b2RpY2hlc2tvZS1wcm9zdHJhbnN0dm8vaW5vc3RyYW5ueWUteWF6eWtpL1wiLCBpY29uOiBcImJvb2tcIiB9LFxuICB7IHRpdGxlOiBcItCc0LDRgtC10LzQsNGC0LjQutCwXCIsIGhyZWY6IFwiL21ldG9kaWNoZXNrb2UtcHJvc3RyYW5zdHZvL21hdGVtYXRpa2EvXCIsIGljb246IFwiYm9va1wiIH0sXG4gIHsgdGl0bGU6IFwi0JjQvdGE0L7RgNC80LDRgtC40LrQsFwiLCBocmVmOiBcIi9tZXRvZGljaGVza29lLXByb3N0cmFuc3R2by9pbmZvcm1hdGlrYS9cIiwgaWNvbjogXCJib29rXCIgfSxcbiAgeyB0aXRsZTogXCLQpdC40LzQuNGPXCIsIGhyZWY6IFwiL21ldG9kaWNoZXNrb2UtcHJvc3RyYW5zdHZvL2hpbWl5YS9cIiwgaWNvbjogXCJib29rXCIgfSxcbiAgeyB0aXRsZTogXCLQkdC40L7Qu9C+0LPQuNGPXCIsIGhyZWY6IFwiL21ldG9kaWNoZXNrb2UtcHJvc3RyYW5zdHZvL2Jpb2xvZ2l5YS9cIiwgaWNvbjogXCJib29rXCIgfSxcbiAgeyB0aXRsZTogXCLQk9C10L7Qs9GA0LDRhNC40Y9cIiwgaHJlZjogXCIvbWV0b2RpY2hlc2tvZS1wcm9zdHJhbnN0dm8vZ2VvZ3JhZml5YS9cIiwgaWNvbjogXCJib29rXCIgfSxcbiAgeyB0aXRsZTogXCLQkdCw0LnQutCw0LvQvtCy0LXQtNC10L3QuNC1XCIsIGhyZWY6IFwiL21ldG9kaWNoZXNrb2UtcHJvc3RyYW5zdHZvL2JheWthbG92ZWRlbmllL1wiLCBpY29uOiBcImJvb2tcIiB9LFxuICB7IHRpdGxlOiBcItCk0LjQt9C60YPQu9GM0YLRg9GA0LBcIiwgaHJlZjogXCIvbWV0b2RpY2hlc2tvZS1wcm9zdHJhbnN0dm8vZml6a3VsdHVyYS9cIiwgaWNvbjogXCJib29rXCIgfSxcbiAgeyB0aXRsZTogXCLQntCR0JZcIiwgaHJlZjogXCIvbWV0b2RpY2hlc2tvZS1wcm9zdHJhbnN0dm8vb2J6aC9cIiwgaWNvbjogXCJib29rXCIgfSxcbiAgeyB0aXRsZTogXCLQotC10YXQvdC+0LvQvtCz0LjRj1wiLCBocmVmOiBcIi9tZXRvZGljaGVza29lLXByb3N0cmFuc3R2by90ZWhub2xvZ2l5YS9cIiwgaWNvbjogXCJib29rXCIgfSxcbiAgeyB0aXRsZTogXCLQktC+0YHQv9C40YLQsNC90LjQtVwiLCBocmVmOiBcIi9tZXRvZGljaGVza29lLXByb3N0cmFuc3R2by92b3NwaXRhbmllL1wiLCBpY29uOiBcInBlb3BsZVwiIH0sXG4gIHsgdGl0bGU6IFwi0J/RgdC40YXQvtC70L7Qs9C4XCIsIGhyZWY6IFwiL21ldG9kaWNoZXNrb2UtcHJvc3RyYW5zdHZvL3BzaWhvbG9naS9cIiwgaWNvbjogXCJwc3ljaG9sb2d5XCIgfSxcbiAgeyB0aXRsZTogXCLQodC+0YbQuNCw0LvRjNC90YvQtSDQv9C10LTQsNCz0L7Qs9C4XCIsIGhyZWY6IFwiL21ldG9kaWNoZXNrb2UtcHJvc3RyYW5zdHZvL3NvY2lhbG55ZS1wZWRhZ29naS9cIiwgaWNvbjogXCJwZW9wbGVcIiB9LFxuICB7IHRpdGxlOiBcItCc0L7Qu9C+0LTRi9C1INGB0L/QtdGG0LjQsNC70LjRgdGC0YtcIiwgaHJlZjogXCIvbWV0b2RpY2hlc2tvZS1wcm9zdHJhbnN0dm8vbW9sb2R5ZS1zcGVjaWFsaXN0eS9cIiwgaWNvbjogXCJzcGFya1wiIH0sXG4gIHsgdGl0bGU6IFwi0JzQvtC70L7QtNGL0LUg0L/QtdC00LDQs9C+0LPQuFwiLCBocmVmOiBcIi9tb2xvZHllLXBlZGFnb2dpL1wiLCBpY29uOiBcInNwYXJrXCIgfSxcbiAgeyB0aXRsZTogXCLQn9GA0LXQtNC80LXRgtC90YvQtSDQvtCx0LvQsNGB0YLQuFwiLCBocmVmOiBcIi9wcmVkbWV0bnllLW9ibGFzdGkvXCIsIGljb246IFwiYm9va1wiIH0sXG4gIHsgdGl0bGU6IFwi0J3QsNGB0YLQsNCy0L3QuNGH0LXRgdGC0LLQvlwiLCBocmVmOiBcIi9uYXN0YXZuaWNoZXN0dm8vXCIsIGljb246IFwicGVvcGxlXCIgfSxcbiAgeyB0aXRsZTogXCLQndCh0KMg0KHQmtCY0J9cIiwgaHJlZjogXCIvbnN1LXNraXAvXCIsIGljb246IFwic2NpZW5jZVwiIH0sXG4gIHsgdGl0bGU6IFwi0JrQvtC90LrRg9GA0YHRi1wiLCBocmVmOiBcIi9rb25rdXJzeS9cIiwgaWNvbjogXCJhd2FyZFwiIH0sXG4gIHsgdGl0bGU6IFwi0J7Qu9C40LzQv9C40LDQtNGLINC00LvRjyDQtNC10YLQtdC5XCIsIGhyZWY6IFwiL29saW1waWFkeS1kbHlhLWRldGV5L1wiLCBpY29uOiBcImdyYWR1YXRpb25cIiB9LFxuICB7IHRpdGxlOiBcItCa0L7QvdGE0LXRgNC10L3RhtC40Lgg0LTQu9GPINC00LXRgtC10LlcIiwgaHJlZjogXCIva29uZmVyZW5jaWktZGx5YS1kZXRleS9cIiwgaWNvbjogXCJjYWxlbmRhclwiIH0sXG4gIHsgdGl0bGU6IFwi0J7QsdGA0LDQt9C+0LLQsNGC0LXQu9GM0L3QsNGPINC/0YDQvtCz0YDQsNC80LzQsFwiLCBocmVmOiBcIi9vYnJhem92YXRlbG5heWEtcHJvZ3JhbW1hL1wiLCBpY29uOiBcImNvbXBhc3NcIiB9LFxuICB7IHRpdGxlOiBcItCf0L7Qu9C10LfQvdCw0Y8g0LjQvdGE0L7RgNC80LDRhtC40Y9cIiwgaHJlZjogXCIvcG9sZXpuYXlhLWluZm9ybWFjaXlhL1wiLCBpY29uOiBcInNoaWVsZFwiIH0sXG4gIHsgdGl0bGU6IFwi0JTQvtC8INGD0YfQuNGC0LXQu9GPXCIsIGhyZWY6IFwiL2RvbS11Y2hpdGVseWEvXCIsIGljb246IFwicGVvcGxlXCIgfSxcbiAgeyB0aXRsZTogXCLQlNC10Y/RgtC10LvRjNC90L7RgdGC0YxcIiwgaHJlZjogXCIvZGV5YXRlbG5vc3QvXCIsIGljb246IFwiY29tcGFzc1wiIH0sXG4gIHsgdGl0bGU6IFwi0JzQtdGC0L7QtNC40YfQtdGB0LrQvtC1INC/0YDQvtGB0YLRgNCw0L3RgdGC0LLQvlwiLCBocmVmOiBcIi9tZXRvZGljaGVza29lLXByb3N0cmFuc3R2by9cIiwgaWNvbjogXCJib29rXCIgfSxcbl07XG5cbmV4cG9ydCBjb25zdCBjb250YWN0SW5mbyA9IHtcbiAgYWRkcmVzczogXCLQmNGA0LrRg9GC0YHQuiwg0YPQuy4g0JvQtdC90LjQvdCwLCAyNlwiLFxuICBwaG9uZTogXCIrNyAoMzk1MikgMjAxIDk4NVwiLFxuICBlbWFpbDogXCJpcmtfaW1jcm9AYmsucnVcIixcbiAgbWFwSHJlZjogXCJodHRwczovL3lhbmRleC5ydS9tYXBzLz9sbD0xMDQuMjgwOTQ4JTJDNTIuMjgxNzMyJno9MTcmcHQ9MTA0LjI4MDk0OCUyQzUyLjI4MTczMixwbTJyZG1cIixcbn07XG4iXX0=

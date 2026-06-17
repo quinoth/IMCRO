@@ -1315,11 +1315,12 @@
 
 .sv-notice-info {
   border-color: var(--sv-border);
-  background: var(--sv-soft);
+  background: var(--sv-surface);
 }
 
 .sv-notice-muted {
-  background: var(--sv-soft);
+  border-color: var(--sv-border);
+  background: var(--sv-surface);
 }
 
 @media (min-width: 720px) {

@@ -1,0 +1,8 @@
+# Secrets and local configuration — never commit real .env
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db

@@ -16,6 +16,10 @@ assert.ok(
   "public /svedeniya/* alias is registered",
 );
 assert.ok(
+  appSource.includes('path="/bezopasnost/"'),
+  "standalone Security page route is registered",
+);
+assert.ok(
   appSource.includes('replace(/^\\/svedeniya\\/?/, "/sveden/")'),
   "/svedeniya/* alias preserves the nested path when redirecting to /sveden/*",
 );

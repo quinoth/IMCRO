@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { demoFeaturedNews, directions, keyEvents, mainSections } from "../src/pages/homePageData.js";
+import { demoFeaturedNews, directions, homeBanners, keyEvents, mainSections } from "../src/pages/homePageData.js";
 
 const homePageSource = readFileSync(new URL("../src/pages/HomePage.jsx", import.meta.url), "utf8");
 const componentsSource = readFileSync(new URL("../src/components/imcro/ImcroPublicComponents.jsx", import.meta.url), "utf8");
@@ -51,7 +51,7 @@ const expectedDirections = [
   { title: "Конкурсы", href: "/konkursy/" },
   { title: "Олимпиады для детей", href: "/olimpiady-dlya-detey/" },
   { title: "Конференции для детей", href: "/konferencii-dlya-detey/" },
-  { title: "Образовательная программа", href: "/obrazovatelnaya-programma/" },
+  { title: "Образовательные события", href: "/obrazovatelnye-sobytiya/" },
   { title: "Полезная информация", href: "/poleznaya-informaciya/" },
   { title: "Дом учителя", href: "/dom-uchitelya/" },
   { title: "Деятельность", href: "/deyatelnost/" },
@@ -65,6 +65,11 @@ assert.deepEqual(
   "home page 9 cards follow the approved structure and routes",
 );
 assert.equal(keyEvents.length, 3, "home page keeps exactly 3 key event banners");
+assert.equal(
+  keyEvents[0].href,
+  "/obrazovatelnye-sobytiya/avgustovskie-pedagogicheskie-soveshchaniya/",
+  "August key event links to the educational events subsection",
+);
 assert.equal(directions.length, 37, "home page activity carousel keeps the approved 37 directions");
 assert.deepEqual(
   directions.map(({ title, href }) => ({ title, href })),
@@ -73,6 +78,8 @@ assert.deepEqual(
 );
 assert.equal(demoFeaturedNews.title, "Иркутские педагогические чтения: горизонты развития современного образования", "home page exposes the demo featured news");
 assert.equal(demoFeaturedNews.image, "/images/news2.jpg", "demo featured news uses a local public image");
+assert.ok(homeBanners.length >= 10, "home page exposes all local banner files");
+assert.ok(homeBanners.every((item) => item.src.startsWith("/banners/")), "home banners use only local public assets");
 assert.ok(directions.every((item) => item.href?.startsWith("/") && item.href.endsWith("/")), "every activity carousel card has a normalized internal route");
 assert.ok(!directions.some((item) => item.href === "/metodika/" || item.title === "Методика"), "carousel no longer exposes the old Methodika naming or route");
 
@@ -100,13 +107,25 @@ assert.ok(!directions.some((item) => item.href === "/metodika/" || item.title ==
 
 assert.ok(homePageSource.includes("home-hero-grid"), "HomePage has the new two-column hero grid");
 assert.ok(homePageSource.includes("home-services-grid"), "HomePage has the 9-card service grid");
+assert.ok(homePageSource.includes("home-banners-section"), "HomePage renders the local banners section");
+assert.ok(homePageSource.includes('loading="lazy"'), "HomePage lazy-loads banner images");
 assert.ok(homePageSource.includes("home-contact-layout"), "HomePage has the contact layout");
 assert.ok(homePageSource.includes("demoFeaturedNews"), "HomePage uses demo news when no published news are available");
 assert.ok(homePageSource.includes("imageSrc={event.image}"), "HomePage passes event images into key event banners");
 assert.ok(componentsSource.includes("onPointerDown"), "activity carousel supports pointer drag scrolling");
+assert.ok(homePageSource.includes('variant="paged"'), "HomePage renders directions as a paginated carousel");
+assert.ok(componentsSource.includes("imcro-activity-carousel--paged"), "activity component supports a paginated carousel mode");
+assert.ok(componentsSource.includes("imcro-activity-carousel__pages"), "activity component renders page slides");
+assert.ok(componentsSource.includes("imcro-activity-carousel__dots"), "activity component renders pagination dots");
 assert.ok(componentsSource.includes("imcro-activity-carousel__stage"), "activity carousel exposes a stage for side arrows");
 assert.ok(componentsSource.includes("href={item.href}"), "activity carousel makes the whole card clickable when href exists");
 assert.ok(homePageStyles.includes("grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr)"), "contact layout keeps two separate desktop cards");
+assert.ok(homePageStyles.includes(".home-banners-grid"), "home page has a dedicated banners grid");
+assert.ok(homePageStyles.includes("aspect-ratio: 16 / 9"), "home page banner cards keep a consistent aspect ratio");
+assert.ok(homePageStyles.includes("--activity-columns: 5"), "activity directions show up to 5 columns on wide desktop");
+assert.ok(homePageStyles.includes("--activity-rows: 2"), "activity directions use two rows per page on desktop");
+assert.ok(!/home-activity-section[\s\S]*overflow-y:\s*auto/.test(homePageStyles), "activity directions do not use an internal vertical scrollbar");
+assert.ok(!/home-activity-section[\s\S]*max-height:\s*/.test(homePageStyles), "activity directions do not cap height with max-height");
 assert.ok(!homePageSource.includes("home-reveal"), "HomePage no longer depends on the old reveal system");
 assert.ok(!homePageSource.includes("EventsSection"), "HomePage does not restore the removed calendar/events block");
 assert.ok(!homePageSource.includes("#calendar"), "HomePage does not restore calendar hash behavior");

@@ -2,7 +2,7 @@ export const keyEvents = [
   {
     title: "Августовские встречи",
     description: "Ежегодный педагогический совет и профессиональная повестка нового учебного года.",
-    href: "/deyatelnost/",
+    href: "/obrazovatelnye-sobytiya/avgustovskie-pedagogicheskie-soveshchaniya/",
     icon: "people",
     image: "/images/event-august-meetings.png",
   },
@@ -122,7 +122,7 @@ export const directions = [
   { title: "Конкурсы", href: "/konkursy/", icon: "award" },
   { title: "Олимпиады для детей", href: "/olimpiady-dlya-detey/", icon: "graduation" },
   { title: "Конференции для детей", href: "/konferencii-dlya-detey/", icon: "calendar" },
-  { title: "Образовательная программа", href: "/obrazovatelnaya-programma/", icon: "compass" },
+  { title: "Образовательные события", href: "/obrazovatelnye-sobytiya/", icon: "compass" },
   { title: "Полезная информация", href: "/poleznaya-informaciya/", icon: "shield" },
   { title: "Дом учителя", href: "/dom-uchitelya/", icon: "people" },
   { title: "Деятельность", href: "/deyatelnost/", icon: "compass" },
@@ -135,3 +135,17 @@ export const contactInfo = {
   email: "irk_imcro@bk.ru",
   mapHref: "https://yandex.ru/maps/?ll=104.280948%2C52.281732&z=17&pt=104.280948%2C52.281732,pm2rdm",
 };
+
+export const homeBanners = [
+  { title: "Информационный баннер", src: "/banners/banner-500.png" },
+  { title: "Информационный баннер", src: "/banners/banner-6.png" },
+  { title: "ФПД", src: "/banners/banner-fpd.jpg" },
+  { title: "ГИА", src: "/banners/banner-gia.png" },
+  { title: "Профессиональная переподготовка", src: "/banners/banner-pr.png" },
+  { title: "Информационный баннер", src: "/banners/banner-site-copy.png" },
+  { title: "Информационный баннер", src: "/banners/banner-site.png" },
+  { title: "НСУ СКИП", src: "/banners/banner-skip.jpg" },
+  { title: "Воспитание", src: "/banners/banner-vospitanie-irk.png" },
+  { title: "Все для победы", src: "/banners/banner-vse-dlya-pobedy.jpg" },
+  { title: "Мой любимый педагог", src: "/banners/banner-moi-lyubimyi-pedagog.png" },
+];

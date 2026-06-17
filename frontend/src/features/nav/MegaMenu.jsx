@@ -113,7 +113,19 @@ const MEGA_MENU_GROUPS = [
       link("Муниципальные конференции", "/konferencii-dlya-detey/municipalnye-konferencii/"),
       link("Региональные конференции", "/konferencii-dlya-detey/regionalnye-konferencii/"),
       link("Всероссийские конференции", "/konferencii-dlya-detey/vserossiyskie-konferencii/"),
-      link("Образовательная программа", "/obrazovatelnaya-programma/"),
+      link("Образовательные события", "/obrazovatelnye-sobytiya/"),
+    ],
+  },
+  {
+    id: "educational-events",
+    groupTitle: "Образовательные события",
+    description: "Конференции РАО, августовские совещания, образовательная панорама и форум.",
+    links: [
+      link("Образовательные события", "/obrazovatelnye-sobytiya/"),
+      link("Конференции РАО", "/obrazovatelnye-sobytiya/konferencii-rao/"),
+      link("Августовские педагогические совещания", "/obrazovatelnye-sobytiya/avgustovskie-pedagogicheskie-soveshchaniya/"),
+      link("Образовательная панорама", "/obrazovatelnye-sobytiya/obrazovatelnaya-panorama/"),
+      link("Образовательный форум", "/obrazovatelnye-sobytiya/obrazovatelnyy-forum/"),
     ],
   },
   {
@@ -157,7 +169,7 @@ const MEGA_MENU_GROUPS = [
       link("Полезная информация", "/poleznaya-informaciya/"),
       link("Осторожно, мошенники!", "/poleznaya-informaciya/ostorozhno-moshenniki/"),
       link("Муниципальный семейный клуб «ФамилиЯ»", "/municipalnyy-semeynyy-klub-familiya/"),
-      link("Безопасность", "/sveden/ovz/"),
+      link("Безопасность", "/bezopasnost/"),
     ],
   },
 ];

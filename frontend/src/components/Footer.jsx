@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { A11Y_EVENT, readAccessibilitySettings, saveAccessibilitySettings } from "../accessibility.js";
+import { A11Y_EVENT, disableAccessibilityMode, enableAccessibilityMode, readAccessibilitySettings } from "../accessibility.js";
 import { useEffect, useState } from "react";
 
 const FOOTER_COLS = [
@@ -27,7 +27,6 @@ const FOOTER_COLS = [
       { label: "Деятельность", to: "/deyatelnost/" },
       { label: "Олимпиады и конкурсы", to: "/konkursy/" },
       { label: "Архив", to: "/archiv/" },
-      { label: "Контакты ТПМПК", to: "/tpmpk/kontakty/" },
     ],
   },
   {
@@ -50,7 +49,7 @@ export default function Footer() {
   }, []);
 
   function toggleA11y() {
-    setSettings(saveAccessibilitySettings({ ...settings, enabled: !settings.enabled }));
+    setSettings(settings.enabled ? disableAccessibilityMode(settings) : enableAccessibilityMode());
   }
 
   return (

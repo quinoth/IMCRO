@@ -123,8 +123,8 @@ const expectedSections = [
     ],
   },
   {
-    path: "/obrazovatelnaya-programma/",
-    title: "Образовательная программа",
+    path: "/obrazovatelnye-sobytiya/",
+    title: "Образовательные события",
     cards: [
       "Конференции РАО",
       "Августовские педагогические совещания",

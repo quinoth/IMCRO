@@ -17,6 +17,7 @@ import {
   contactInfo,
   demoFeaturedNews,
   directions,
+  homeBanners,
   keyEvents,
   mainSections,
 } from "./homePageData.js";
@@ -146,6 +147,26 @@ function Icon({ name }) {
           <path d="M17 10l3 9" />
           <path d="M14.5 19 17 10l2.5 9" />
           <path d="M15.5 16h3" />
+        </svg>
+      );
+    case "calendar":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" {...common}>
+          <rect x="4" y="5" width="16" height="15" rx="2" />
+          <path d="M8 3v4" />
+          <path d="M16 3v4" />
+          <path d="M4 10h16" />
+          <path d="M8 14h3" />
+          <path d="M13 14h3" />
+          <path d="M8 17h3" />
+        </svg>
+      );
+    case "compass":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" {...common}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8 4.8-2.2Z" />
+          <circle cx="12" cy="12" r="1" />
         </svg>
       );
     case "calculator":
@@ -387,11 +408,25 @@ export default function HomePage({
           <ImcroSection className="home-activity-section">
             <ImcroActivityCarousel
               title="Направления деятельности"
+              variant="paged"
               items={directions.map((item) => ({
                 ...item,
                 icon: <Icon name={item.icon} />,
               }))}
             />
+          </ImcroSection>
+
+          <ImcroSection className="home-banners-section" aria-labelledby="home-banners-title">
+            <div className="home-banners-head">
+              <h2 id="home-banners-title">Полезная информация</h2>
+            </div>
+            <div className="home-banners-grid">
+              {homeBanners.map((banner) => (
+                <figure className="home-banner-card" key={banner.src}>
+                  <img src={banner.src} alt={banner.title} loading="lazy" />
+                </figure>
+              ))}
+            </div>
           </ImcroSection>
 
           <ImcroSection className="home-contact-section" aria-labelledby="contact-title">

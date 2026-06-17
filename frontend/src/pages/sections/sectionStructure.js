@@ -370,27 +370,27 @@ const RAW_SECTION_TREE = [
         description: "Городские конференции для обучающихся по различным направлениям.",
         children: [
           {
-            title: "«Ступеньки открытий»",
+            title: "Городская конференция проектно-исследовательских работ обучающихся 1-4 классов «Ступеньки открытий»",
             path: "/konferencii-dlya-detey/municipalnye-konferencii/stupenki-otkrytiy/",
-            description: "Материалы конференции исследовательских и проектных работ.",
+            description: "Материалы, положения и результаты конференции исследовательских и проектных работ.",
           },
           {
-            title: "«Эврика»",
+            title: "Городская научно-практическая конференция учащихся 5-8 классов «Эврика»",
             path: "/konferencii-dlya-detey/municipalnye-konferencii/evrika/",
-            description: "Положения, сроки и итоги конференции «Эврика».",
+            description: "Положения, сроки, материалы и итоги конференции «Эврика».",
           },
           {
-            title: "«Открытый мир»",
+            title: "Городская конференция для обучающихся 4-11 классов «Открытый Мир: информационные технологии в образовательном пространстве»",
             path: "/konferencii-dlya-detey/municipalnye-konferencii/otkrytyy-mir/",
-            description: "Материалы конференции для представления детских исследований.",
+            description: "Материалы конференции по информационным технологиям и детским исследованиям.",
           },
           {
-            title: "«Юность. Творчество. Поиск»",
+            title: "Городская научно-практическая конференция учащихся 9-11 классов «Юность. Творчество. Поиск»",
             path: "/konferencii-dlya-detey/municipalnye-konferencii/yunost-tvorchestvo-poisk/",
-            description: "Информация о конференции, секциях и результатах.",
+            description: "Информация о конференции, секциях, документах и результатах.",
           },
           {
-            title: "«Удивительная Вселенная»",
+            title: "Пятая городская конференция проектно-исследовательских работ обучающихся 7-11 классов «Удивительная Вселенная»",
             path: "/konferencii-dlya-detey/municipalnye-konferencii/udivitelnaya-vselennaya/",
             description: "Материалы конференции естественно-научной направленности.",
           },
@@ -402,7 +402,7 @@ const RAW_SECTION_TREE = [
         description: "Региональные конференции, положения и итоговые материалы.",
         children: [
           {
-            title: "«Тайны психологии»",
+            title: "Региональная научно-практическая конференция «Тайны психологии»",
             path: "/konferencii-dlya-detey/regionalnye-konferencii/tayny-psihologii/",
             description: "Материалы региональной конференции «Тайны психологии».",
           },
@@ -416,29 +416,29 @@ const RAW_SECTION_TREE = [
     ],
   },
   {
-    title: "Образовательная программа",
-    path: "/obrazovatelnaya-programma/",
+    title: "Образовательные события",
+    path: "/obrazovatelnye-sobytiya/",
     icon: "compass",
-    description: "Конференции, совещания, панорамы и форумы образовательной программы.",
+    description: "Конференции, совещания, панорамы и форумы образовательной повестки ИМЦРО.",
     children: [
       {
         title: "Конференции РАО",
-        path: "/obrazovatelnaya-programma/konferencii-rao/",
+        path: "/obrazovatelnye-sobytiya/konferencii-rao/",
         description: "Материалы и информационное сопровождение конференций РАО.",
       },
       {
         title: "Августовские педагогические совещания",
-        path: "/obrazovatelnaya-programma/avgustovskie-pedagogicheskie-soveshchaniya/",
+        path: "/obrazovatelnye-sobytiya/avgustovskie-pedagogicheskie-soveshchaniya/",
         description: "Программы, материалы и итоги августовских совещаний.",
       },
       {
         title: "Образовательная панорама",
-        path: "/obrazovatelnaya-programma/obrazovatelnaya-panorama/",
+        path: "/obrazovatelnye-sobytiya/obrazovatelnaya-panorama/",
         description: "Материалы образовательной панорамы и городских площадок.",
       },
       {
         title: "Образовательный форум",
-        path: "/obrazovatelnaya-programma/obrazovatelnyy-forum/",
+        path: "/obrazovatelnye-sobytiya/obrazovatelnyy-forum/",
         description: "Информация, программа и материалы образовательного форума.",
       },
     ],

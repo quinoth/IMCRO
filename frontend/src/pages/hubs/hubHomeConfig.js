@@ -15,7 +15,7 @@ const HUB_HOME_SECTION_PATHS = [
   "/konkursy/",
   "/olimpiady-dlya-detey/",
   "/konferencii-dlya-detey/",
-  "/obrazovatelnaya-programma/",
+  "/obrazovatelnye-sobytiya/",
   "/poleznaya-informaciya/",
   "/dom-uchitelya/",
   "/deyatelnost/",
