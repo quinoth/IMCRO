@@ -1,13 +1,33 @@
 export const DOMU_SECTIONS = [
-  { path: "/dom-uchitelya/o-dome/", title: "О здании", text: "Адрес, руководитель, контакты и режим работы." },
-  { path: "/dom-uchitelya/programma/", title: "Программа мероприятий", text: "Анонсы встреч, семинаров и городских событий." },
-  { path: "/dom-uchitelya/master-klassy/", title: "Мастер-классы", text: "Практические занятия для педагогов и наставников." },
-  { path: "/dom-uchitelya/molodye-pedagogi/", title: "Клуб молодых педагогов", text: "Поддержка специалистов в первые годы работы." },
-  { path: "/dom-uchitelya/nastavnichestvo/", title: "Наставничество", text: "Опытные педагоги, методическая помощь и обмен практиками." },
-  { path: "/dom-uchitelya/klub-pedagogov/", title: "Клуб педагогов", text: "Профессиональное сообщество и тематические встречи." },
-  { path: "/dom-uchitelya/pedagogicheskaya-gostinaya/", title: "Педагогическая гостиная", text: "Открытые разговоры о школе, воспитании и развитии." },
-  { path: "/dom-uchitelya/konkursy/", title: "Конкурсы Дома учителя", text: "Конкурсные события, положения и сроки участия." },
-  { path: "/dom-uchitelya/itogi/", title: "Итоги и результаты", text: "Результаты мероприятий, списки участников и победителей." },
-  { path: "/dom-uchitelya/fotogalereya/", title: "Фотогалерея", text: "Фотографии встреч и событий Дома учителя." },
-  { path: "/dom-uchitelya/novosti/", title: "Новости", text: "Собственная лента новостей Дома учителя." },
+  {
+    path: "/dom-uchitelya/o-strukturnom-podrazdelenii/",
+    title: "О структурном подразделении",
+    text: "Сведения о задачах, формате работы и городских педагогических инициативах Дома учителя.",
+    icon: "people",
+  },
+  {
+    path: "/dom-uchitelya/meropriyatiya/",
+    title: "Мероприятия",
+    text: "Анонсы встреч, семинаров, мастер-классов и городских событий для педагогов.",
+    icon: "calendar",
+  },
+  {
+    path: "/dom-uchitelya/kontaktnaya-informaciya/",
+    title: "Контактная информация",
+    text: "Адрес, телефон, режим работы и информация для связи со специалистами подразделения.",
+    icon: "clipboard",
+  },
+];
+
+export const DOMU_LEGACY_REDIRECTS = [
+  { from: "/dom-uchitelya/o-dome/", to: "/dom-uchitelya/o-strukturnom-podrazdelenii/" },
+  { from: "/dom-uchitelya/programma/", to: "/dom-uchitelya/meropriyatiya/" },
+  { from: "/dom-uchitelya/master-klassy/", to: "/dom-uchitelya/meropriyatiya/" },
+  { from: "/dom-uchitelya/molodye-pedagogi/", to: "/metodicheskoe-prostranstvo/molodye-specialisty/" },
+  { from: "/dom-uchitelya/nastavnichestvo/", to: "/dom-uchitelya/" },
+  { from: "/dom-uchitelya/klub-pedagogov/", to: "/dom-uchitelya/" },
+  { from: "/dom-uchitelya/pedagogicheskaya-gostinaya/", to: "/dom-uchitelya/" },
+  { from: "/dom-uchitelya/konkursy/", to: "/dom-uchitelya/meropriyatiya/" },
+  { from: "/dom-uchitelya/itogi/", to: "/dom-uchitelya/meropriyatiya/" },
+  { from: "/dom-uchitelya/fotogalereya/", to: "/dom-uchitelya/meropriyatiya/" },
 ];

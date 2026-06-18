@@ -72,7 +72,7 @@ export const mainSections = [
   {
     title: "Методические материалы",
     description: "Подборки, рекомендации и практические материалы для педагогов.",
-    href: "/predmetnye-oblasti/metodicheskie-materialy/",
+    href: "/metodicheskoe-prostranstvo/metodicheskie-materialy/",
     icon: "book",
   },
   {
@@ -114,9 +114,11 @@ export const directions = [
   { title: "Воспитание", href: "/metodicheskoe-prostranstvo/vospitanie/", icon: "people" },
   { title: "Психологи", href: "/metodicheskoe-prostranstvo/psihologi/", icon: "psychology" },
   { title: "Социальные педагоги", href: "/metodicheskoe-prostranstvo/socialnye-pedagogi/", icon: "people" },
+  { title: "Методические материалы", href: "/metodicheskoe-prostranstvo/metodicheskie-materialy/", icon: "book" },
   { title: "Молодые специалисты", href: "/metodicheskoe-prostranstvo/molodye-specialisty/", icon: "spark" },
   { title: "Молодые педагоги", href: "/molodye-pedagogi/", icon: "spark" },
-  { title: "Предметные области", href: "/predmetnye-oblasti/", icon: "book" },
+  { title: "Инновационная деятельность", href: "/innovacionnaya-deyatelnost/", icon: "bulb" },
+  { title: "Воспитательное пространство", href: "/vospitatelnoe-prostranstvo/", icon: "care" },
   { title: "Наставничество", href: "/nastavnichestvo/", icon: "people" },
   { title: "НСУ СКИП", href: "/nsu-skip/", icon: "science" },
   { title: "Конкурсы", href: "/konkursy/", icon: "award" },

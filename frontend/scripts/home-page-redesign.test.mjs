@@ -13,7 +13,7 @@ const expectedMainSections = [
   { title: "Олимпиады и конкурсы для учащихся", href: "/konkursy/dlya-detey/" },
   { title: "Курсы повышения квалификации", href: "/kpk/" },
   { title: "Инновационная деятельность", href: "/innovacionnaya-deyatelnost/" },
-  { title: "Методические материалы", href: "/predmetnye-oblasti/metodicheskie-materialy/" },
+  { title: "Методические материалы", href: "/metodicheskoe-prostranstvo/metodicheskie-materialy/" },
   { title: "Воспитательное пространство", href: "/vospitatelnoe-prostranstvo/" },
   { title: "Муниципальный семейный клуб «ФамилиЯ»", href: "/municipalnyy-semeynyy-klub-familiya/" },
 ];
@@ -43,9 +43,11 @@ const expectedDirections = [
   { title: "Воспитание", href: "/metodicheskoe-prostranstvo/vospitanie/" },
   { title: "Психологи", href: "/metodicheskoe-prostranstvo/psihologi/" },
   { title: "Социальные педагоги", href: "/metodicheskoe-prostranstvo/socialnye-pedagogi/" },
+  { title: "Методические материалы", href: "/metodicheskoe-prostranstvo/metodicheskie-materialy/" },
   { title: "Молодые специалисты", href: "/metodicheskoe-prostranstvo/molodye-specialisty/" },
   { title: "Молодые педагоги", href: "/molodye-pedagogi/" },
-  { title: "Предметные области", href: "/predmetnye-oblasti/" },
+  { title: "Инновационная деятельность", href: "/innovacionnaya-deyatelnost/" },
+  { title: "Воспитательное пространство", href: "/vospitatelnoe-prostranstvo/" },
   { title: "Наставничество", href: "/nastavnichestvo/" },
   { title: "НСУ СКИП", href: "/nsu-skip/" },
   { title: "Конкурсы", href: "/konkursy/" },
@@ -70,7 +72,7 @@ assert.equal(
   "/obrazovatelnye-sobytiya/avgustovskie-pedagogicheskie-soveshchaniya/",
   "August key event links to the educational events subsection",
 );
-assert.equal(directions.length, 37, "home page activity carousel keeps the approved 37 directions");
+assert.equal(directions.length, 39, "home page activity carousel keeps the approved 39 directions");
 assert.deepEqual(
   directions.map(({ title, href }) => ({ title, href })),
   expectedDirections,
@@ -82,6 +84,7 @@ assert.ok(homeBanners.length >= 10, "home page exposes all local banner files");
 assert.ok(homeBanners.every((item) => item.src.startsWith("/banners/")), "home banners use only local public assets");
 assert.ok(directions.every((item) => item.href?.startsWith("/") && item.href.endsWith("/")), "every activity carousel card has a normalized internal route");
 assert.ok(!directions.some((item) => item.href === "/metodika/" || item.title === "Методика"), "carousel no longer exposes the old Methodika naming or route");
+assert.ok(!directions.some((item) => item.href.startsWith("/predmetnye-oblasti/") || item.title === "Предметные области"), "carousel no longer exposes the removed Predmetnye oblasti section");
 
 [
   "/images/event-august-meetings.png",

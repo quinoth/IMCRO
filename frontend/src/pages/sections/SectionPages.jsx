@@ -96,6 +96,7 @@ export function SectionRoutePage({ node, newsItems = [], ...props }) {
           parentHref={parentNode?.path || node.rootPath}
           parentTitle={parentNode?.title || node.rootTitle}
           onOpenArticle={handleOpenArticle}
+          showArticleList={!node.cardsOnly}
         />
       </main>
       <Footer />

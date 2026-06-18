@@ -4,8 +4,22 @@ import {
   SECTION_HOME_CARDS,
   SECTION_PAGE_ROUTES,
   SECTION_TREE,
+  findSectionByPath,
   flattenSectionTree,
 } from "../src/pages/sections/sectionStructure.js";
+
+const standardSubsections = [
+  "Новости / события",
+  "ГМС",
+  "Методические материалы",
+  "Конференции, вебинары, семинары, мастер-классы",
+  "Олимпиады, конкурсы",
+];
+
+const youngSpecialistSubsections = [
+  "Совет молодых педагогов города Иркутска",
+  "Полезная информация для молодых педагогов",
+];
 
 const methodicalDirections = [
   "Дошкольное образование",
@@ -29,8 +43,11 @@ const methodicalDirections = [
   "Воспитание",
   "Психологи",
   "Социальные педагоги",
+  "Методические материалы",
   "Молодые специалисты",
 ];
+
+const standardMethodicalDirections = methodicalDirections.filter((title) => title !== "Молодые специалисты");
 
 const expectedTree = [
   {
@@ -78,16 +95,6 @@ const expectedTree = [
     children: [
       "Список курсов повышения квалификации",
       "Мониторинг профессиональных дефицитов педагогических работников города",
-    ],
-  },
-  {
-    title: "Предметные области",
-    children: [
-      "Новости / события",
-      "ГМС",
-      "Методические материалы",
-      "Конференции, вебинары, семинары, мастер-классы",
-      "Олимпиады, конкурсы",
     ],
   },
   {
@@ -182,8 +189,8 @@ const expectedTree = [
   { title: "Дом учителя", children: [] },
   { title: "Деятельность", children: [] },
   { title: "Методическое пространство", children: methodicalDirections },
-  { title: "Инновационная деятельность", children: [] },
-  { title: "Воспитательное пространство", children: [] },
+  { title: "Инновационная деятельность", children: standardSubsections },
+  { title: "Воспитательное пространство", children: standardSubsections },
   { title: "Муниципальный семейный клуб «ФамилиЯ»", children: [] },
 ];
 
@@ -211,6 +218,16 @@ for (const expectedNode of expectedTree) {
   assertTreeNode(SECTION_TREE.find((section) => section.title === expectedNode.title), expectedNode);
 }
 
+for (const title of standardMethodicalDirections) {
+  const direction = flattenSectionTree(SECTION_TREE).find((section) => section.title === title && section.parentTitle === "Методическое пространство");
+  assert.ok(direction, `methodical direction exists: ${title}`);
+  assert.deepEqual(childTitles(direction), standardSubsections, `${title} uses the standard public subsection set`);
+}
+
+const youngSpecialists = findSectionByPath("/metodicheskoe-prostranstvo/molodye-specialisty/");
+assert.ok(youngSpecialists, "Молодые специалисты section exists");
+assert.deepEqual(childTitles(youngSpecialists), youngSpecialistSubsections, "Молодые специалисты keeps only the two special cards");
+
 const flatNodes = flattenSectionTree(SECTION_TREE);
 const routePaths = SECTION_PAGE_ROUTES.map((route) => route.path);
 
@@ -235,10 +252,18 @@ assert.deepEqual(
 [
   "/metodicheskoe-prostranstvo/",
   "/metodicheskoe-prostranstvo/doshkolnoe-obrazovanie/",
+  "/metodicheskoe-prostranstvo/doshkolnoe-obrazovanie/novosti-sobytiya/",
   "/metodicheskoe-prostranstvo/russkiy-yazyk/",
+  "/metodicheskoe-prostranstvo/psihologi/",
+  "/metodicheskoe-prostranstvo/psihologi/gms/",
   "/metodicheskoe-prostranstvo/molodye-specialisty/",
+  "/metodicheskoe-prostranstvo/molodye-specialisty/sovet-molodyh-pedagogov/",
+  "/metodicheskoe-prostranstvo/molodye-specialisty/poleznaya-informaciya-dlya-molodyh-pedagogov/",
+  "/metodicheskoe-prostranstvo/metodicheskie-materialy/",
   "/innovacionnaya-deyatelnost/",
+  "/innovacionnaya-deyatelnost/olimpiady-konkursy/",
   "/vospitatelnoe-prostranstvo/",
+  "/vospitatelnoe-prostranstvo/metodicheskie-materialy/",
   "/municipalnyy-semeynyy-klub-familiya/",
   "/noko/gia-11/",
   "/noko/gia-11/operativnaya-informaciya/",
@@ -251,6 +276,12 @@ assert.deepEqual(
 });
 
 [
+  "/predmetnye-oblasti/",
+  "/predmetnye-oblasti/novosti-sobytiya/",
+  "/predmetnye-oblasti/gms/",
+  "/predmetnye-oblasti/metodicheskie-materialy/",
+  "/predmetnye-oblasti/konferencii-vebinary-seminary-master-klassy/",
+  "/predmetnye-oblasti/olimpiady-konkursy/",
   "/metodika/",
   "/noko/gia-11-12/",
   "/noko/sborniki-i-almanahi/",
@@ -265,6 +296,8 @@ assert.ok(!homePageSource.includes("#calendar"), "home page has no removed calen
 const megaMenuSource = readFileSync(new URL("../src/features/nav/MegaMenu.jsx", import.meta.url), "utf8");
 assert.ok(!megaMenuSource.includes("/#calendar"), "mega menu does not point to removed home calendar block");
 assert.ok(!megaMenuSource.includes('"/metodika/"'), "mega menu no longer links the old methodika public route");
+assert.ok(!megaMenuSource.includes("Предметные области"), "mega menu does not expose the removed Predmetnye oblasti section");
+assert.ok(!megaMenuSource.includes("/predmetnye-oblasti/"), "mega menu does not link the removed Predmetnye oblasti route");
 
 const sectionPageSource = readFileSync(new URL("../src/pages/sections/SectionPages.jsx", import.meta.url), "utf8");
 const hubSectionLayoutSource = readFileSync(new URL("../src/pages/hubs/HubSectionPageLayout.jsx", import.meta.url), "utf8");

@@ -16,7 +16,7 @@ import {
   DomUchitelyaNewsPage,
   DomUchitelyaStaticPage,
 } from "./pages/domUchitelya/DomUchitelyaPages.jsx";
-import { DOMU_SECTIONS } from "./pages/domUchitelya/domuSections.js";
+import { DOMU_LEGACY_REDIRECTS, DOMU_SECTIONS } from "./pages/domUchitelya/domuSections.js";
 import {
   ArchivHomePage,
   ArchivSectionPage,
@@ -152,9 +152,13 @@ const LEGACY_NOKO_SECTION_ROUTES = NOKO_ROUTES.filter((section) => (
 const LEGACY_METHODIKA_REDIRECTS = METHODIKA_STATIC_PAGES.map((page) => ({
   path: page.path,
   to: page.path.includes("/rekomendacii/")
-    ? "/predmetnye-oblasti/metodicheskie-materialy/"
+    ? "/metodicheskoe-prostranstvo/metodicheskie-materialy/"
     : "/metodicheskoe-prostranstvo/",
 }));
+
+const LEGACY_PREDMETNYE_REDIRECTS = {
+  "/predmetnye-oblasti/metodicheskie-materialy/": "/metodicheskoe-prostranstvo/metodicheskie-materialy/",
+};
 
 function simpleSlug(value) {
   return String(value || "")
@@ -430,6 +434,12 @@ function AppRoutes() {
     return <Navigate to={`${targetPath}${location.search}${location.hash}`} replace />;
   }
 
+  function LegacyPredmetnyeRedirect() {
+    const sourcePath = normalizePublicRoute(location.pathname);
+    const targetPath = LEGACY_PREDMETNYE_REDIRECTS[sourcePath] || "/metodicheskoe-prostranstvo/";
+    return <Navigate to={`${targetPath}${location.search}${location.hash}`} replace />;
+  }
+
   function ArticleNotFoundPage() {
     return (
       <Smart404
@@ -633,6 +643,13 @@ function AppRoutes() {
         {DOMU_SECTIONS.filter((section) => section.path !== "/dom-uchitelya/novosti/").map((section) => (
           <Route key={section.path} path={section.path} element={<DomUchitelyaStaticPage {...publicPageProps} section={section} />} />
         ))}
+        {DOMU_LEGACY_REDIRECTS.map((route) => (
+          <Route
+            key={route.from}
+            path={route.from}
+            element={<Navigate to={route.to} replace />}
+          />
+        ))}
         {LEGACY_METHODIKA_REDIRECTS.map((page) => (
           <Route
             key={page.path}
@@ -643,6 +660,7 @@ function AppRoutes() {
         <Route path="/metodika/" element={<Navigate to="/metodicheskoe-prostranstvo/" replace />} />
         <Route path="/metodika/:predmetSlug/:articleSlug/" element={<MethodikaArticleRoute />} />
         <Route path="/metodika/:predmetSlug/" element={<Navigate to="/metodicheskoe-prostranstvo/" replace />} />
+        <Route path="/predmetnye-oblasti/*" element={<LegacyPredmetnyeRedirect />} />
 
         <Route path="/noko/" element={<NokoHomePage {...publicPageProps} />} />
         {SECTION_DETAIL_ROUTES.map(({ path, node }) => (

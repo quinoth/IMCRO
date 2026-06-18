@@ -6,6 +6,7 @@ import {
   ImcroSection,
   ImcroServiceCard,
 } from "../../components/imcro/ImcroPublicComponents.jsx";
+import { HubHomeIcon } from "./HubHomePageLayout.jsx";
 import "./HubSectionPageLayout.css";
 
 function cx(...values) {
@@ -185,9 +186,9 @@ function ChildSections({ childSections = [] }) {
             className="hub-section-child-card"
             title={section.title}
             description={section.description || "Материалы, документы и справочная информация подраздела."}
-            icon={getSectionIconText(section.title)}
+            icon={section.icon ? <HubHomeIcon name={section.icon} /> : getSectionIconText(section.title)}
             href={section.href || section.path}
-            ctaText="Открыть"
+            ctaText="Перейти"
           />
         ))}
       </div>
@@ -205,6 +206,7 @@ export function HubSectionPageLayout({
   parentTitle,
   onOpenArticle,
   className = "",
+  showArticleList = true,
 }) {
   const sections = normalizeArray(childSections);
   const hasChildSections = sections.length > 0;
@@ -230,12 +232,14 @@ export function HubSectionPageLayout({
 
       <ChildSections childSections={sections} />
 
-      <ArticleList
-        title="Статьи и материалы"
-        articles={articles}
-        fallbackTitle={title}
-        onOpenArticle={onOpenArticle}
-      />
+      {showArticleList && (
+        <ArticleList
+          title="Статьи и материалы"
+          articles={articles}
+          fallbackTitle={title}
+          onOpenArticle={onOpenArticle}
+        />
+      )}
     </ImcroContainer>
   );
 }

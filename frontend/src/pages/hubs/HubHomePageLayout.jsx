@@ -16,7 +16,7 @@ function cx(...values) {
   return values.filter(Boolean).join(" ");
 }
 
-function HubHomeIcon({ name }) {
+export function HubHomeIcon({ name }) {
   const common = { fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" };
 
   switch (name) {

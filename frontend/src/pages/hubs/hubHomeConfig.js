@@ -9,7 +9,6 @@ const HUB_HOME_SECTION_PATHS = [
   "/noko/",
   "/molodye-pedagogi/",
   "/kpk/",
-  "/predmetnye-oblasti/",
   "/nastavnichestvo/",
   "/nsu-skip/",
   "/konkursy/",
@@ -41,7 +40,7 @@ const EXTERNAL_ROOT_SECTIONS = {
       title: section.title,
       path: section.path,
       description: section.text,
-      icon: section.path === "/dom-uchitelya/novosti/" ? "document" : "people",
+      icon: section.icon || (section.path === "/dom-uchitelya/novosti/" ? "document" : "people"),
     })),
   },
   "/deyatelnost/": {
@@ -248,6 +247,15 @@ function createHubHomeConfig(section) {
 }
 
 function enhanceHubHomeConfig(path, config) {
+  if (path === "/dom-uchitelya/") {
+    return {
+      ...config,
+      contactBlock: undefined,
+      gridClassName: "imcro-grid-3",
+      latestNews: undefined,
+    };
+  }
+
   if (path !== "/tpmpk/") return config;
 
   return {

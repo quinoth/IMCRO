@@ -28,7 +28,7 @@ const METHODICAL_LINKS = [
   link("Социальные педагоги", "/metodicheskoe-prostranstvo/socialnye-pedagogi/"),
   link("Молодые специалисты", "/metodicheskoe-prostranstvo/molodye-specialisty/"),
   link("Инновационная деятельность", "/innovacionnaya-deyatelnost/"),
-  link("Методические материалы", "/predmetnye-oblasti/metodicheskie-materialy/"),
+  link("Методические материалы", "/metodicheskoe-prostranstvo/metodicheskie-materialy/"),
   link("Воспитательное пространство", "/vospitatelnoe-prostranstvo/"),
 ];
 
@@ -134,11 +134,9 @@ const MEGA_MENU_GROUPS = [
     description: "Профессиональные события, клубы и материалы Дома учителя.",
     links: [
       link("Дом учителя", "/dom-uchitelya/"),
-      link("Новости и материалы", "/dom-uchitelya/novosti/"),
-      link("Мероприятия", "/dom-uchitelya/programma/"),
-      link("Мастер-классы", "/dom-uchitelya/master-klassy/"),
-      link("Клуб молодых педагогов", "/dom-uchitelya/molodye-pedagogi/"),
-      link("Наставничество", "/dom-uchitelya/nastavnichestvo/"),
+      link("О структурном подразделении", "/dom-uchitelya/o-strukturnom-podrazdelenii/"),
+      link("Мероприятия", "/dom-uchitelya/meropriyatiya/"),
+      link("Контактная информация", "/dom-uchitelya/kontaktnaya-informaciya/"),
     ],
   },
   {
@@ -147,7 +145,6 @@ const MEGA_MENU_GROUPS = [
     description: "Основные направления работы и профессиональные сообщества.",
     links: [
       link("Деятельность", "/deyatelnost/"),
-      link("Предметные области", "/predmetnye-oblasti/"),
       link("НСУ СКИП", "/nsu-skip/"),
       link("Наставничество", "/nastavnichestvo/"),
       link("Молодые педагоги", "/molodye-pedagogi/"),

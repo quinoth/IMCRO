@@ -7,12 +7,72 @@ const CONTACT_DEFAULT = {
   person: "Ответственный специалист МКУ ИМЦРО",
 };
 
-const methodicalDirection = (title, slug, description) => ({
-  title,
-  path: `/metodicheskoe-prostranstvo/${slug}/`,
-  description,
-  icon: "book",
-});
+const STANDARD_SUBSECTIONS = [
+  {
+    title: "Новости / события",
+    slug: "novosti-sobytiya",
+    description: "Актуальные новости и события направления.",
+  },
+  {
+    title: "ГМС",
+    slug: "gms",
+    description: "Материалы городских методических сообществ и заседаний.",
+  },
+  {
+    title: "Методические материалы",
+    slug: "metodicheskie-materialy",
+    description: "Подборки, рекомендации и практические материалы для педагогов.",
+  },
+  {
+    title: "Конференции, вебинары, семинары, мастер-классы",
+    slug: "konferencii-vebinary-seminary-master-klassy",
+    description: "Профессиональные события и материалы для обмена опытом.",
+  },
+  {
+    title: "Олимпиады, конкурсы",
+    slug: "olimpiady-konkursy",
+    description: "Олимпиады, конкурсы и материалы сопровождения.",
+  },
+];
+
+const YOUNG_SPECIALIST_SUBSECTIONS = [
+  {
+    title: "Совет молодых педагогов города Иркутска",
+    slug: "sovet-molodyh-pedagogov",
+    description: "Работа совета, инициативы и городские встречи молодых педагогов.",
+    icon: "spark",
+  },
+  {
+    title: "Полезная информация для молодых педагогов",
+    slug: "poleznaya-informaciya-dlya-molodyh-pedagogov",
+    description: "Рекомендации, материалы адаптации и ответы на частые вопросы.",
+    icon: "book",
+  },
+];
+
+function createSubsections(basePath, items, defaultIcon = "book") {
+  return items.map((item) => ({
+    title: item.title,
+    path: `${basePath}${item.slug}/`,
+    description: item.description,
+    icon: item.icon || defaultIcon,
+  }));
+}
+
+const createStandardSubsections = (basePath) => createSubsections(basePath, STANDARD_SUBSECTIONS);
+const createYoungSpecialistSubsections = (basePath) => createSubsections(basePath, YOUNG_SPECIALIST_SUBSECTIONS, "spark");
+
+const methodicalDirection = (title, slug, description, options = {}) => {
+  const path = `/metodicheskoe-prostranstvo/${slug}/`;
+  return {
+    title,
+    path,
+    description,
+    icon: options.icon || "book",
+    cardsOnly: true,
+    children: options.children || createStandardSubsections(path),
+  };
+};
 
 const METHODICAL_DIRECTIONS = [
   methodicalDirection("Дошкольное образование", "doshkolnoe-obrazovanie", "Материалы для методического сопровождения дошкольных образовательных организаций."),
@@ -36,7 +96,11 @@ const METHODICAL_DIRECTIONS = [
   methodicalDirection("Воспитание", "vospitanie", "Практики и материалы по воспитательной работе."),
   methodicalDirection("Психологи", "psihologi", "Материалы для педагогов-психологов образовательных организаций."),
   methodicalDirection("Социальные педагоги", "socialnye-pedagogi", "Справочные и методические материалы для социальных педагогов."),
-  methodicalDirection("Молодые специалисты", "molodye-specialisty", "Материалы профессиональной адаптации молодых специалистов."),
+  methodicalDirection("Методические материалы", "metodicheskie-materialy", "Подборки, рекомендации и практические материалы для педагогов."),
+  methodicalDirection("Молодые специалисты", "molodye-specialisty", "Материалы профессиональной адаптации молодых специалистов.", {
+    icon: "spark",
+    children: createYoungSpecialistSubsections("/metodicheskoe-prostranstvo/molodye-specialisty/"),
+  }),
 ];
 
 const RAW_SECTION_TREE = [
@@ -184,39 +248,6 @@ const RAW_SECTION_TREE = [
         title: "Мониторинг профессиональных дефицитов педагогических работников города",
         path: "/kpk/monitoring-professionalnyh-deficitov/",
         description: "Материалы мониторинга, аналитика и рекомендации по развитию компетенций.",
-      },
-    ],
-  },
-  {
-    title: "Предметные области",
-    path: "/predmetnye-oblasti/",
-    icon: "book",
-    description: "Методические материалы, ГМС, события и конкурсы по предметным направлениям.",
-    children: [
-      {
-        title: "Новости / события",
-        path: "/predmetnye-oblasti/novosti-sobytiya/",
-        description: "Актуальные новости и события предметных направлений.",
-      },
-      {
-        title: "ГМС",
-        path: "/predmetnye-oblasti/gms/",
-        description: "Материалы городских методических сообществ и заседаний.",
-      },
-      {
-        title: "Методические материалы",
-        path: "/predmetnye-oblasti/metodicheskie-materialy/",
-        description: "Подборки, рекомендации и практические материалы для педагогов.",
-      },
-      {
-        title: "Конференции, вебинары, семинары, мастер-классы",
-        path: "/predmetnye-oblasti/konferencii-vebinary-seminary-master-klassy/",
-        description: "Профессиональные события и материалы для обмена опытом.",
-      },
-      {
-        title: "Олимпиады, конкурсы",
-        path: "/predmetnye-oblasti/olimpiady-konkursy/",
-        description: "Предметные олимпиады, конкурсы и материалы сопровождения.",
       },
     ],
   },
@@ -480,12 +511,14 @@ const RAW_SECTION_TREE = [
     path: "/innovacionnaya-deyatelnost/",
     icon: "spark",
     description: "Инновационные практики, проектные инициативы и сопровождение развития образовательных организаций.",
+    children: createStandardSubsections("/innovacionnaya-deyatelnost/"),
   },
   {
     title: "Воспитательное пространство",
     path: "/vospitatelnoe-prostranstvo/",
     icon: "people",
     description: "Материалы, события и практики по воспитательной работе в образовательных организациях.",
+    children: createStandardSubsections("/vospitatelnoe-prostranstvo/"),
   },
   {
     title: "Муниципальный семейный клуб «ФамилиЯ»",

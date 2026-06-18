@@ -84,8 +84,15 @@ function assertKnownRoute(path, label) {
 
 [
   "/metodicheskoe-prostranstvo/",
+  "/metodicheskoe-prostranstvo/doshkolnoe-obrazovanie/novosti-sobytiya/",
+  "/metodicheskoe-prostranstvo/psihologi/olimpiady-konkursy/",
+  "/metodicheskoe-prostranstvo/molodye-specialisty/sovet-molodyh-pedagogov/",
+  "/metodicheskoe-prostranstvo/molodye-specialisty/poleznaya-informaciya-dlya-molodyh-pedagogov/",
+  "/metodicheskoe-prostranstvo/metodicheskie-materialy/",
   "/innovacionnaya-deyatelnost/",
+  "/innovacionnaya-deyatelnost/gms/",
   "/vospitatelnoe-prostranstvo/",
+  "/vospitatelnoe-prostranstvo/konferencii-vebinary-seminary-master-klassy/",
   "/municipalnyy-semeynyy-klub-familiya/",
 ].forEach((path) => assertKnownRoute(path, `approved public route ${path}`));
 
@@ -97,6 +104,8 @@ assert.ok(megaMenuLinks.length > 20, "mega menu links are discoverable");
 megaMenuLinks.forEach((item) => assertKnownRoute(item.path, `mega menu ${item.label}`));
 assert.ok(!megaMenuLinks.some((item) => item.path === "/metodika/"), "mega menu does not link the old methodika root route");
 assert.ok(!megaMenuLinks.some((item) => item.label === "Методика"), "mega menu does not expose the old Methodika label");
+assert.ok(!megaMenuLinks.some((item) => item.path.startsWith("/predmetnye-oblasti/")), "mega menu does not link the removed Predmetnye oblasti route");
+assert.ok(!megaMenuLinks.some((item) => item.label === "Предметные области"), "mega menu does not expose the removed Predmetnye oblasti label");
 assert.ok(!megaMenuLinks.some((item) => item.label === "Инновации"), "mega menu uses Инновационная деятельность instead of Инновации");
 assert.ok(!megaMenuLinks.some((item) => item.label === "КПК"), "mega menu uses full public wording for courses");
 
@@ -185,6 +194,10 @@ assert.ok(!footerLinks.some((item) => item.path === "/#calendar"), "footer does 
 assert.ok(!homePageSource.includes("EventsSection"), "home page does not render the removed events/calendar block");
 assert.ok(!homePageSource.includes("#calendar"), "home page does not keep removed calendar hash behavior");
 assert.ok(!directions.some((item) => item.href === "/metodika/" || item.title === "Методика"), "home carousel uses Методическое пространство instead of old Методика");
+assert.ok(!directions.some((item) => item.href.startsWith("/predmetnye-oblasti/") || item.title === "Предметные области"), "home directions do not expose the removed Predmetnye oblasti section");
+assert.ok(!mainSections.some((item) => item.href.startsWith("/predmetnye-oblasti/") || item.title === "Предметные области"), "home main cards do not expose the removed Predmetnye oblasti section");
+assert.ok(directions.some((item) => item.title === "Методические материалы" && item.href === "/metodicheskoe-prostranstvo/metodicheskie-materialy/"), "home directions expose Методические материалы as a direct methodical route");
+assert.ok(mainSections.some((item) => item.title === "Методические материалы" && item.href === "/metodicheskoe-prostranstvo/metodicheskie-materialy/"), "home main cards link Методические материалы to the methodical route");
 
 const publicPaletteFiles = [
   "../src/App.jsx",

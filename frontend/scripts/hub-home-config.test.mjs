@@ -30,7 +30,16 @@ const methodicalDirections = [
   "Воспитание",
   "Психологи",
   "Социальные педагоги",
+  "Методические материалы",
   "Молодые специалисты",
+];
+
+const standardSubsections = [
+  "Новости / события",
+  "ГМС",
+  "Методические материалы",
+  "Конференции, вебинары, семинары, мастер-классы",
+  "Олимпиады, конкурсы",
 ];
 
 const expectedSections = [
@@ -67,17 +76,6 @@ const expectedSections = [
     cards: [
       "Список курсов повышения квалификации",
       "Мониторинг профессиональных дефицитов педагогических работников города",
-    ],
-  },
-  {
-    path: "/predmetnye-oblasti/",
-    title: "Предметные области",
-    cards: [
-      "Новости / события",
-      "ГМС",
-      "Методические материалы",
-      "Конференции, вебинары, семинары, мастер-классы",
-      "Олимпиады, конкурсы",
     ],
   },
   {
@@ -142,7 +140,11 @@ const expectedSections = [
   {
     path: "/dom-uchitelya/",
     title: "Дом учителя",
-    cards: DOMU_SECTIONS.map((section) => section.title),
+    cards: [
+      "О структурном подразделении",
+      "Мероприятия",
+      "Контактная информация",
+    ],
   },
   {
     path: "/deyatelnost/",
@@ -157,12 +159,12 @@ const expectedSections = [
   {
     path: "/innovacionnaya-deyatelnost/",
     title: "Инновационная деятельность",
-    cards: [],
+    cards: standardSubsections,
   },
   {
     path: "/vospitatelnoe-prostranstvo/",
     title: "Воспитательное пространство",
-    cards: [],
+    cards: standardSubsections,
   },
   {
     path: "/municipalnyy-semeynyy-klub-familiya/",
@@ -174,6 +176,7 @@ const expectedSections = [
 assert.equal(Object.keys(HUB_HOME_CONFIGS).length, expectedSections.length, "all requested root hub configs are exported");
 assert.deepEqual(HUB_HOME_PAGE_ROUTES.map((item) => item.path), expectedSections.map((item) => item.path), "hub home routes keep the requested order");
 assert.equal(NOKO_HUB_HOME_CONFIG, HUB_HOME_CONFIGS["/noko/"], "NOKO keeps the same config object");
+assert.deepEqual(DOMU_SECTIONS.map((section) => section.title), expectedSections.find((section) => section.path === "/dom-uchitelya/").cards, "Дом учителя exposes only the requested three subsections");
 
 for (const expected of expectedSections) {
   const config = HUB_HOME_CONFIGS[expected.path];
@@ -182,11 +185,16 @@ for (const expected of expectedSections) {
   assert.ok(config.description && !config.description.toLowerCase().includes("lorem"), `${expected.title} has an official description`);
   assert.deepEqual(config.cards.map((card) => card.title), expected.cards, `${expected.title} cards follow the requested order`);
   assert.ok(config.cards.every((card) => card.href?.startsWith("/") && card.href.endsWith("/")), `${expected.title} card links are normalized routes`);
-  assert.equal(config.latestNews?.items?.length, 3, `${expected.title} has 3 temporary latest materials`);
-  assert.ok(config.latestNews.items.every((item) => item.title && item.date && item.href), `${expected.title} latest materials are complete`);
-  assert.ok(config.contactBlock?.title, `${expected.title} has contact block title`);
-  assert.ok(config.contactBlock?.description, `${expected.title} has contact block description`);
-  assert.ok(config.contactBlock?.contacts?.length >= 1, `${expected.title} has contact data`);
+  if (expected.path === "/dom-uchitelya/") {
+    assert.equal(config.latestNews, undefined, "Дом учителя does not render an extra latest-materials block");
+    assert.equal(config.contactBlock, undefined, "Дом учителя keeps contact information as a card, not an extra contact panel");
+  } else {
+    assert.equal(config.latestNews?.items?.length, 3, `${expected.title} has 3 temporary latest materials`);
+    assert.ok(config.latestNews.items.every((item) => item.title && item.date && item.href), `${expected.title} latest materials are complete`);
+    assert.ok(config.contactBlock?.title, `${expected.title} has contact block title`);
+    assert.ok(config.contactBlock?.description, `${expected.title} has contact block description`);
+    assert.ok(config.contactBlock?.contacts?.length >= 1, `${expected.title} has contact data`);
+  }
 }
 
 [
@@ -218,5 +226,7 @@ assert.ok(layoutSource.includes("ImcroButton"), "hub layout renders the top-bloc
 assert.ok(layoutStyles.includes("hub-home-hero-actions"), "hub layout styles the top-block action");
 
 assert.ok(!configSource.includes('"/metodika/"'), "hub home config does not expose the old public methodika route");
+assert.ok(!configSource.includes('"/predmetnye-oblasti/"'), "hub home config does not expose the removed Predmetnye oblasti route");
+assert.ok(!configSource.includes("Предметные области"), "hub home config does not expose the removed Predmetnye oblasti label");
 assert.ok(!/tailwind|grid-cols-\d|bg-\[|text-\[|rounded-\[|shadow-\[/i.test(layoutSource + configSource), "hub home pages do not use Tailwind utility classes");
 assert.ok(!/#(?:7C3AED|6D28D9|8B5CF6|C4B5FD|F5F3FF|F3EEFF|EDE9FE|92400E|B45309|F59E0B|D97706)/i.test(configSource), "hub home config avoids banned accent colors");
