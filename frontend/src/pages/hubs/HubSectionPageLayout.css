@@ -13,11 +13,13 @@
 }
 
 .hub-section-breadcrumbs {
-  margin-bottom: 14px;
-  color: var(--imcro-color-surface);
+  margin-bottom: 18px;
+  color: rgba(255, 255, 255, 0.82);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 14px;
-  font-weight: 700;
-  line-height: 1.4;
+  font-weight: 850;
+  letter-spacing: 0;
+  line-height: normal;
 }
 
 .hub-section-breadcrumbs ol {
@@ -42,12 +44,31 @@
 }
 
 .hub-section-breadcrumbs .app-breadcrumbs-separator {
-  opacity: 0.72;
+  color: rgba(255, 255, 255, 0.58);
+  opacity: 1;
 }
 
 .hub-section-breadcrumbs a:hover {
+  color: var(--imcro-color-surface);
   text-decoration: underline;
   text-underline-offset: 4px;
+}
+
+.hub-section-page .hub-section-breadcrumbs,
+.hub-section-page .hub-section-breadcrumbs a {
+  color: var(--imcro-color-surface);
+}
+
+.hub-section-page .hub-section-breadcrumbs [aria-current="page"] {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.hub-section-page .hub-section-breadcrumbs a:hover {
+  color: var(--imcro-color-surface);
+}
+
+.hub-section-page .hub-section-breadcrumbs .app-breadcrumbs-separator {
+  color: rgba(255, 255, 255, 0.58);
 }
 
 .hub-section-hero-section {
@@ -60,6 +81,8 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 18px 24px;
   align-items: center;
+  background: var(--imcro-color-surface);
+  color: var(--imcro-color-text);
   padding: clamp(16px, 2.4vw, 24px);
 }
 

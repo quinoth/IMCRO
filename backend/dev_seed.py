@@ -15,7 +15,6 @@ from permissions import default_permissions_for_role, normalize_role_permissions
 DEV_TEST_USERS = [
     {
         "email": "user@mky.test",
-        "username": "smirnov_ap",
         "last_name": "Смирнов",
         "first_name": "Алексей",
         "middle_name": "Петрович",
@@ -24,7 +23,6 @@ DEV_TEST_USERS = [
     },
     {
         "email": "methodist@mky.test",
-        "username": "abramova_iv",
         "last_name": "Абрамова",
         "first_name": "Ирина",
         "middle_name": "Владимировна",
@@ -33,7 +31,6 @@ DEV_TEST_USERS = [
     },
     {
         "email": "operator@mky.test",
-        "username": "tpmpk_operator",
         "last_name": "Петрова",
         "first_name": "Ольга",
         "middle_name": "Сергеевна",
@@ -42,7 +39,6 @@ DEV_TEST_USERS = [
     },
     {
         "email": "admin@mky.test",
-        "username": "admin_mky",
         "last_name": "Кузнецова",
         "first_name": "Марина",
         "middle_name": "Андреевна",
@@ -51,7 +47,6 @@ DEV_TEST_USERS = [
     },
     {
         "email": "domu@mky.test",
-        "username": "domu_editor",
         "last_name": "Соколова",
         "first_name": "Елена",
         "middle_name": "Павловна",
@@ -107,7 +102,6 @@ def ensure_dev_test_users(
         if user is None:
             user = User(
                 email=credentials["email"],
-                username=credentials["username"],
                 last_name=credentials["last_name"],
                 first_name=credentials["first_name"],
                 middle_name=credentials["middle_name"],
@@ -118,7 +112,6 @@ def ensure_dev_test_users(
             db.add(user)
             continue
 
-        user.username = credentials["username"]
         user.last_name = credentials["last_name"]
         user.first_name = credentials["first_name"]
         user.middle_name = credentials["middle_name"]

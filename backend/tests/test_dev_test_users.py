@@ -29,7 +29,6 @@ def test_dev_test_users_are_seeded_with_expected_credentials():
         for credentials in DEV_TEST_USERS:
             user = db.query(User).filter_by(email=credentials["email"]).first()
             assert user is not None, credentials["email"]
-            assert user.username == credentials["username"]
             assert user.is_active is True
             assert user.role is not None
             assert user.role.role_name == credentials["role"]
@@ -74,7 +73,7 @@ def test_seeded_dev_test_users_can_login_and_receive_roles():
         assert verify_password(form_data.password, user.password_hash)
         role = role_name(session, user)
         token = create_access_token({"sub": user.email, "role": role})
-        return {"access_token": token, "role": role, "user": {"id": user.id, "email": user.email, "username": user.username, "is_active": user.is_active, "role": role}}
+        return {"access_token": token, "role": role, "user": {"id": user.id, "email": user.email, "is_active": user.is_active, "role": role}}
 
     app.dependency_overrides[get_db] = override_get_db
     client = TestClient(app)

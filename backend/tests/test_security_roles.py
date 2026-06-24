@@ -74,7 +74,6 @@ def test_users_api_lists_roles_and_updates_role_and_activity():
         db.flush()
         editable = User(
             email="editable@example.com",
-            username="editable",
             password_hash=hash_password("oldpass"),
             is_active=True,
             role_id=user_role.id,
@@ -106,7 +105,6 @@ def test_users_api_lists_roles_and_updates_role_and_activity():
         f"/users/{user_id}",
         json={
             "email": "editable@example.com",
-            "username": "edited",
             "role": "methodist",
             "is_active": False,
         },
@@ -114,7 +112,6 @@ def test_users_api_lists_roles_and_updates_role_and_activity():
 
     assert updated.status_code == 200
     payload = updated.json()
-    assert payload["username"] == "edited"
     assert payload["role"] == "methodist"
     assert payload["is_active"] is False
 
@@ -189,7 +186,6 @@ def test_tpmpk_admin_accepts_real_bearer_token_for_operator_role():
         db.flush()
         db.add(User(
             email="operator@example.test",
-            username="tpmpk_operator",
             password_hash=hash_password("operator123"),
             is_active=True,
             role_id=role.id,
@@ -241,7 +237,6 @@ def test_tpmpk_dashboard_initializes_schedule_on_sqlite_without_preseed():
         db.flush()
         db.add(User(
             email="operator@example.test",
-            username="tpmpk_operator",
             password_hash=hash_password("operator123"),
             is_active=True,
             role_id=role.id,

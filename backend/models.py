@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Float, JSON
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Float, JSON, text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from database import Base
@@ -8,6 +8,8 @@ class UserRole(Base):
     __tablename__ = "user_role"
     id = Column(Integer, primary_key=True, index=True)
     role_name = Column(String(50), unique=True, nullable=False)
+    can_access_internal_docs = Column(Boolean, nullable=False, default=False, server_default=text("FALSE"))
+    permissions = Column(JSON, nullable=False, default=dict)
 
 
 class User(Base):
@@ -16,11 +18,18 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
-    username = Column(String(100), nullable=True)
+    last_name = Column(String(100), nullable=True)
+    first_name = Column(String(100), nullable=True)
+    middle_name = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     role_id = Column(Integer, ForeignKey("user_role.id"), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    allowed_methodika_subjects = Column(JSON, nullable=False, default=list)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     role = relationship("UserRole")
+
+    @property
+    def can_access_internal_docs(self) -> bool:
+        return bool(getattr(self.role, "can_access_internal_docs", False))
 
 
 # ====================== ТАБЛИЦЫ ДЛЯ ГРАМОТ ======================

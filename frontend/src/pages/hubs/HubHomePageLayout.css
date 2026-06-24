@@ -40,12 +40,14 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 26px;
-  color: rgba(255, 255, 255, 0.76);
+  gap: 8px;
+  margin-bottom: 18px;
+  color: rgba(255, 255, 255, 0.82);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 14px;
-  font-weight: 700;
-  line-height: 1.4;
+  font-weight: 850;
+  letter-spacing: 0;
+  line-height: normal;
 }
 
 .hub-home-breadcrumbs__item {
@@ -57,6 +59,14 @@
 .hub-home-breadcrumbs a {
   color: var(--imcro-color-surface);
   text-decoration: none;
+}
+
+.hub-home-breadcrumbs [aria-current="page"] {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.hub-home-breadcrumbs .app-breadcrumbs-separator {
+  color: rgba(255, 255, 255, 0.58);
 }
 
 .hub-home-breadcrumbs a:hover {
@@ -81,6 +91,42 @@
   font-size: 18px;
   font-weight: 600;
   line-height: 1.65;
+}
+
+.hub-home-page--light-hero .hub-home-hero-grid {
+  grid-template-columns: 1fr;
+}
+
+.hub-home-page--light-hero .hub-home-hero-copy {
+  border-color: var(--imcro-color-border);
+  background: var(--imcro-color-surface);
+  color: var(--imcro-color-text);
+  box-shadow: var(--imcro-shadow-card);
+}
+
+.hub-home-page--light-hero .hub-home-breadcrumbs {
+  margin-bottom: 18px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.hub-home-page--light-hero .hub-home-breadcrumbs a {
+  color: var(--imcro-color-surface);
+}
+
+.hub-home-page--light-hero .hub-home-breadcrumbs [aria-current="page"] {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.hub-home-page--light-hero .hub-home-breadcrumbs .app-breadcrumbs-separator {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.hub-home-page--light-hero .hub-home-hero-copy h1 {
+  color: var(--imcro-color-text);
+}
+
+.hub-home-page--light-hero .hub-home-hero-copy p {
+  color: var(--imcro-color-text-muted);
 }
 
 .hub-home-hero-actions {

@@ -1842,7 +1842,8 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           min-height: 56px;
           display: flex;
           align-items: center;
-          justify-content: space-between;
+          justify-content: flex-start;
+          align-content: flex-start;
           gap: 14px;
           padding: 10px 18px;
           border-bottom: 1px solid var(--tpl-border);
@@ -1854,12 +1855,16 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           align-items: center;
           gap: 8px;
           min-width: 0;
+          flex: 0 0 auto;
+          flex-wrap: wrap;
+          row-gap: 8px;
         }
         .tpl-toolbar-title {
           color: var(--tpl-primary-dark);
           font-size: 15px;
           font-weight: 900;
           white-space: nowrap;
+          flex: 0 0 auto;
         }
         .tpl-back-btn {
           width: 34px;
@@ -1877,7 +1882,9 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         .tpl-back-btn:hover { border-color: var(--tpl-primary); background: #edf6f8; }
         .tpl-title-input {
           min-height: 34px;
-          width: 220px;
+          width: clamp(160px, 22vw, 220px);
+          min-width: 160px;
+          flex: 1 1 180px;
           padding: 0 10px;
           border: 1px solid var(--tpl-border);
           border-radius: 8px;
@@ -1890,6 +1897,9 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         .tpl-title-input:focus { outline: 0; border-color: var(--tpl-primary); box-shadow: 0 0 0 3px rgba(25,120,156,.14); }
         .tpl-template-select {
           min-height: 34px;
+          width: clamp(150px, 20vw, 200px);
+          min-width: 150px;
+          flex: 1 1 170px;
           max-width: 200px;
           padding: 0 10px;
           border: 1px solid var(--tpl-border);
@@ -1902,6 +1912,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         .tpl-zoom {
           display: inline-flex;
           align-items: center;
+          flex: 0 0 auto;
           border: 1px solid var(--tpl-border);
           border-radius: 8px;
           background: #fff;
@@ -1935,6 +1946,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         .tpl-icon-btn {
           width: 34px;
           height: 34px;
+          flex: 0 0 34px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -1953,6 +1965,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
         .tpl-mode-toggle {
           display: inline-flex;
           align-items: center;
+          flex: 0 0 auto;
           border: 1px solid var(--tpl-border);
           border-radius: 8px;
           background: #f4f7f9;
@@ -1969,6 +1982,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           font-weight: 800;
           cursor: pointer;
           border-radius: 6px;
+          white-space: nowrap;
         }
         .tpl-mode-toggle button.is-active {
           background: var(--tpl-primary);
@@ -1980,6 +1994,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           color: var(--tpl-muted);
           padding: 0 6px;
           white-space: nowrap;
+          flex: 0 0 auto;
         }
         .tpl-save-status--saved { color: #047857; }
         .tpl-save-status--autosaved { color: #19789c; }
@@ -2000,6 +2015,8 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
           display: inline-flex;
           align-items: center;
           gap: 6px;
+          flex: 0 0 auto;
+          white-space: nowrap;
         }
         .tpl-btn:hover:not(:disabled) { border-color: var(--tpl-primary); color: var(--tpl-primary-dark); background: #edf6f8; }
         .tpl-btn:disabled { color: #b2bec5; cursor: not-allowed; }
@@ -2407,7 +2424,7 @@ export default function TemplateConstructor({ templates, onTemplatesSaved }) {
       `}</style>
 
       <div className="template-toolbar">
-        <div className="tpl-toolbar-group" style={{ minWidth: 0, flex: 1 }}>
+        <div className="tpl-toolbar-group" style={{ minWidth: 0, flex: "1 1 420px" }}>
           <span className="tpl-toolbar-title">Конструктор шаблонов</span>
           <input
             className="tpl-title-input"

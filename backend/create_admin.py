@@ -13,7 +13,6 @@ from database import Base, SessionLocal, engine
 from models import User, UserRole
 
 LOGIN = os.getenv("ADMIN_EMAIL", "admin@example.local")
-USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 LAST_NAME = os.getenv("ADMIN_LAST_NAME", "Администратор")
 FIRST_NAME = os.getenv("ADMIN_FIRST_NAME", "МКУ")
 MIDDLE_NAME = os.getenv("ADMIN_MIDDLE_NAME", "ИМЦРО")
@@ -49,8 +48,6 @@ def migrate_users_table() -> None:
     with engine.begin() as conn:
         if "hashed_password" in cols and "password_hash" not in cols:
             conn.execute(text("ALTER TABLE users RENAME COLUMN hashed_password TO password_hash"))
-        if "username" not in cols:
-            conn.execute(text("ALTER TABLE users ADD COLUMN username VARCHAR(100)"))
         if "last_name" not in cols:
             conn.execute(text("ALTER TABLE users ADD COLUMN last_name VARCHAR(100)"))
         if "first_name" not in cols:
@@ -62,11 +59,6 @@ def migrate_users_table() -> None:
         if "created_at" not in cols:
             conn.execute(text(
                 "ALTER TABLE users ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT now()"
-            ))
-        existing_indexes = {ix["name"] for ix in insp.get_indexes("users")}
-        if "ix_users_username" not in existing_indexes:
-            conn.execute(text(
-                "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON users (username)"
             ))
 
 
@@ -92,7 +84,6 @@ def main() -> None:
             user.password_hash = hash_password(password)
             user.role_id = role.id
             user.is_active = True
-            user.username = USERNAME
             user.last_name = LAST_NAME
             user.first_name = FIRST_NAME
             user.middle_name = MIDDLE_NAME
@@ -103,7 +94,6 @@ def main() -> None:
             user = User(
                 email=LOGIN,
                 password_hash=hash_password(password),
-                username=USERNAME,
                 last_name=LAST_NAME,
                 first_name=FIRST_NAME,
                 middle_name=MIDDLE_NAME,

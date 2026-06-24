@@ -16,13 +16,16 @@ const templates = source("src/components/certificates/TemplateConstructor.jsx");
 const users = source("src/features/admin/UsersRolesModule.jsx");
 const sharedStyles = source("src/components/certificates/shared/styles.js");
 
-for (const publicPiece of ["Header", "Footer", "ChatSettings"]) {
+for (const publicPiece of ["Header", "Footer"]) {
   assert.equal(
     new RegExp(`(?:import\\s+${publicPiece}\\b|<${publicPiece}\\b)`).test(adminPage),
     false,
     `AdminPage must not render public ${publicPiece} inside /admin`,
   );
 }
+
+assert.ok(adminPage.includes('key: "chat"') && adminPage.includes("<ChatSettings />"), "AdminPage exposes assistant chat settings");
+assert.ok(adminPage.includes('key: "quality"') && adminPage.includes("<AnswerQualityStats />"), "AdminPage exposes assistant answer quality stats");
 
 for (const label of [
   "Дашборд",

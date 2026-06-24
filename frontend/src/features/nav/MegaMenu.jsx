@@ -196,7 +196,7 @@ export default function MegaMenu({ open, onClose, currentUser }) {
         link("Статьи", "/admin/articles"),
         link("Генератор грамот", "/admin/certificates"),
         link("Конструктор шаблонов", "/admin/templates"),
-        link("Демо чат-бота", "/admin/chat"),
+        link("Виртуальный ассистент", "/admin/assistant/chat"),
       );
     }
     if (canAccessDomuAdmin(currentUser)) items.push(link("Админка Дома учителя", "/admin/dom-uchitelya/"));

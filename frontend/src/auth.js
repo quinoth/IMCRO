@@ -1,4 +1,6 @@
 export const AUTH_STORAGE_KEY = "mky_current_user";
+export const AUTH_TOKEN_STORAGE_KEYS = ["access_token", "mky_access_token"];
+export const AUTH_REFRESH_TOKEN_STORAGE_KEYS = ["refresh_token", "mky_refresh_token"];
 
 export const ROLE_LABELS = {
   user: "Пользователь",
@@ -217,7 +219,7 @@ export const TEST_CREDENTIALS = [
 
 function withoutPassword(user) {
   if (!user) return null;
-  const { password: _password, ...safeUser } = user;
+  const { password: _password, password_hash: _passwordHash, ...safeUser } = user;
   return safeUser;
 }
 
@@ -312,10 +314,16 @@ export function getStoredUser() {
   try {
     const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
     const user = raw ? JSON.parse(raw) : null;
-    const token = user?.access_token || window.localStorage.getItem("mky_access_token") || window.localStorage.getItem("access_token");
+    const token = user?.access_token || AUTH_TOKEN_STORAGE_KEYS.map((key) => window.localStorage.getItem(key)).find(Boolean);
     if (token && isAccessTokenExpired(token)) {
       clearStoredUser();
       return null;
+    }
+    if (user?.access_token) {
+      AUTH_TOKEN_STORAGE_KEYS.forEach((key) => window.localStorage.setItem(key, user.access_token));
+    }
+    if (user?.refresh_token) {
+      AUTH_REFRESH_TOKEN_STORAGE_KEYS.forEach((key) => window.localStorage.setItem(key, user.refresh_token));
     }
     return user;
   } catch {
@@ -327,13 +335,15 @@ export function storeUser(user) {
   const safeUser = withoutPassword(user);
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(safeUser));
   if (safeUser?.access_token) {
-    window.localStorage.setItem("mky_access_token", safeUser.access_token);
-    window.localStorage.setItem("access_token", safeUser.access_token);
+    AUTH_TOKEN_STORAGE_KEYS.forEach((key) => window.localStorage.setItem(key, safeUser.access_token));
+  }
+  if (safeUser?.refresh_token) {
+    AUTH_REFRESH_TOKEN_STORAGE_KEYS.forEach((key) => window.localStorage.setItem(key, safeUser.refresh_token));
   }
 }
 
 export function clearStoredUser() {
   window.localStorage.removeItem(AUTH_STORAGE_KEY);
-  window.localStorage.removeItem("mky_access_token");
-  window.localStorage.removeItem("access_token");
+  AUTH_TOKEN_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+  AUTH_REFRESH_TOKEN_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
 }

@@ -145,6 +145,7 @@ function renderCardIcon(icon) {
 
 export function HubHomePageLayout({
   breadcrumbs = [],
+  breadcrumbsOutsideHero = false,
   cards = [],
   classNames = {},
   contactBlock,
@@ -171,9 +172,14 @@ export function HubHomePageLayout({
       <main className={cx("hub-home-main", mainClassName)}>
         <ImcroContainer>
           <ImcroSection className={cx("hub-home-hero-section", classNames.heroSection)}>
+            {breadcrumbsOutsideHero && (
+              <Breadcrumbs className={cx("hub-home-breadcrumbs", classNames.breadcrumbs)} items={breadcrumbs} />
+            )}
             <div className={cx("hub-home-hero-grid", classNames.heroGrid)}>
               <div className={cx("hub-home-hero-copy", classNames.heroCopy)}>
-                <Breadcrumbs className={cx("hub-home-breadcrumbs", classNames.breadcrumbs)} items={breadcrumbs} />
+                {!breadcrumbsOutsideHero && (
+                  <Breadcrumbs className={cx("hub-home-breadcrumbs", classNames.breadcrumbs)} items={breadcrumbs} />
+                )}
                 <h1>{title}</h1>
                 {description && <p>{description}</p>}
                 {heroAction?.text && heroAction?.href && (

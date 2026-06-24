@@ -29,5 +29,25 @@ pytrovich
 python-dotenv
 httpx
 
+# Virtual assistant / RAG
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1+cpu
+langchain
+langchain-chroma
+langchain-huggingface
+langchain-text-splitters
+gigachat
+sentence-transformers
+chromadb
+requests
+beautifulsoup4
+boto3
+python-docx
+pymupdf
+surya-ocr
+mammoth
+pytesseract
+pdf2image
+
 # Tests
 pytest

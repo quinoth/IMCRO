@@ -3,6 +3,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -307,6 +308,16 @@ def _slice_filtered_articles(items: list[Article], limit: int, offset: int) -> l
     return items[offset:offset + limit]
 
 
+def _home_article_sql_filter():
+    return and_(
+        Article.methodika_subject.is_(None),
+        Article.dom_uchitelya_section.is_(None),
+        Article.noko_section.is_(None),
+        Article.hub_kind.is_(None),
+        Article.hub_path.is_(None),
+    )
+
+
 def _extract_article_values(article: Article) -> dict:
     return {
         "status": article.status,
@@ -367,16 +378,20 @@ def _apply_main_duplication_policy(role_name: str, payload: dict, explicit_chang
 
 def _query_public_news(db: Session, scopes: tuple[str, str], limit: int, offset: int, root: str = "home"):
     now = datetime.now(timezone.utc)
-    items = (
-        db.query(Article)
-        .filter(
-            Article.status == "published",
-            Article.publishing_scope.in_(scopes),
-            ((Article.published_at == None) | (Article.published_at <= now)),  # noqa: E711
-        )
-        .order_by(Article.is_pinned.desc(), Article.published_at.desc(), Article.created_at.desc(), Article.id.desc())
-        .all()
+    query = db.query(Article).filter(
+        Article.status == "published",
+        Article.publishing_scope.in_(scopes),
+        or_(Article.published_at.is_(None), Article.published_at <= now),
     )
+    if root == "home":
+        query = query.filter(or_(Article.duplicate_to_main.is_(True), _home_article_sql_filter()))
+    elif root == "domu":
+        query = query.filter(or_(
+            Article.dom_uchitelya_section.isnot(None),
+            Article.duplicate_to_main.is_(True),
+            _home_article_sql_filter(),
+        ))
+    items = query.order_by(Article.is_pinned.desc(), Article.published_at.desc(), Article.created_at.desc(), Article.id.desc()).all()
     return {"items": _slice_filtered_articles([article for article in items if _article_matches_feed(article, root)], limit, offset)}
 
 
@@ -387,7 +402,8 @@ def _query_public_events(db: Session, scopes: tuple[str, str], limit: int, offse
         .filter(
             Article.status == "published",
             Article.publishing_scope.in_(scopes),
-            ((Article.published_at == None) | (Article.published_at <= now)),  # noqa: E711
+            or_(Article.published_at.is_(None), Article.published_at <= now),
+            or_(Article.duplicate_to_events.is_(True), Article.hub_kind == "events"),
         )
         .order_by(Article.is_pinned.desc(), Article.published_at.desc(), Article.created_at.desc(), Article.id.desc())
         .all()
@@ -408,8 +424,21 @@ def _query_public_hub_news(
     query = db.query(Article).filter(
         Article.status == "published",
         Article.publishing_scope.in_(scopes),
-        ((Article.published_at == None) | (Article.published_at <= now)),  # noqa: E711
+        or_(Article.published_at.is_(None), Article.published_at <= now),
     )
+    if hub == "methodika":
+        if subject:
+            query = query.filter(Article.methodika_subject == subject)
+        elif section:
+            query = query.filter(Article.hub_kind == "methodika", Article.hub_path == section)
+        else:
+            query = query.filter(or_(Article.methodika_subject.isnot(None), Article.hub_kind == "methodika"))
+    elif hub == "noko":
+        query = query.filter(Article.noko_section == section if section else Article.noko_section.isnot(None))
+    else:
+        query = query.filter(Article.hub_kind == hub)
+        if section:
+            query = query.filter(Article.hub_path == section)
     items = (
         query.order_by(Article.is_pinned.desc(), Article.published_at.desc(), Article.created_at.desc(), Article.id.desc())
         .all()

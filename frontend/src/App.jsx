@@ -1,46 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
-import HomePage from "./pages/HomePage.jsx";
-import AuthPage from "./pages/AuthPage.jsx";
-import AdminPage from "./pages/AdminPage.jsx";
-import ArticlePage from "./pages/ArticlePage.jsx";
-import AuthorArticlesPage from "./pages/AuthorArticlesPage.jsx";
-import ProfilePage from "./pages/ProfilePage.jsx";
-import SafetyPage from "./pages/SafetyPage.jsx";
-import Smart404 from "./pages/Smart404.jsx";
-import TpmpkZapisPage from "./pages/TpmpkZapisPage.jsx";
-import TpmpkAdmin from "./pages/admin/tpmpk/TpmpkAdmin.jsx";
-import DomUchitelyaAdmin from "./pages/admin/domUchitelya/DomUchitelyaAdmin.jsx";
-import {
-  CommonNewsPage,
-  DomUchitelyaNewsPage,
-  DomUchitelyaStaticPage,
-} from "./pages/domUchitelya/DomUchitelyaPages.jsx";
 import { DOMU_LEGACY_REDIRECTS, DOMU_SECTIONS } from "./pages/domUchitelya/domuSections.js";
-import {
-  ArchivHomePage,
-  ArchivSectionPage,
-  DeyatelnostSectionPage,
-  HubHomeRoutePage,
-  KonkursySectionPage,
-  NokoHomePage,
-  NokoSectionPage,
-} from "./pages/hubs/HubPages.jsx";
 import { HUB_HOME_PAGE_ROUTES } from "./pages/hubs/hubHomeConfig.js";
 import { getMethodikaArticleBackPath } from "./pages/hubs/hubUtils.js";
-import { SectionRoutePage } from "./pages/sections/SectionPages.jsx";
 import { SECTION_PAGE_ROUTES } from "./pages/sections/sectionStructure.js";
-import SvedeniyaPage from "./pages/SvedeniyaPage.jsx";
-import BlankiPage from "./pages/tpmpk/BlankiPage.jsx";
-import DlyaPedagogovPage from "./pages/tpmpk/DlyaPedagogovPage.jsx";
-import DlyaRoditeleyPage from "./pages/tpmpk/DlyaRoditeleyPage.jsx";
-import DokumentyPage from "./pages/tpmpk/DokumentyPage.jsx";
-import FaqPage from "./pages/tpmpk/FaqPage.jsx";
-import GrafikPage from "./pages/tpmpk/GrafikPage.jsx";
-import KontaktyPage from "./pages/tpmpk/KontaktyPage.jsx";
-import NpaPage from "./pages/tpmpk/NpaPage.jsx";
-import SostavPage from "./pages/tpmpk/SostavPage.jsx";
-import ChatBot from "./components/ChatBot.jsx";
+import { apiMe, AUTH_SESSION_EXPIRED_EVENT } from "./api.js";
 import { API_BASE } from "./constants/index.js";
 import {
   ARCHIV_ROUTES,
@@ -54,6 +18,52 @@ import {
 } from "./features/admin/articleTaxonomy.js";
 import { htmlToPlainText } from "./features/admin/articleEditorContent.js";
 import { canAccessAdmin, canAccessDomuAdmin, canAccessTpmpkAdmin, clearStoredUser, getStoredUser, storeUser } from "./auth.js";
+
+function lazyNamed(loader, exportName) {
+  return lazy(() => loader().then((module) => ({ default: module[exportName] })));
+}
+
+const HomePage = lazy(() => import("./pages/HomePage.jsx"));
+const AuthPage = lazy(() => import("./pages/AuthPage.jsx"));
+const AdminPage = lazy(() => import("./pages/AdminPage.jsx"));
+const ArticlePage = lazy(() => import("./pages/ArticlePage.jsx"));
+const AuthorArticlesPage = lazy(() => import("./pages/AuthorArticlesPage.jsx"));
+const ProfilePage = lazy(() => import("./pages/ProfilePage.jsx"));
+const SafetyPage = lazy(() => import("./pages/SafetyPage.jsx"));
+const Smart404 = lazy(() => import("./pages/Smart404.jsx"));
+const TpmpkZapisPage = lazy(() => import("./pages/TpmpkZapisPage.jsx"));
+const TpmpkAdmin = lazy(() => import("./pages/admin/tpmpk/TpmpkAdmin.jsx"));
+const DomUchitelyaAdmin = lazy(() => import("./pages/admin/domUchitelya/DomUchitelyaAdmin.jsx"));
+const SvedeniyaPage = lazy(() => import("./pages/SvedeniyaPage.jsx"));
+const BlankiPage = lazy(() => import("./pages/tpmpk/BlankiPage.jsx"));
+const DlyaPedagogovPage = lazy(() => import("./pages/tpmpk/DlyaPedagogovPage.jsx"));
+const DlyaRoditeleyPage = lazy(() => import("./pages/tpmpk/DlyaRoditeleyPage.jsx"));
+const DokumentyPage = lazy(() => import("./pages/tpmpk/DokumentyPage.jsx"));
+const FaqPage = lazy(() => import("./pages/tpmpk/FaqPage.jsx"));
+const GrafikPage = lazy(() => import("./pages/tpmpk/GrafikPage.jsx"));
+const KontaktyPage = lazy(() => import("./pages/tpmpk/KontaktyPage.jsx"));
+const NpaPage = lazy(() => import("./pages/tpmpk/NpaPage.jsx"));
+const SostavPage = lazy(() => import("./pages/tpmpk/SostavPage.jsx"));
+const ChatBot = lazy(() => import("./components/ChatBot.jsx"));
+
+const loadDomUchitelyaPages = () => import("./pages/domUchitelya/DomUchitelyaPages.jsx");
+const CommonNewsPage = lazyNamed(loadDomUchitelyaPages, "CommonNewsPage");
+const DomUchitelyaNewsPage = lazyNamed(loadDomUchitelyaPages, "DomUchitelyaNewsPage");
+const DomUchitelyaStaticPage = lazyNamed(loadDomUchitelyaPages, "DomUchitelyaStaticPage");
+
+const loadHubPages = () => import("./pages/hubs/HubPages.jsx");
+const ArchivHomePage = lazyNamed(loadHubPages, "ArchivHomePage");
+const ArchivSectionPage = lazyNamed(loadHubPages, "ArchivSectionPage");
+const DeyatelnostSectionPage = lazyNamed(loadHubPages, "DeyatelnostSectionPage");
+const HubHomeRoutePage = lazyNamed(loadHubPages, "HubHomeRoutePage");
+const KonkursySectionPage = lazyNamed(loadHubPages, "KonkursySectionPage");
+const NokoHomePage = lazyNamed(loadHubPages, "NokoHomePage");
+const NokoSectionPage = lazyNamed(loadHubPages, "NokoSectionPage");
+
+const SectionRoutePage = lazyNamed(
+  () => import("./pages/sections/SectionPages.jsx"),
+  "SectionRoutePage",
+);
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -71,6 +81,56 @@ function ScrollToTop() {
   }, [pathname]);
 
   return null;
+}
+
+function RouteFallback() {
+  return (
+    <div
+      role="status"
+      style={{
+        minHeight: "40vh",
+        display: "grid",
+        placeItems: "center",
+        color: "#1F5073",
+        fontWeight: 800,
+      }}
+    >
+      Загрузка...
+    </div>
+  );
+}
+
+function DeferredChatBot({ disabled }) {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (disabled) {
+      setReady(false);
+      return undefined;
+    }
+
+    if (typeof window === "undefined") {
+      setReady(true);
+      return undefined;
+    }
+
+    const load = () => setReady(true);
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(load, { timeout: 3000 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timerId = window.setTimeout(load, 1200);
+    return () => window.clearTimeout(timerId);
+  }, [disabled]);
+
+  if (disabled || !ready) return null;
+
+  return (
+    <Suspense fallback={null}>
+      <ChatBot />
+    </Suspense>
+  );
 }
 
 const PUBLIC_CATEGORY_STYLE = { categoryColor: "#1F5073", categoryBg: "rgba(31,80,115,0.08)" };
@@ -402,6 +462,24 @@ function AppRoutes() {
     return () => { cancelled = true; };
   }, [loadPublicNews]);
 
+  useEffect(() => {
+    if (!getStoredUser()) return;
+    apiMe().catch(() => {
+      // Individual API requests surface their own auth errors; this only warms the saved session.
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      clearStoredUser();
+      setCurrentUser(null);
+      navigate("/auth?tab=login&reason=session-expired", { replace: true });
+    };
+
+    window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
+  }, [navigate]);
+
   const publishedNews = sortNewsByDateDesc(apiCommonNews);
   const eventsNews = sortNewsByDateDesc(apiEventsNews);
   const domuNews = sortNewsByDateDesc(apiDomuNews);
@@ -542,14 +620,16 @@ function AppRoutes() {
   const handleLogin = useCallback((user) => {
     storeUser(user);
     setCurrentUser(user);
+    void loadPublicNews();
     navigate("/profile", { replace: true });
-  }, [navigate]);
+  }, [loadPublicNews, navigate]);
 
   const handleLogout = useCallback(() => {
     clearStoredUser();
     setCurrentUser(null);
+    void loadPublicNews();
     navigate("/auth?tab=login", { replace: true });
-  }, [navigate]);
+  }, [loadPublicNews, navigate]);
 
   const adminTarget = canAccessAdmin(currentUser)
     ? "/admin"
@@ -573,7 +653,8 @@ function AppRoutes() {
 
   return (
     <>
-      <Routes>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
         <Route
           path="/"
           element={
@@ -769,8 +850,9 @@ function AppRoutes() {
             />
           }
         />
-      </Routes>
-      {!location.pathname.startsWith("/admin") && <ChatBot />}
+        </Routes>
+      </Suspense>
+      <DeferredChatBot disabled={location.pathname.startsWith("/admin")} />
     </>
   );
 }

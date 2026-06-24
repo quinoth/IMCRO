@@ -4,6 +4,8 @@ import { API_BASE } from "../constants/index.js";
 import GenerateSingle from "../components/certificates/GenerateSingle.jsx";
 import GenerateBatch from "../components/certificates/GenerateBatch.jsx";
 import TemplateConstructor from "../components/certificates/TemplateConstructor.jsx";
+import AnswerQualityStats from "../components/chat/AnswerQualityStats.jsx";
+import ChatSettings from "../components/chat/ChatSettings.jsx";
 import ArticlesModule from "../features/admin/ArticlesModule.jsx";
 import UsersRolesModule from "../features/admin/UsersRolesModule.jsx";
 import AdminLayout from "../features/admin/AdminLayout.jsx";
@@ -18,6 +20,21 @@ const ADMIN_MODULES = [
   { key: "users", path: "/admin/users", label: "Пользователи и роли", icon: "users" },
   { key: "audit", path: "/admin/audit", label: "Журнал действий", icon: "audit" },
   { key: "settings", path: "/admin/settings", label: "Настройки портала", icon: "settings" },
+  {
+    key: "assistant",
+    path: "/admin/assistant",
+    label: "Виртуальный ассистент",
+    icon: "chat",
+    children: [
+      { key: "assistant-chat-settings", path: "/admin/assistant/chat", label: "Настройка чата" },
+      { key: "assistant-answer-quality", path: "/admin/assistant/quality", label: "Качество ответа" },
+    ],
+  },
+];
+
+const ASSISTANT_LEGACY_PATHS = [
+  { from: "/admin/chat", to: "/admin/assistant/chat" },
+  { from: "/admin/chat-quality", to: "/admin/assistant/quality" },
 ];
 
 const MODULE_META = {
@@ -37,6 +54,10 @@ const MODULE_META = {
     title: "Конструктор шаблонов",
     subtitle: "Рабочий редактор бланков, текстовых блоков и подписей",
   },
+  assistant: {
+    title: "Виртуальный ассистент",
+    subtitle: "Настройки, тестовый чат и качество ответов виртуального ассистента",
+  },
   users: {
     title: "Пользователи и роли",
     subtitle: "Учётные записи сотрудников, роли и матрица прав",
@@ -50,6 +71,26 @@ const MODULE_META = {
     subtitle: "Служебные параметры внутренней административной системы",
   },
 };
+
+function isModulePath(pathname, modulePath) {
+  const currentPath = pathname.replace(/\/+$/, "") || "/";
+  const targetPath = modulePath.replace(/\/+$/, "") || "/";
+  return currentPath === targetPath || currentPath.startsWith(`${targetPath}/`);
+}
+
+function isAssistantModulePath(pathname) {
+  return isModulePath(pathname, "/admin/assistant") || ASSISTANT_LEGACY_PATHS.some((path) => isModulePath(pathname, path.from));
+}
+
+function getActiveAdminModule(pathname) {
+  return ADMIN_MODULES.find((module) => (
+    module.key === "assistant" ? isAssistantModulePath(pathname) : isModulePath(pathname, module.path)
+  )) || ADMIN_MODULES[0];
+}
+
+function getAssistantView(pathname) {
+  return isModulePath(pathname, "/admin/assistant/quality") ? "quality" : "chat";
+}
 
 function IssueModule({ templates }) {
   const navigate = useNavigate();
@@ -426,6 +467,17 @@ function AccessDenied({ title }) {
   );
 }
 
+function AssistantModule({ currentUser, view }) {
+  const canViewSettings = hasPermission(currentUser, "portal_settings", "view") || canManageUsers(currentUser);
+  const canViewQuality = canViewSettings || hasPermission(currentUser, "audit_log", "view");
+
+  if (view === "quality") {
+    return canViewQuality ? <AnswerQualityStats /> : <AccessDenied title="Качество ответа" />;
+  }
+
+  return canViewSettings ? <ChatSettings /> : <AccessDenied title="Настройка чата" />;
+}
+
 export default function AdminPage({ currentUser, onArticlesChanged }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -440,10 +492,12 @@ export default function AdminPage({ currentUser, onArticlesChanged }) {
     users: canManageUsers(currentUser),
     audit: hasPermission(currentUser, "audit_log", "view"),
     settings: hasPermission(currentUser, "portal_settings", "view"),
+    assistant: hasPermission(currentUser, "portal_settings", "view") || hasPermission(currentUser, "audit_log", "view") || canManageUsers(currentUser),
   }), [currentUser]);
 
-  const activeModule = ADMIN_MODULES.find((module) => location.pathname.startsWith(module.path)) || ADMIN_MODULES[0];
+  const activeModule = getActiveAdminModule(location.pathname);
   const activeKey = activeModule.key;
+  const assistantView = getAssistantView(location.pathname);
   const needsTemplates = activeKey === "issue" || activeKey === "editor";
   const meta = MODULE_META[activeKey] || MODULE_META.dashboard;
 
@@ -466,8 +520,13 @@ export default function AdminPage({ currentUser, onArticlesChanged }) {
   }, [needsTemplates]);
 
   useEffect(() => {
+    const legacyAssistantPath = ASSISTANT_LEGACY_PATHS.find((path) => isModulePath(location.pathname, path.from));
     if (location.pathname === "/admin" || location.pathname === "/admin/") {
       navigate("/admin/dashboard", { replace: true });
+    } else if (location.pathname === "/admin/assistant" || location.pathname === "/admin/assistant/") {
+      navigate("/admin/assistant/chat", { replace: true });
+    } else if (legacyAssistantPath) {
+      navigate(legacyAssistantPath.to, { replace: true });
     }
   }, [location.pathname, navigate]);
 
@@ -507,6 +566,8 @@ export default function AdminPage({ currentUser, onArticlesChanged }) {
         onNewArticle={() => navigate("/admin/articles/new")}
       />
     );
+  } else if (activeKey === "assistant") {
+    content = <AssistantModule currentUser={currentUser} view={assistantView} />;
   } else if (activeKey === "users") {
     content = <UsersRolesModule currentUser={currentUser} />;
   } else if (activeKey === "audit") {

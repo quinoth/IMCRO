@@ -42,6 +42,7 @@ dev.db
 *.sqlite
 *.sqlite3
 backups/
+.assistant_data_backup_*/
 *.dump
 
 # Generated uploads and runtime media

@@ -148,7 +148,6 @@ def test_public_news_returns_author_display_name_not_username(client):
     try:
         user = User(
             email="abramova@example.test",
-            username="abramova_iv",
             password_hash="secret",
             last_name="Абрамова",
             first_name="Ирина",
@@ -181,7 +180,6 @@ def test_public_news_returns_author_fio_fields_and_key(client):
     try:
         user = User(
             email="petrova@example.test",
-            username="tpmpk_operator",
             password_hash="secret",
             last_name="Петрова",
             first_name="Ольга",
@@ -512,9 +510,11 @@ def test_admin_article_attachment_upload_accepts_documents(client):
 
 
 def test_admin_articles_alias_routes_match_news_routes(client):
+    route_sources = [client.app.routes, router.routes]
     routes = {
         (route.path, tuple(sorted(route.methods or [])))
-        for route in client.app.routes
+        for source in route_sources
+        for route in source
         if getattr(route, "path", "").startswith("/api/admin/")
     }
 

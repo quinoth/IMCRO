@@ -63,7 +63,7 @@ function getArticleDescription(article) {
     || "Материал раздела с подробной информацией, документами и методическими рекомендациями.";
 }
 
-export function createFallbackArticles(sectionTitle = "раздел") {
+function createFallbackArticles(sectionTitle = "раздел") {
   return [
     {
       id: "section-fallback-methodical",
@@ -209,7 +209,6 @@ export function HubSectionPageLayout({
   showArticleList = true,
 }) {
   const sections = normalizeArray(childSections);
-  const hasChildSections = sections.length > 0;
 
   return (
     <ImcroContainer className={cx("hub-section-container", className)}>

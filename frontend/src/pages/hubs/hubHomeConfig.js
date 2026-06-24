@@ -250,9 +250,11 @@ function enhanceHubHomeConfig(path, config) {
   if (path === "/dom-uchitelya/") {
     return {
       ...config,
+      breadcrumbsOutsideHero: true,
       contactBlock: undefined,
       gridClassName: "imcro-grid-3",
       latestNews: undefined,
+      pageClassName: `${config.pageClassName || ""} hub-home-page--light-hero`.trim(),
     };
   }
 
@@ -260,7 +262,10 @@ function enhanceHubHomeConfig(path, config) {
 
   return {
     ...config,
+    breadcrumbsOutsideHero: true,
     heroAction: TPMPK_APPOINTMENT_ACTION,
+    latestNews: undefined,
+    pageClassName: `${config.pageClassName || ""} hub-home-page--light-hero`.trim(),
     contactBlock: {
       ...config.contactBlock,
       actionText: TPMPK_APPOINTMENT_ACTION.text,

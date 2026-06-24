@@ -1,4 +1,5 @@
-from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, JSON, String
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -39,6 +40,7 @@ class UserRole(Base):
     __tablename__ = "user_role"
     id = Column(Integer, primary_key=True, index=True)
     role_name = Column(String(50), unique=True, nullable=False)
+    can_access_internal_docs = Column(Boolean, nullable=False, default=False, server_default=text("FALSE"))
     permissions = Column(JSON, nullable=False, default=dict)
 
 
@@ -48,83 +50,85 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
-    username = Column(String(100), nullable=True)
     last_name = Column(String(100), nullable=True)
     first_name = Column(String(100), nullable=True)
     middle_name = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     role_id = Column(Integer, ForeignKey("user_role.id"), nullable=True)
     allowed_methodika_subjects = Column(JSON, nullable=False, default=list)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     role = relationship("UserRole")
 
+    @property
+    def can_access_internal_docs(self) -> bool:
+        return bool(getattr(self.role, "can_access_internal_docs", False))
 
-class Article(Base):
-    __tablename__ = "article"
+
+class AssistantChatSession(Base):
+    __tablename__ = "assistant_chat_session"
     __table_args__ = (
-        CheckConstraint(
-            "status IN ('draft', 'published', 'archive')",
-            name="article_status_chk",
-        ),
-        CheckConstraint(
-            "publishing_scope IN ('imcro_only', 'dom_uchitelya_only', 'both')",
-            name="article_publishing_scope_chk",
-        ),
+        Index("assistant_chat_session_user_idx", "user_id"),
+        Index("assistant_chat_session_updated_idx", "updated_at"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(300), nullable=False)
-    slug = Column(String(160), unique=True, nullable=False, index=True)
-    status = Column(String(20), nullable=False, default="draft", index=True)
-    excerpt = Column(String(800), nullable=True)
-    image = Column(String(500), nullable=True)
-    lead = Column(String(800), nullable=True)
-    body = Column(String, nullable=False, default="")
-    cover_image_url = Column(String(500), nullable=True)
-    is_pinned = Column(Boolean, nullable=False, default=False, index=True)
-    duplicate_to_main = Column(Boolean, nullable=False, default=False, index=True)
-    duplicate_to_events = Column(Boolean, nullable=False, default=False, index=True)
-    blocks = Column(JSON, nullable=False, default=list)
-    attachments = Column(JSON, nullable=False, default=list)
-    categories = Column(JSON, nullable=False, default=list)
-    tags = Column(JSON, nullable=False, default=list)
-    sections = Column(JSON, nullable=False, default=list)
-    publishing_scope = Column(String(20), nullable=False, default="both", index=True)
-    methodika_subject = Column(String(120), nullable=True, index=True)
-    dom_uchitelya_section = Column(String(120), nullable=True, index=True)
-    noko_section = Column(String(120), nullable=True, index=True)
-    hub_kind = Column(String(64), nullable=True, index=True)
-    hub_path = Column(String(160), nullable=True, index=True)
-    author_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-    published_at = Column(DateTime(timezone=True), nullable=True)
+    session_key = Column(String(255), unique=True, nullable=False, index=True)
+    session_id = Column(String(120), nullable=False)
+    access_scope = Column(String(20), nullable=False)
+    user_role = Column(String(100), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_email = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    author = relationship("User", foreign_keys=[author_id])
+    user = relationship("User")
+    messages = relationship(
+        "AssistantChatMessage",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="AssistantChatMessage.id",
+    )
 
-    @property
-    def author_name(self):
-        return _user_display_name(self.author)
 
-    @property
-    def author_full_name(self):
-        return _user_display_name(self.author)
+class AssistantChatMessage(Base):
+    __tablename__ = "assistant_chat_message"
+    __table_args__ = (
+        Index("assistant_chat_message_session_idx", "assistant_session_id", "id"),
+        Index("assistant_chat_message_turn_idx", "turn_id"),
+    )
 
-    @property
-    def author_last_name(self):
-        return getattr(self.author, "last_name", None) if self.author is not None else None
+    id = Column(Integer, primary_key=True, index=True)
+    assistant_session_id = Column(
+        Integer,
+        ForeignKey("assistant_chat_session.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    turn_id = Column(String(64), nullable=False)
+    role = Column(String(20), nullable=False)
+    content = Column(Text, nullable=False)
+    message_metadata = Column("metadata", JSONB().with_variant(JSON, "sqlite"), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    @property
-    def author_first_name(self):
-        return getattr(self.author, "first_name", None) if self.author is not None else None
+    session = relationship("AssistantChatSession", back_populates="messages")
 
-    @property
-    def author_middle_name(self):
-        return getattr(self.author, "middle_name", None) if self.author is not None else None
 
-    @property
-    def author_key(self):
-        return f"id-{self.author_id}" if self.author_id else None
+class AssistantRuntimeSettings(Base):
+    __tablename__ = "assistant_runtime_settings"
+
+    id = Column(Integer, primary_key=True)
+    update_interval_hours = Column(Float, nullable=False)
+    gigachat_model = Column(String(64), nullable=False)
+    question_max_length = Column(Integer, nullable=False)
+    session_ttl_seconds = Column(Integer, nullable=False)
+    history_max_messages = Column(Integer, nullable=False)
+    rate_limit_window_seconds = Column(Integer, nullable=False)
+    rate_limit_max_requests = Column(Integer, nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
 
 
 class CertificateTemplate(Base):
@@ -199,17 +203,6 @@ class GeneratedCertificate(Base):
     generated_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
-class Appointment(Base):
-    __tablename__ = "appointments"
-
-    id = Column(Integer, primary_key=True, index=True)
-    full_name = Column(String(200), nullable=False)
-    appointment_date = Column(String(10), nullable=False)
-    appointment_time = Column(String(5), nullable=False)
-    comment = Column(String(500), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-
 class TemplateSigner(Base):
     __tablename__ = "template_signers"
     id = Column(Integer, primary_key=True, index=True)
@@ -225,11 +218,139 @@ class TemplateSigner(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class Appointment(Base):
+    __tablename__ = "appointments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    user_email = Column(String, nullable=True)
+    full_name = Column(String(200), nullable=False)
+    appointment_date = Column(String(10), nullable=False)
+    appointment_time = Column(String(5), nullable=False)
+    comment = Column(String(500), nullable=True)
+    status = Column(String(20), nullable=False, default="new", server_default=text("'new'"))
+    source = Column(String(20), nullable=False, default="site", server_default=text("'site'"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User")
+
+
+class ArticleStatus(Base):
+    __tablename__ = "article_status"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), unique=True, nullable=False)
+
+
+class Category(Base):
+    __tablename__ = "category"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), nullable=False)
+    slug = Column(String(200), nullable=False)
+
+
+class Tag(Base):
+    __tablename__ = "tag"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), nullable=False)
+    slug = Column(String(200), nullable=False)
+
+
+class Article(Base):
+    __tablename__ = "article"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft', 'published', 'archive')",
+            name="article_status_chk",
+        ),
+        CheckConstraint(
+            "publishing_scope IN ('imcro_only', 'dom_uchitelya_only', 'both')",
+            name="article_publishing_scope_chk",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(500), nullable=False)
+    slug = Column(String(500), nullable=False)
+    content = Column(Text, nullable=True)
+    status_id = Column(Integer, ForeignKey("article_status.id"), nullable=True)
+    status = Column(String(20), nullable=False, default="draft", index=True)
+    excerpt = Column(String(800), nullable=True)
+    image = Column(String(500), nullable=True)
+    lead = Column(String(800), nullable=True)
+    body = Column(Text, nullable=False, default="")
+    cover_image_url = Column(String(500), nullable=True)
+    is_pinned = Column(Boolean, nullable=False, default=False, index=True)
+    duplicate_to_main = Column(Boolean, nullable=False, default=False, index=True)
+    duplicate_to_events = Column(Boolean, nullable=False, default=False, index=True)
+    blocks = Column(JSON, nullable=False, default=list)
+    attachments = Column(JSON, nullable=False, default=list)
+    categories = Column(JSON, nullable=False, default=list)
+    tags = Column(JSON, nullable=False, default=list)
+    sections = Column(JSON, nullable=False, default=list)
+    publishing_scope = Column(String(20), nullable=False, default="both", index=True)
+    methodika_subject = Column(String(120), nullable=True, index=True)
+    dom_uchitelya_section = Column(String(120), nullable=True, index=True)
+    noko_section = Column(String(120), nullable=True, index=True)
+    hub_kind = Column(String(64), nullable=True, index=True)
+    hub_path = Column(String(160), nullable=True, index=True)
+    author_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    published_at = Column(DateTime(timezone=True), nullable=True)
+
+    author = relationship("User", foreign_keys=[author_id])
+
+    @property
+    def author_name(self):
+        return _user_display_name(self.author)
+
+    @property
+    def author_full_name(self):
+        return _user_display_name(self.author)
+
+    @property
+    def author_last_name(self):
+        return getattr(self.author, "last_name", None) if self.author is not None else None
+
+    @property
+    def author_first_name(self):
+        return getattr(self.author, "first_name", None) if self.author is not None else None
+
+    @property
+    def author_middle_name(self):
+        return getattr(self.author, "middle_name", None) if self.author is not None else None
+
+    @property
+    def author_key(self):
+        return f"id-{self.author_id}" if self.author_id else None
+
+
+class ArticleCategory(Base):
+    __tablename__ = "article_category"
+    article_id = Column(Integer, ForeignKey("article.id"), primary_key=True)
+    category_id = Column(Integer, ForeignKey("category.id"), primary_key=True)
+
+
+class ArticleTag(Base):
+    __tablename__ = "article_tag"
+    article_id = Column(Integer, ForeignKey("article.id"), primary_key=True)
+    tag_id = Column(Integer, ForeignKey("tag.id"), primary_key=True)
+
+
 __all__ = [
     "Appointment",
     "Article",
+    "ArticleCategory",
+    "ArticleStatus",
+    "ArticleTag",
+    "AssistantChatMessage",
+    "AssistantChatSession",
+    "AssistantRuntimeSettings",
+    "Category",
     "CertificateTemplate",
     "GeneratedCertificate",
+    "Tag",
     "TemplateSigner",
     "TemplateTextElement",
     "TPMPKAppointment",

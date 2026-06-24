@@ -44,6 +44,41 @@ function HubStyles() {
       .hub-eyebrow { width: fit-content; padding: 7px 11px; border-radius: 999px; background: rgba(31,80,115,0.08); color: var(--imcro-color-primary); font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 12px; }
       .hub-hero h1 { font-size: clamp(30px, 9vw, 60px); line-height: 1; margin: 0 0 10px; letter-spacing: 0; }
       .hub-hero p { margin: 0; color: var(--imcro-color-text-muted); font-size: 16px; line-height: 1.62; font-weight: 650; }
+      .hub-hero--safety-style {
+        position: relative;
+        min-width: 0;
+        display: grid;
+        gap: 16px;
+        padding: 26px 18px;
+        border-radius: 14px;
+        background:
+          linear-gradient(135deg, var(--imcro-color-surface), rgba(255, 255, 255, 0.96)),
+          repeating-linear-gradient(90deg, rgba(31, 80, 115, 0.055) 0 1px, transparent 1px 92px);
+        box-shadow: var(--imcro-shadow-card);
+      }
+      .hub-hero--safety-style .hub-eyebrow {
+        min-height: 28px;
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--imcro-color-border);
+        padding: 0 10px;
+        font-weight: 850;
+        letter-spacing: 0.06em;
+        margin-bottom: 0;
+      }
+      .hub-hero--safety-style h1 {
+        max-width: 900px;
+        margin: 0;
+        color: var(--imcro-color-text);
+        font-size: clamp(32px, 5vw, 58px);
+        line-height: 1.04;
+      }
+      .hub-hero--safety-style p {
+        max-width: 780px;
+        line-height: 1.66;
+        font-weight: 620;
+        overflow-wrap: anywhere;
+      }
       .hub-grid, .hub-news-grid, .methodika-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); justify-content: stretch; gap: 14px; margin-top: 18px; width: 100%; }
       .hub-link { display: grid; gap: 10px; min-height: 128px; color: inherit; text-decoration: none; padding: 18px; }
       .hub-link h3 { margin: 0; font-size: 20px; line-height: 1.2; }
@@ -61,6 +96,7 @@ function HubStyles() {
       @media (min-width: 720px) {
         .hub-shell { width: min(var(--imcro-container-max, 1280px), calc(100% - 96px)); padding-top: 46px; }
         .hub-hero { padding: 34px; }
+        .hub-hero--safety-style { padding: 34px; }
       }
       @media (max-width: 520px) {
         .hub-shell { width: min(100% - 24px, var(--imcro-container-max, 1280px)); }
@@ -92,12 +128,12 @@ function HubNewsList({ title, newsItems, onOpenArticle, onOpenAuthor }) {
   );
 }
 
-function HubSectionLayout({ title, lead, homePath, homeLabel, children, ...props }) {
+function HubSectionLayout({ title, lead, homePath, homeLabel, children, heroClassName = "", ...props }) {
   return (
     <HubShell {...props}>
       <div className="hub-shell">
         <Breadcrumbs items={[{ label: "Главная", to: "/" }, { label: homeLabel, to: homePath }, { label: title }]} />
-        <section className="hub-hero">
+        <section className={`hub-hero${heroClassName ? ` ${heroClassName}` : ""}`}>
           <span className="hub-eyebrow">{homeLabel}</span>
           <h1>{title}</h1>
           <p>{lead}</p>
@@ -252,7 +288,16 @@ export function DeyatelnostHomePage(props) {
 }
 
 export function DeyatelnostSectionPage({ section, ...props }) {
-  return <GenericHubSection {...props} homePath="/deyatelnost/" homeLabel="Деятельность" section={section} kind="deyatelnost" />;
+  return (
+    <GenericHubSection
+      {...props}
+      homePath="/deyatelnost/"
+      homeLabel="Деятельность"
+      section={section}
+      kind="deyatelnost"
+      heroClassName={section?.value === "muzey" ? "hub-hero--safety-style" : ""}
+    />
+  );
 }
 
 export function ArchivHomePage(props) {

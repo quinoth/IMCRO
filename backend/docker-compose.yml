@@ -28,20 +28,67 @@ services:
       PD_ENCRYPTION_KEY: ${PD_ENCRYPTION_KEY:-change-this-key-in-dev}
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
       ENABLE_DEV_TEST_USERS: "${ENABLE_DEV_TEST_USERS:-true}"
+      HF_HOME: /cache/huggingface
+      HF_HUB_CACHE: /cache/huggingface/hub
+      HF_HUB_DISABLE_XET: "1"
+      TRANSFORMERS_CACHE: /cache/huggingface/transformers
+      SENTENCE_TRANSFORMERS_HOME: /cache/huggingface/sentence-transformers
+      STATE_FILE: ${STATE_FILE:-/app/state/update_state.json}
+      GIGACHAT_CREDENTIALS: ${GIGACHAT_CREDENTIALS:-}
+      GIGACHAT_SCOPE: ${GIGACHAT_SCOPE:-GIGACHAT_API_PERS}
+      GIGACHAT_MODEL: ${GIGACHAT_MODEL:-GigaChat}
+      GIGACHAT_TIMEOUT_SECONDS: ${GIGACHAT_TIMEOUT_SECONDS:-30}
+      GIGACHAT_MAX_RETRIES: ${GIGACHAT_MAX_RETRIES:-1}
+      GIGACHAT_RETRY_BACKOFF_SECONDS: ${GIGACHAT_RETRY_BACKOFF_SECONDS:-0.5}
+      GIGACHAT_RETRY_STATUS_CODES: ${GIGACHAT_RETRY_STATUS_CODES:-429,500,502,503,504}
+      CHROMA_COLLECTION_NAME: ${CHROMA_COLLECTION_NAME:-eduirk}
+      UPDATE_INTERVAL_HOURS: ${UPDATE_INTERVAL_HOURS:-24}
+      ASSISTANT_QUESTION_MAX_LENGTH: ${ASSISTANT_QUESTION_MAX_LENGTH:-4000}
+      ASSISTANT_SESSION_TTL_SECONDS: ${ASSISTANT_SESSION_TTL_SECONDS:-10800}
+      ASSISTANT_HISTORY_MAX_MESSAGES: ${ASSISTANT_HISTORY_MAX_MESSAGES:-400}
+      ASSISTANT_RATE_LIMIT_WINDOW_SECONDS: ${ASSISTANT_RATE_LIMIT_WINDOW_SECONDS:-60}
+      ASSISTANT_RATE_LIMIT_MAX_REQUESTS: ${ASSISTANT_RATE_LIMIT_MAX_REQUESTS:-12}
+      ASSISTANT_SESSION_ID_MAX_LENGTH: ${ASSISTANT_SESSION_ID_MAX_LENGTH:-120}
+      ASSISTANT_HISTORY_LIMIT_MAX: ${ASSISTANT_HISTORY_LIMIT_MAX:-200}
+      ASSISTANT_SESSION_CLEANUP_INTERVAL_SECONDS: ${ASSISTANT_SESSION_CLEANUP_INTERVAL_SECONDS:-300}
+      ASSISTANT_MAX_SESSIONS: ${ASSISTANT_MAX_SESSIONS:-200}
+      ASSISTANT_RATE_LIMIT_MAX_ENTRIES: ${ASSISTANT_RATE_LIMIT_MAX_ENTRIES:-1000}
+      SITE_START_URL: ${SITE_START_URL:-https://mc.eduirk.ru/}
+      SITE_MAX_PAGES: ${SITE_MAX_PAGES:-2000}
+      SITE_CRAWL_DELAY: ${SITE_CRAWL_DELAY:-0.5}
+      SITE_CACHE_FILE: ${SITE_CACHE_FILE:-/app/chroma_gigachat/site_pages_cache.json}
+      YC_KEY_ID: ${YC_KEY_ID:-}
+      YC_SECRET_KEY: ${YC_SECRET_KEY:-}
+      YC_BUCKET: ${YC_BUCKET:-eduirk}
+      YC_PREFIX: ${YC_PREFIX:-}
+      S3_FILE_CACHE_DIR: ${S3_FILE_CACHE_DIR:-/app/s3_extracted/.cache/s3_documents}
+      CHUNK_SIZE: ${CHUNK_SIZE:-300}
+      CHUNK_OVERLAP: ${CHUNK_OVERLAP:-50}
+      OCR_LANG: ${OCR_LANG:-rus+eng}
+      OCR_DPI: ${OCR_DPI:-192}
     depends_on:
       db:
         condition: service_healthy
     command: >
-      sh -c "python -m alembic upgrade head &&
+      sh -c "alembic upgrade head &&
              uvicorn main:app --host 0.0.0.0 --port 8000"
     ports:
       - "8000:8000"
     volumes:
-      # Persistent certificate assets.
+      # Persistent assistant indexes, OCR cache, extracted source files, and generated assets.
+      - ./chroma_gigachat:/app/chroma_gigachat
+      - ./ocr_cache:/app/ocr_cache
+      - ./s3_extracted:/app/s3_extracted
+      - ./static/articles/covers:/app/static/articles/covers
+      - ./static/articles/attachments:/app/static/articles/attachments
       - ./static/certificates/backgrounds:/app/static/certificates/backgrounds
       - ./static/certificates/facsimiles:/app/static/certificates/facsimiles
       - ./static/certificates/generated:/app/static/certificates/generated
+      - assistant_state:/app/state
+      - hf_cache:/cache/huggingface
 
 volumes:
   pgdata:
     name: eduirk_backend_mky_pgdata
+  assistant_state:
+  hf_cache:

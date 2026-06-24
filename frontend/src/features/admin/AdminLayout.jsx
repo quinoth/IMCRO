@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const ICON_PATHS = {
   dashboard: "M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z",
   articles: "M6 3h12a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm3 5h6M9 12h6M9 16h4",
   issue: "M4 5h16v10H4V5Zm2 12h12M8 15v4m8-4v4",
   editor: "m5 17 4-4m0 0 6-6 2 2-6 6m-2-2 2 2M4 6l3-3 4 4-3 3L4 6Zm13 7 3 3-4 4-3-3",
+  chat: "M4 5a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H9l-5 4V5Zm5 3h6M9 11h4",
   users: "M16 11a4 4 0 1 0-8 0m8 0a4 4 0 1 1-8 0m8 0c2.2.5 4 2.1 4 4v1H4v-1c0-1.9 1.8-3.5 4-4",
   audit: "M5 4h14v16H5V4Zm4 4h6M9 12h6M9 16h4",
   settings: "M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0-5v3m0 12v3M4.2 4.2l2.1 2.1m11.4 11.4 2.1 2.1M3 12h3m12 0h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1",
@@ -71,6 +72,7 @@ function userRole(currentUser) {
 
 export default function AdminLayout({ modules, activeKey, title, subtitle, currentUser, children }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return window.localStorage.getItem("imcro-admin-sidebar-collapsed") === "1";
@@ -82,6 +84,14 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
   const displayTitle = title || activeModule?.label || "Админ-панель";
   const name = userName(currentUser);
   const shortName = shortUserName(currentUser, name);
+
+  const isChildActive = (path) => {
+    const [childPath, childHash = ""] = String(path || "").split("#");
+    const currentPath = location.pathname.replace(/\/+$/, "") || "/";
+    const targetPath = childPath.replace(/\/+$/, "") || "/";
+    if (currentPath !== targetPath) return false;
+    return childHash ? location.hash === `#${childHash}` : !location.hash;
+  };
 
   useEffect(() => {
     try {
@@ -230,6 +240,10 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           display: grid;
           gap: 8px;
         }
+        .admin-nav-item {
+          position: relative;
+          min-width: 0;
+        }
         .admin-nav-button {
           position: relative;
           width: 100%;
@@ -263,6 +277,82 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           background: var(--admin-primary);
           color: #fff;
           box-shadow: 0 10px 22px rgba(25, 120, 156, .26);
+        }
+        .admin-nav-chevron {
+          width: 7px;
+          height: 7px;
+          border-right: 2px solid currentColor;
+          border-bottom: 2px solid currentColor;
+          transform: rotate(-45deg);
+          opacity: .65;
+          margin-left: auto;
+          flex: 0 0 auto;
+        }
+        .admin-shell.is-collapsed .admin-nav-chevron {
+          display: none;
+        }
+        .admin-subnav {
+          position: absolute;
+          left: calc(100% + 10px);
+          top: 0;
+          z-index: 60;
+          width: 220px;
+          display: grid;
+          gap: 6px;
+          padding: 8px;
+          border: 1px solid var(--admin-border);
+          border-radius: var(--admin-radius-md);
+          background: #fff;
+          box-shadow: 0 18px 42px rgba(15, 23, 42, .16);
+          opacity: 0;
+          visibility: hidden;
+          pointer-events: none;
+          transform: translateX(-6px);
+          transition: opacity .16s ease, transform .16s ease, visibility .16s ease;
+        }
+        .admin-subnav::before {
+          content: "";
+          position: absolute;
+          left: -12px;
+          top: 0;
+          width: 12px;
+          height: 100%;
+        }
+        .admin-nav-item.has-children:hover .admin-subnav,
+        .admin-nav-item.has-children:focus-within .admin-subnav {
+          opacity: 1;
+          visibility: visible;
+          pointer-events: auto;
+          transform: translateX(0);
+        }
+        .admin-nav-item.has-children .admin-nav-button[data-tooltip]::after {
+          display: none;
+        }
+        .admin-subnav-button {
+          min-height: 38px;
+          width: 100%;
+          border: 1px solid transparent;
+          border-radius: var(--admin-radius-sm);
+          background: transparent;
+          color: #24323a;
+          padding: 0 11px;
+          font: inherit;
+          font-size: 13px;
+          font-weight: 800;
+          text-align: left;
+          cursor: pointer;
+        }
+        .admin-subnav-button:hover,
+        .admin-subnav-button:focus-visible {
+          outline: none;
+          border-color: #c7dce4;
+          background: #edf5f8;
+          color: var(--admin-primary-dark);
+        }
+        .admin-subnav-button.is-active {
+          border-color: var(--admin-primary);
+          background: var(--admin-primary);
+          color: #fff;
         }
         .admin-shell-icon {
           width: 23px;
@@ -325,6 +415,7 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
         }
         .admin-shell.is-collapsed .admin-sidebar-user {
           justify-content: center;
+          gap: 0;
         }
         .admin-avatar {
           width: 36px;
@@ -349,8 +440,13 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           stroke-linejoin: round;
           flex-shrink: 0;
         }
-        .admin-sidebar-user strong,
-        .admin-sidebar-user span {
+        .admin-sidebar-user .admin-avatar {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .admin-sidebar-user > div > strong,
+        .admin-sidebar-user > div > span {
           display: block;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -543,6 +639,10 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
           .admin-nav {
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
           }
+          .admin-subnav {
+            left: 0;
+            top: calc(100% + 6px);
+          }
           .admin-shell.is-collapsed .admin-nav-button {
             justify-content: flex-start;
             padding: 0 14px;
@@ -593,19 +693,39 @@ export default function AdminLayout({ modules, activeKey, title, subtitle, curre
         </div>
 
         <nav className="admin-nav">
-          {modules.map((module) => (
-            <button
-              key={module.key}
-              type="button"
-              className={`admin-nav-button${activeKey === module.key ? " is-active" : ""}`}
-              onClick={() => navigate(module.path)}
-              data-tooltip={module.label}
-              title={collapsed ? module.label : undefined}
-            >
-              <AdminIcon name={module.icon} />
-              <span>{module.label}</span>
-            </button>
-          ))}
+          {modules.map((module) => {
+            const hasChildren = Array.isArray(module.children) && module.children.length > 0;
+            return (
+              <div key={module.key} className={`admin-nav-item${hasChildren ? " has-children" : ""}`}>
+                <button
+                  type="button"
+                  className={`admin-nav-button${activeKey === module.key ? " is-active" : ""}`}
+                  onClick={() => navigate(module.path)}
+                  data-tooltip={module.label}
+                  title={collapsed && !hasChildren ? module.label : undefined}
+                >
+                  <AdminIcon name={module.icon} />
+                  <span>{module.label}</span>
+                  {hasChildren && <i className="admin-nav-chevron" aria-hidden="true" />}
+                </button>
+                {hasChildren && (
+                  <div className="admin-subnav" role="menu" aria-label={`${module.label}: подразделы`}>
+                    {module.children.map((child) => (
+                      <button
+                        key={child.key}
+                        type="button"
+                        role="menuitem"
+                        className={`admin-subnav-button${isChildActive(child.path) ? " is-active" : ""}`}
+                        onClick={() => navigate(child.path)}
+                      >
+                        {child.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="admin-sidebar-user" title={name}>

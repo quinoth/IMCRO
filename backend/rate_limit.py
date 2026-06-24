@@ -16,6 +16,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 SENSITIVE_METHODS = ("POST", "PUT", "PATCH", "DELETE")
 
 
+def _normalize_path(path: str) -> str:
+    clean = "/" + str(path or "").strip().lstrip("/")
+    return clean.rstrip("/") or "/"
+
+
 @dataclass(frozen=True)
 class RateLimitRule:
     name: str
@@ -25,14 +30,35 @@ class RateLimitRule:
     exact_paths: tuple[str, ...] = ()
     prefixes: tuple[str, ...] = ()
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "methods", _normalize_methods(self.methods))
+        object.__setattr__(
+            self,
+            "exact_paths",
+            tuple(_normalize_path(path) for path in self.exact_paths),
+        )
+        object.__setattr__(
+            self,
+            "prefixes",
+            tuple(_normalize_path(prefix) for prefix in self.prefixes),
+        )
+
     def matches(self, method: str, path: str) -> bool:
-        if self.methods is not None and method.upper() not in {item.upper() for item in self.methods}:
+        return self.matches_normalized(method.upper(), _normalize_path(path))
+
+    def matches_normalized(self, method: str, normalized_path: str) -> bool:
+        if self.methods is not None and method not in self.methods:
             return False
 
-        normalized_path = _normalize_path(path)
-        if any(_same_path(normalized_path, exact_path) for exact_path in self.exact_paths):
+        if normalized_path in self.exact_paths:
             return True
-        return any(normalized_path.startswith(_normalize_path(prefix)) for prefix in self.prefixes)
+        return any(normalized_path.startswith(prefix) for prefix in self.prefixes)
+
+
+def _normalize_methods(methods: tuple[str, ...] | None) -> tuple[str, ...] | None:
+    if methods is None:
+        return None
+    return tuple(dict.fromkeys(str(method).upper() for method in methods))
 
 
 DEFAULT_RATE_LIMIT_RULES: tuple[RateLimitRule, ...] = (
@@ -101,8 +127,10 @@ def find_rate_limit_rule(
     path: str,
     rules: Iterable[RateLimitRule] = DEFAULT_RATE_LIMIT_RULES,
 ) -> RateLimitRule | None:
+    normalized_method = method.upper()
+    normalized_path = _normalize_path(path)
     for rule in rules:
-        if rule.matches(method, path):
+        if rule.matches_normalized(normalized_method, normalized_path):
             return rule
     return None
 
@@ -120,7 +148,12 @@ class InMemoryRateLimiter:
         self._max_window = max((rule.window_seconds for rule in self.rules), default=60)
         self._next_cleanup_at = 0.0
 
-    def hit(self, rule: RateLimitRule, identity: str, now: float | None = None) -> tuple[bool, int, int]:
+    def hit(
+        self,
+        rule: RateLimitRule,
+        identity: str,
+        now: float | None = None,
+    ) -> tuple[bool, int, int]:
         now = time.monotonic() if now is None else now
         key = f"{rule.name}:{identity}"
         cutoff = now - rule.window_seconds
@@ -176,7 +209,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not allowed:
             return JSONResponse(
                 status_code=429,
-                content={"detail": "Слишком много запросов. Попробуйте позже."},
+                content={
+                    "detail": "Слишком много запросов. Попробуйте позже.",
+                },
                 headers={
                     "Retry-After": str(retry_after),
                     "X-RateLimit-Limit": str(rule.limit),
@@ -204,12 +239,3 @@ def _client_identity(request: Request) -> str:
     if request.client and request.client.host:
         return request.client.host
     return "unknown"
-
-
-def _normalize_path(path: str) -> str:
-    clean = "/" + str(path or "").strip().lstrip("/")
-    return clean.rstrip("/") or "/"
-
-
-def _same_path(left: str, right: str) -> bool:
-    return _normalize_path(left) == _normalize_path(right)

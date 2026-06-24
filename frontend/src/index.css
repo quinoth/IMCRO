@@ -134,36 +134,69 @@ button {
 }
 
 .safety-page__card {
+  position: relative;
+  min-width: 0;
   display: grid;
-  gap: 12px;
-  padding: clamp(24px, 4vw, 42px);
+  gap: 16px;
+  padding: 26px 18px;
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, var(--imcro-color-surface), rgba(255, 255, 255, 0.96)),
+    repeating-linear-gradient(90deg, rgba(31, 80, 115, 0.055) 0 1px, transparent 1px 92px);
+  box-shadow: var(--imcro-shadow-card);
 }
 
 .safety-page__eyebrow {
   width: fit-content;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--imcro-color-border);
   border-radius: 999px;
   background: rgba(31, 80, 115, 0.08);
   color: var(--imcro-color-primary);
-  padding: 7px 11px;
+  padding: 0 10px;
   font-size: 12px;
   font-weight: 850;
+  letter-spacing: 0.06em;
   line-height: 1;
+  text-transform: uppercase;
 }
 
 .safety-page__card h1 {
+  max-width: 900px;
   margin: 0;
-  color: var(--imcro-color-primary);
-  font-size: clamp(32px, 4vw, 48px);
-  line-height: 1.12;
+  color: var(--imcro-color-text);
+  font-size: clamp(32px, 5vw, 58px);
+  line-height: 1.04;
+  letter-spacing: 0;
 }
 
 .safety-page__card p {
-  max-width: 720px;
+  max-width: 780px;
   margin: 0;
   color: var(--imcro-color-text-muted);
-  font-size: 17px;
-  font-weight: 650;
-  line-height: 1.6;
+  font-size: 16px;
+  font-weight: 620;
+  line-height: 1.66;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 720px) {
+  .safety-page__card {
+    padding: 34px;
+  }
+}
+
+@media (max-width: 719px) {
+  .safety-page__card {
+    padding: 22px 16px;
+  }
+
+  .safety-page__card h1,
+  .safety-page__card p {
+    max-width: 100%;
+  }
 }
 
 .imcro-grid-3,
@@ -1149,6 +1182,11 @@ body.mky-a11y-mode[data-a11y-reduce-motion="true"] *::after {
 .tz-page .app-breadcrumbs,
 .tpmpk-page .app-breadcrumbs {
   color: rgba(255, 255, 255, 0.82);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  font-weight: 850;
+  letter-spacing: 0;
+  line-height: normal;
 }
 
 .imcro-public-page .app-breadcrumbs a,

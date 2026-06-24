@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import os
+
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
-from sqlalchemy.exc import ArgumentError, SQLAlchemyError
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
-from dotenv import load_dotenv
-import os
+from sqlalchemy.exc import ArgumentError
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Load local environment variables when a developer has a private .env file.
 load_dotenv()

@@ -1,30 +1,69 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from datetime import datetime
 from typing import Any, Optional, List, Dict
+
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+
+
+def _normalize_email_value(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    return normalized or None
+
+
+def _reject_surrounding_password_whitespace(value: str | None) -> str | None:
+    if value is None:
+        return None
+    if value != value.strip():
+        raise ValueError("password must not start or end with whitespace")
+    return value
 
 
 # ====================== Аутентификация ======================
 class UserCreate(BaseModel):
     email: EmailStr
-    username: Optional[str] = Field(None, min_length=2, max_length=100)
     last_name: Optional[str] = Field(None, max_length=100)
     first_name: Optional[str] = Field(None, max_length=100)
     middle_name: Optional[str] = Field(None, max_length=100)
-    password: str
+    password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def _normalize_email(cls, value: str) -> str:
+        return _normalize_email_value(value) or ""
+
+    @field_validator("password")
+    @classmethod
+    def _validate_password(cls, value: str) -> str:
+        value = _reject_surrounding_password_whitespace(value) or ""
+        if not any(char.isalpha() for char in value):
+            raise ValueError("password must contain at least one letter")
+        if not any(char.isdigit() for char in value):
+            raise ValueError("password must contain at least one digit")
+        return value
 
 
 class UserAdminCreate(BaseModel):
     email: EmailStr
-    username: Optional[str] = Field(None, min_length=2, max_length=100)
     last_name: Optional[str] = Field(None, max_length=100)
     first_name: Optional[str] = Field(None, max_length=100)
     middle_name: Optional[str] = Field(None, max_length=100)
-    password: str = Field(..., min_length=6)
+    password: str = Field(..., min_length=6, max_length=128)
     role: Optional[str] = Field("user", max_length=50)
     is_active: bool = True
     allowed_methodika_subjects: List[str] = Field(default_factory=list)
+
+    @field_validator("email")
+    @classmethod
+    def _normalize_email(cls, value: str) -> str:
+        return _normalize_email_value(value) or ""
+
+    @field_validator("password")
+    @classmethod
+    def _validate_password(cls, value: str) -> str:
+        return _reject_surrounding_password_whitespace(value) or ""
 
     @field_validator("role")
     @classmethod
@@ -34,14 +73,23 @@ class UserAdminCreate(BaseModel):
 
 class UserAdminUpdate(BaseModel):
     email: Optional[EmailStr] = None
-    username: Optional[str] = Field(None, min_length=2, max_length=100)
     last_name: Optional[str] = Field(None, max_length=100)
     first_name: Optional[str] = Field(None, max_length=100)
     middle_name: Optional[str] = Field(None, max_length=100)
-    password: Optional[str] = Field(None, min_length=6)
+    password: Optional[str] = Field(None, min_length=6, max_length=128)
     role: Optional[str] = Field(None, max_length=50)
     is_active: Optional[bool] = None
     allowed_methodika_subjects: Optional[List[str]] = None
+
+    @field_validator("email")
+    @classmethod
+    def _normalize_email(cls, value: str | None) -> str | None:
+        return _normalize_email_value(value)
+
+    @field_validator("password")
+    @classmethod
+    def _validate_password(cls, value: str | None) -> str | None:
+        return _reject_surrounding_password_whitespace(value)
 
     @field_validator("role")
     @classmethod
@@ -91,12 +139,13 @@ class RolePermissionsUpdate(BaseModel):
 class UserResponse(BaseModel):
     id: int
     email: str
-    username: Optional[str] = None
     last_name: Optional[str] = None
     first_name: Optional[str] = None
     middle_name: Optional[str] = None
+    created_at: Optional[datetime] = None
     is_active: bool
     role: str = "user"
+    can_access_internal_docs: bool = False
     permissions: Dict[str, str] = Field(default_factory=dict)
     allowed_methodika_subjects: List[str] = Field(default_factory=list)
 
@@ -114,14 +163,24 @@ class UserResponse(BaseModel):
     def _normalize_allowed_subjects(cls, value):
         return value or []
 
+    @field_validator("can_access_internal_docs", mode="before")
+    @classmethod
+    def _normalize_internal_docs_access(cls, value):
+        return bool(value)
+
     model_config = {"from_attributes": True}
 
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
     role: Optional[str] = None
     user: Optional[UserResponse] = None
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(..., min_length=1)
 
 
 class TokenData(BaseModel):
@@ -137,11 +196,16 @@ class AppointmentCreate(BaseModel):
 
 class AppointmentResponse(BaseModel):
     id: int
+    user_id: Optional[int] = None
+    user_email: Optional[str] = None
     full_name: str
     appointment_date: str
     appointment_time: str
     comment: Optional[str]
+    status: str = "new"
+    source: str = "site"
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -280,6 +344,7 @@ class ArticleResponse(ArticleBase):
 
 
 class ArticleListResponse(BaseModel):
+    title: Optional[str] = None
     items: List[ArticleResponse]
 
 

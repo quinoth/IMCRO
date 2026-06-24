@@ -28,6 +28,7 @@ dev.db
 *.sqlite
 *.sqlite3
 backups
+.assistant_data_backup_*
 *.dump
 
 cache
@@ -38,7 +39,12 @@ s3_extracted
 media
 uploads
 static/articles/attachments
+static/articles/covers
 static/certificates/backgrounds
 static/certificates/facsimiles
 static/certificates/generated
 static/fonts/custom
+
+tmp_docx_render
+docx_work
+.codex-doc-review
