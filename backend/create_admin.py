@@ -8,16 +8,17 @@ from getpass import getpass
 
 from sqlalchemy import inspect, text
 
-from auth import hash_password
+from auth import hash_password, normalize_email
 from database import Base, SessionLocal, engine
 from models import User, UserRole
+from permissions import default_permissions_for_role, normalize_role_permissions
 
-LOGIN = os.getenv("ADMIN_EMAIL", "admin@example.local")
+LOGIN = normalize_email(os.getenv("ADMIN_EMAIL", "admin@example.local"))
 LAST_NAME = os.getenv("ADMIN_LAST_NAME", "Администратор")
 FIRST_NAME = os.getenv("ADMIN_FIRST_NAME", "МКУ")
 MIDDLE_NAME = os.getenv("ADMIN_MIDDLE_NAME", "ИМЦРО")
 PASSWORD = os.getenv("ADMIN_PASSWORD")
-ROLE = os.getenv("ADMIN_ROLE", "admin")
+ROLE = str(os.getenv("ADMIN_ROLE", "admin") or "admin").strip().lower() or "admin"
 
 
 def resolve_admin_password() -> str:
@@ -71,12 +72,18 @@ def main() -> None:
     try:
         role = db.query(UserRole).filter_by(role_name=ROLE).first()
         if not role:
-            role = UserRole(role_name=ROLE)
+            role = UserRole(
+                role_name=ROLE,
+                permissions=default_permissions_for_role(ROLE),
+            )
             db.add(role)
             db.commit()
             db.refresh(role)
             print(f"Created role: {role.role_name} (id={role.id})")
         else:
+            role.permissions = normalize_role_permissions(role.permissions, role.role_name)
+            db.commit()
+            db.refresh(role)
             print(f"Role already exists: {role.role_name} (id={role.id})")
 
         user = db.query(User).filter_by(email=LOGIN).first()

@@ -53,6 +53,19 @@ def _env(name: str, default: str | None = None, *aliases: str) -> str | None:
     return default
 
 
+def _int_env(name: str, default: int, *, minimum: int = 0) -> int:
+    raw = _clean_env_value(name, os.getenv(name))
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise DatabaseConfigurationError(f"{name} must be an integer.") from exc
+    if value < minimum:
+        raise DatabaseConfigurationError(f"{name} must be at least {minimum}.")
+    return value
+
+
 def validate_database_url(value: str | None) -> str:
     url = _clean_env_value("DATABASE_URL", value)
     if not url:
@@ -160,11 +173,24 @@ def raise_friendly_database_error(exc: BaseException) -> None:
 
 DATABASE_URL = get_database_url()
 
-engine = create_engine(
-    DATABASE_URL,
-    echo=False,
-    pool_pre_ping=True,
-)
+
+def _engine_options(url: str) -> dict[str, object]:
+    options: dict[str, object] = {
+        "echo": False,
+        "pool_pre_ping": True,
+    }
+    parsed = make_url(url)
+    if parsed.drivername.startswith("postgresql"):
+        options.update(
+            pool_size=_int_env("DB_POOL_SIZE", 5, minimum=1),
+            max_overflow=_int_env("DB_MAX_OVERFLOW", 5),
+            pool_timeout=_int_env("DB_POOL_TIMEOUT_SECONDS", 30, minimum=1),
+            pool_recycle=_int_env("DB_POOL_RECYCLE_SECONDS", 1800, minimum=1),
+        )
+    return options
+
+
+engine = create_engine(DATABASE_URL, **_engine_options(DATABASE_URL))
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

@@ -203,9 +203,10 @@ def smart_404_suggestions(request_url: str, db: Session | None = None, limit: in
 
 
 def _cors_origins_from_env() -> list[str]:
-    raw_origins = os.getenv(
-        "CORS_ALLOWED_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000",
+    raw_origins = (
+        os.getenv("CORS_ALLOWED_ORIGINS")
+        or os.getenv("CORS_ORIGINS")
+        or "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
     )
     return [origin.strip().rstrip("/") for origin in raw_origins.split(",") if origin.strip()]
 
