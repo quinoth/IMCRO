@@ -202,13 +202,19 @@ def smart_404_suggestions(request_url: str, db: Session | None = None, limit: in
     return _rank_site_pages(path, limit)
 
 
+DEFAULT_CORS_ALLOWED_ORIGINS = [
+    "https://imcro.onrender.com",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+
 def _cors_origins_from_env() -> list[str]:
-    raw_origins = (
-        os.getenv("CORS_ALLOWED_ORIGINS")
-        or os.getenv("CORS_ORIGINS")
-        or "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
-    )
-    return [origin.strip().rstrip("/") for origin in raw_origins.split(",") if origin.strip()]
+    raw_origins = os.getenv("CORS_ALLOWED_ORIGINS") or os.getenv("CORS_ORIGINS") or ""
+    configured_origins = [origin.strip().rstrip("/") for origin in raw_origins.split(",") if origin.strip()]
+    return list(dict.fromkeys([*DEFAULT_CORS_ALLOWED_ORIGINS, *configured_origins]))
 
 # ── Планировщик (глобальный, чтобы была ссылка) ───────────────────────────────
 _scheduler: Any | None = None
