@@ -7,7 +7,12 @@ from sqlalchemy.orm import Session
 from auth import hash_password, normalize_email
 from database import get_db
 from models import User, UserRole
-from permissions import normalize_role_permissions, require_admin_user
+from permissions import (
+    DEFAULT_ROLE_PERMISSIONS,
+    default_permissions_for_role,
+    normalize_role_permissions,
+    require_admin_user,
+)
 from schemas import RolePermissionsUpdate, RoleResponse, UserAdminCreate, UserAdminUpdate, UserResponse
 
 router = APIRouter(
@@ -26,10 +31,37 @@ def _role_or_400(db: Session, role_name: str | None) -> UserRole | None:
     normalized = _normalize_role_name(role_name)
     if normalized is None:
         return None
+    _ensure_default_roles(db)
     role = db.query(UserRole).filter(UserRole.role_name == normalized).first()
     if not role:
         raise HTTPException(status_code=400, detail="Role not found")
     return role
+
+
+def _ensure_default_roles(db: Session) -> bool:
+    changed = False
+    existing_roles = {
+        role.role_name: role
+        for role in db.query(UserRole)
+        .filter(UserRole.role_name.in_(tuple(DEFAULT_ROLE_PERMISSIONS)))
+        .all()
+    }
+
+    for role_name in DEFAULT_ROLE_PERMISSIONS:
+        role = existing_roles.get(role_name)
+        if role is None:
+            db.add(UserRole(role_name=role_name, permissions=default_permissions_for_role(role_name)))
+            changed = True
+            continue
+
+        normalized_permissions = normalize_role_permissions(role.permissions, role.role_name)
+        if role.permissions != normalized_permissions:
+            role.permissions = normalized_permissions
+            changed = True
+
+    if changed:
+        db.flush()
+    return changed
 
 
 def _ensure_unique_user_identity(
@@ -59,6 +91,8 @@ def get_all_users(db: Session = Depends(get_db)):
 
 @router.get("/roles/", response_model=List[RoleResponse])
 def get_all_roles(db: Session = Depends(get_db)):
+    if _ensure_default_roles(db):
+        db.commit()
     roles = db.query(UserRole).order_by(UserRole.role_name.asc()).all()
     for role in roles:
         role.permissions = normalize_role_permissions(role.permissions, role.role_name)

@@ -49,6 +49,7 @@ def test_access_and_refresh_tokens_have_distinct_types():
 
 def test_invalid_password_hash_is_rejected_without_error():
     assert verify_password("secret", "not-a-valid-bcrypt-hash") is False
+    assert verify_password("secret", None) is False
 
 
 def _auth_session():

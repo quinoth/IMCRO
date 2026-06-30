@@ -1,19 +1,15 @@
 /** Базовый URL бэкенда.
  *
- * В production-сборке (Docker + Nginx) переменная VITE_API_URL должна быть
- * пустой или не задана — тогда API_BASE = "" и все запросы идут на тот же
- * origin через Nginx, который проксирует их на backend:8000.
- *
- * Для локальной разработки (npm run dev) по умолчанию используется
- * http://localhost:8000. Для другого адреса задайте в .env файле:
+ * По умолчанию фронтенд подключается к Render backend.
+ * Для локального или другого окружения можно переопределить адрес:
  *   VITE_API_URL=http://localhost:8000
  */
+const DEFAULT_API_BASE = "https://eduirk-backend.onrender.com";
+
 export const API_BASE =
   typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL
     ? import.meta.env.VITE_API_URL.replace(/\/$/, "")
-    : typeof import.meta !== "undefined" && import.meta.env?.DEV
-      ? "http://localhost:8000"
-      : "";
+    : DEFAULT_API_BASE;
 
 export const NAV = [
   {

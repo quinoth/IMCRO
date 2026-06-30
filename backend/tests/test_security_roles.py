@@ -89,7 +89,9 @@ def test_users_api_lists_roles_and_updates_role_and_activity():
 
     roles = client.get("/users/roles/")
     assert roles.status_code == 200
-    assert {item["role_name"] for item in roles.json()} == {"user", "methodist"}
+    role_names = {item["role_name"] for item in roles.json()}
+    assert {"user", "methodist"}.issubset(role_names)
+    assert {"admin", "domu_editor"}.issubset(role_names)
     methodist_role_payload = next(item for item in roles.json() if item["role_name"] == "methodist")
     assert methodist_role_payload["permissions"]["articles"] == "edit"
 

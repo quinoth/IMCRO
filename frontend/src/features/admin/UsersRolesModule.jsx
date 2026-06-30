@@ -6,7 +6,6 @@ import { authHeaders } from "../../utils/authHeaders.js";
 const emptyForm = {
   id: null,
   email: "",
-  username: "",
   last_name: "",
   first_name: "",
   middle_name: "",
@@ -26,6 +25,12 @@ const ROLE_META = {
   domu_editor: { accent: "#19789c", description: "Публикации раздела «Дом учителя»" },
   user: { accent: "#64748b", description: "Базовая роль пользователя" },
 };
+
+const FALLBACK_ROLES = ROLE_ORDER.map((roleName) => ({
+  id: `fallback-${roleName}`,
+  role_name: roleName,
+  permissions: DEFAULT_ROLE_PERMISSIONS[roleName] || DEFAULT_ROLE_PERMISSIONS.user,
+}));
 
 const MODULE_DEFINITIONS = [
   { key: "articles", label: "Статьи", description: "Материалы публичных разделов" },
@@ -85,7 +90,7 @@ function roleName(user) {
 }
 
 function initials(user) {
-  const source = userDisplayName(user) || user?.username || user?.email || "?";
+  const source = userDisplayName(user) || user?.email || "?";
   const parts = String(source).replace(/@.+$/, "").split(/[._\s-]+/).filter(Boolean);
   if (parts.length > 1) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
   return String(source).slice(0, 2).toUpperCase();
@@ -97,11 +102,11 @@ function userDisplayName(user) {
     user?.first_name || user?.firstName,
     user?.middle_name || user?.middleName,
   ].filter(Boolean).join(" ");
-  return user?.full_name || user?.fullName || fio || user?.username || user?.email || `Пользователь #${user?.id || ""}`;
+  return user?.full_name || user?.fullName || fio || user?.email || `Пользователь #${user?.id || ""}`;
 }
 
 function userSecondaryLine(user) {
-  return [user?.username, user?.email].filter(Boolean).join(" · ") || "Контакты не указаны";
+  return user?.email || "Контакты не указаны";
 }
 
 function accessSummary(permissions) {
@@ -165,7 +170,7 @@ export default function UsersRolesModule({ currentUser }) {
       return users
         .filter((user) => {
           if (query) {
-            const haystack = `${userDisplayName(user)} ${userSecondaryLine(user)} ${user?.username || ""} ${user?.email || ""}`.toLowerCase();
+            const haystack = `${userDisplayName(user)} ${userSecondaryLine(user)} ${user?.email || ""}`.toLowerCase();
             if (!haystack.includes(query)) return false;
           }
           if (roleFilter !== "all" && roleName(user) !== roleFilter) return false;
@@ -183,7 +188,7 @@ export default function UsersRolesModule({ currentUser }) {
   );
   const pageCount = Math.max(1, Math.ceil(sortedUsers.length / pageSize));
   const pagedUsers = sortedUsers.slice((page - 1) * pageSize, page * pageSize);
-  const sortedRoles = useMemo(() => sortRoles(roles), [roles]);
+  const sortedRoles = useMemo(() => sortRoles(roles.length ? roles : FALLBACK_ROLES), [roles]);
   const selectedRoleData = useMemo(
     () => sortedRoles.find((role) => role.role_name === selectedRole) || null,
     [selectedRole, sortedRoles],
@@ -304,7 +309,6 @@ export default function UsersRolesModule({ currentUser }) {
     setForm({
       id: user.id,
       email: user.email || "",
-      username: user.username || "",
       last_name: user.last_name || user.lastName || "",
       first_name: user.first_name || user.firstName || "",
       middle_name: user.middle_name || user.middleName || "",
@@ -334,7 +338,6 @@ export default function UsersRolesModule({ currentUser }) {
         ? { role: form.role }
         : {
             email: form.email.trim(),
-            username: form.username.trim() || undefined,
             last_name: form.last_name.trim() || undefined,
             first_name: form.first_name.trim() || undefined,
             middle_name: form.middle_name.trim() || undefined,
@@ -767,7 +770,7 @@ export default function UsersRolesModule({ currentUser }) {
                   <div className="ur-readonly-user">
                     <div className="ur-readonly-item">
                       <span>Пользователь</span>
-                      <strong>{form.username || "Без имени"}</strong>
+                      <strong>{[form.last_name, form.first_name, form.middle_name].filter(Boolean).join(" ") || form.email}</strong>
                     </div>
                     <div className="ur-readonly-item">
                       <span>Email</span>
@@ -783,10 +786,6 @@ export default function UsersRolesModule({ currentUser }) {
                     <label className="ur-field">
                       <span className="ur-label">Email</span>
                       <input className="ur-input" type="email" value={form.email} onChange={(event) => updateForm("email", event.target.value)} required />
-                    </label>
-                    <label className="ur-field">
-                      <span className="ur-label">Имя пользователя</span>
-                      <input className="ur-input" value={form.username} onChange={(event) => updateForm("username", event.target.value)} placeholder="Например, ivanov_ai" />
                     </label>
                     <label className="ur-field">
                       <span className="ur-label">Фамилия</span>

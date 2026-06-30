@@ -622,6 +622,21 @@ def _token_response(db: Session, user: User) -> Token:
     )
 
 
+def _password_matches_or_upgrade(db: Session, user: User, plain_password: str) -> bool:
+    password_hash = getattr(user, "password_hash", None)
+    if verify_password(plain_password, password_hash):
+        return True
+
+    if isinstance(password_hash, str) and password_hash == plain_password:
+        user.password_hash = hash_password(plain_password)
+        db.commit()
+        db.refresh(user)
+        logger.warning("Upgraded legacy plaintext password hash for user id=%s", user.id)
+        return True
+
+    return False
+
+
 @app.post("/auth/register", response_model=UserResponse, status_code=201)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
     email = normalize_email(user_data.email)
@@ -653,7 +668,7 @@ def login(
     db: Session = Depends(get_db),
 ):
     user = get_user_by_email(db, form_data.username)
-    if not user or not verify_password(form_data.password, user.password_hash):
+    if not user or not _password_matches_or_upgrade(db, user, form_data.password):
         raise HTTPException(
             status_code=401,
             detail="Неверный логин или пароль",
