@@ -949,7 +949,8 @@ function AlignControl({ value = "left", onChange }) {
 function BlockPreview({ block }) {
   if (block.type === "heading") {
     const Tag = `h${Math.min(Math.max(Number(block.data.level || 2), 1), 3)}`;
-    return <Tag className="preview-heading" style={{ textAlign: block.data.align || "left" }}>{block.data.text || "Заголовок"}</Tag>;
+    const text = String(block.data.text || "").trim();
+    return text ? <Tag className="preview-heading" style={{ textAlign: block.data.align || "left" }}>{text}</Tag> : null;
   }
   if (block.type === "paragraph") return <div className="preview-paragraph" style={{ textAlign: block.data.align || "left" }} dangerouslySetInnerHTML={{ __html: block.data.html || "" }} />;
   if (block.type === "quote") {
@@ -1030,7 +1031,7 @@ function BlockEditor({ block, onChange, onRemove, onMove, index, count, uploadIm
                 <option value={2}>H2</option>
                 <option value={3}>H3</option>
               </select>
-              <input value={block.data.text || ""} onChange={(event) => updateData({ text: event.target.value })} placeholder="Заголовок раздела" />
+              <input value={block.data.text || ""} onChange={(event) => updateData({ text: event.target.value })} />
             </div>
           </>
         )}
@@ -1715,7 +1716,6 @@ function ArticleForm({
                   onChange={(event) => updateTitle(event.target.value)}
                   onBlur={() => markTouched("title")}
                   aria-invalid={Boolean(titleError)}
-                  placeholder="Введите заголовок статьи"
                 />
                 <p className="article-field-hint">Например: «Городской семинар для педагогов»</p>
                 {titleError && <div className="article-field-error">{titleError}</div>}

@@ -335,13 +335,32 @@
 }
 
 .sv-sidebar-links {
+  position: relative;
   display: grid;
   gap: 7px;
 }
 
+.sv-sidebar-active-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none;
+  border: 1px solid var(--sv-border);
+  border-radius: 10px;
+  background: var(--sv-soft);
+  opacity: 0;
+  will-change: transform, width, height;
+  transition:
+    transform 0.68s cubic-bezier(0.16, 1, 0.3, 1),
+    width 0.68s cubic-bezier(0.16, 1, 0.3, 1),
+    height 0.68s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.28s ease;
+}
+
 .sv-sidebar-link {
   position: relative;
-  overflow: hidden;
+  z-index: 1;
   min-height: 42px;
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
@@ -352,28 +371,11 @@
   border-radius: 10px;
   color: var(--sv-muted);
   text-decoration: none;
-  isolation: isolate;
-  will-change: transform;
+  background: transparent;
   transition:
-    border-color 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
-    color 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
-    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.sv-sidebar-link::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: var(--sv-soft);
-  opacity: 0;
-  transform: scaleX(0.94);
-  transform-origin: left center;
-  transition:
-    opacity 0.34s cubic-bezier(0.2, 0.8, 0.2, 1),
-    transform 0.34s cubic-bezier(0.2, 0.8, 0.2, 1);
+    border-color 0.58s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.58s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.58s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sv-sidebar-link span {
@@ -384,16 +386,14 @@
   background: var(--sv-soft);
   border-color: var(--sv-border);
   transition:
-    color 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
-    background-color 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
-    border-color 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
-    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+    color 0.58s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.58s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.58s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sv-sidebar-link .sv-icon {
   width: 15px;
   height: 15px;
-  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .sv-sidebar-link strong {
@@ -401,38 +401,20 @@
   font-size: 12.5px;
   font-weight: 780;
   line-height: 1.25;
-  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .sv-sidebar-link:hover,
 .sv-sidebar-link.active {
-  border-color: var(--sv-border);
+  border-color: transparent;
   color: var(--sv-primary);
 }
 
-.sv-sidebar-link:hover::before,
-.sv-sidebar-link.active::before {
-  opacity: 1;
-  transform: scaleX(1);
-}
-
 .sv-sidebar-link:hover {
-  transform: translateX(3px);
+  background: rgba(31, 80, 115, 0.045);
 }
 
-.sv-sidebar-link:hover span,
-.sv-sidebar-link.active span {
-  transform: scale(1.03);
-}
-
-.sv-sidebar-link:hover .sv-icon,
-.sv-sidebar-link.active .sv-icon {
-  transform: scale(1.05);
-}
-
-.sv-sidebar-link:hover strong,
-.sv-sidebar-link.active strong {
-  transform: translateX(1px);
+.sv-sidebar-link.active {
+  background: transparent;
 }
 
 .sv-sidebar-link.active span {
@@ -1481,7 +1463,7 @@
   }
 
   .sv-sidebar-link:hover {
-    transform: translateY(-1px);
+    transform: translateY(0);
   }
 }
 

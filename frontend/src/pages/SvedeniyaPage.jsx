@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import Footer from "../components/Footer.jsx";
 import Header from "../features/nav/Header.jsx";
 import Breadcrumbs from "../components/Breadcrumbs.jsx";
@@ -578,11 +578,13 @@ function Section({ section }) {
 
 export default function SvedeniyaPage({ currentUser, onGoAuth, onGoAdmin, onGoProfile }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const activeLinkRef = useRef(null);
   const sidebarLinksRef = useRef(null);
   const programmaticScrollTimerRef = useRef(0);
   const programmaticScrollCleanupRef = useRef(null);
   const [activeAnchor, setActiveAnchor] = useState(svedeniyaPage.sections[0].anchor);
+  const [activeIndicatorStyle, setActiveIndicatorStyle] = useState(null);
   const normalizedPath = location.pathname.replace(/\/+$/, "") || "/";
   const isRootPage = normalizedPath === "/sveden";
   const sectionAnchors = useMemo(() => svedeniyaPage.sections.map((section) => section.anchor), []);
@@ -590,6 +592,80 @@ export default function SvedeniyaPage({ currentUser, onGoAuth, onGoAdmin, onGoPr
     () => svedeniyaPage.sections.find((section) => section.anchor === activeAnchor) || svedeniyaPage.sections[0],
     [activeAnchor]
   );
+
+  const scrollToAnchor = (targetAnchor) => {
+    if (!targetAnchor) return;
+
+    if (programmaticScrollCleanupRef.current) {
+      programmaticScrollCleanupRef.current();
+    }
+
+    let retryTimer = 0;
+
+    const scrollToTarget = (attempt = 0) => {
+      const targetElement = document.getElementById(targetAnchor);
+      if (!targetElement) {
+        if (attempt < 8) {
+          retryTimer = window.setTimeout(() => scrollToTarget(attempt + 1), 60);
+        }
+        return;
+      }
+
+      const releaseScrollLock = () => {
+        window.removeEventListener("scrollend", releaseScrollLock);
+        if (programmaticScrollTimerRef.current) {
+          window.clearTimeout(programmaticScrollTimerRef.current);
+        }
+        programmaticScrollTimerRef.current = 0;
+        programmaticScrollCleanupRef.current = null;
+        setActiveAnchor(targetAnchor);
+        window.dispatchEvent(new Event("scroll"));
+      };
+
+      const stickyOffset = window.matchMedia("(max-width: 1039px)").matches ? 154 : 112;
+      const top = Math.max(0, targetElement.offsetTop - stickyOffset);
+      const distance = Math.abs(targetElement.getBoundingClientRect().top);
+      const fallbackDelay = Math.min(2600, Math.max(1100, distance * 0.55));
+
+      window.addEventListener("scrollend", releaseScrollLock, { once: true });
+      if (typeof window.scrollTo === "function") {
+        window.scrollTo({ top, behavior: "smooth" });
+      } else if (typeof targetElement.scrollIntoView === "function") {
+        targetElement.scrollIntoView({ block: "start", behavior: "smooth" });
+      }
+
+      programmaticScrollTimerRef.current = window.setTimeout(releaseScrollLock, fallbackDelay);
+      programmaticScrollCleanupRef.current = () => {
+        window.removeEventListener("scrollend", releaseScrollLock);
+        if (retryTimer) {
+          window.clearTimeout(retryTimer);
+        }
+        if (programmaticScrollTimerRef.current) {
+          window.clearTimeout(programmaticScrollTimerRef.current);
+        }
+        programmaticScrollTimerRef.current = 0;
+        programmaticScrollCleanupRef.current = null;
+      };
+    };
+
+    scrollToTarget();
+  };
+
+  const handleSidebarLinkClick = (event, item) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+    event.preventDefault();
+    const nextUrl = `${item.path}#${item.anchor}`;
+    const currentUrl = `${window.location.pathname}${window.location.hash}`;
+    if (currentUrl !== nextUrl) {
+      setActiveAnchor(item.anchor);
+      navigate(nextUrl, { preventScrollReset: true });
+      return;
+    }
+
+    setActiveAnchor(item.anchor);
+    scrollToAnchor(item.anchor);
+  };
 
   const scrollToIndex = (event) => {
     event.preventDefault();
@@ -603,83 +679,17 @@ export default function SvedeniyaPage({ currentUser, onGoAuth, onGoAdmin, onGoPr
   useEffect(() => {
     const path = location.pathname.replace(/\/+$/, "/");
     const targetAnchor = location.hash.replace(/^#/, "") || SVEDENIYA_ROUTE_TO_ANCHOR[path];
-    let retryTimer = 0;
 
     const timer = window.setTimeout(() => {
       if (!targetAnchor) return;
       setActiveAnchor(targetAnchor);
       if (!isRootPage) {
-        if (programmaticScrollCleanupRef.current) {
-          programmaticScrollCleanupRef.current();
-        }
-
-        const scrollToTarget = (attempt = 0) => {
-          const targetElement = document.getElementById(targetAnchor);
-          if (!targetElement) {
-            if (attempt < 8) {
-              retryTimer = window.setTimeout(() => scrollToTarget(attempt + 1), 60);
-            }
-            return;
-          }
-          if (window.location.hash !== `#${targetAnchor}`) {
-            window.location.hash = targetAnchor;
-          }
-
-          const releaseScrollLock = () => {
-            window.removeEventListener("scrollend", releaseScrollLock);
-            if (programmaticScrollTimerRef.current) {
-              window.clearTimeout(programmaticScrollTimerRef.current);
-            }
-            programmaticScrollTimerRef.current = 0;
-            programmaticScrollCleanupRef.current = null;
-            setActiveAnchor(targetAnchor);
-            window.dispatchEvent(new Event("scroll"));
-          };
-
-          const stickyOffset = window.matchMedia("(max-width: 1039px)").matches ? 154 : 112;
-          const top = Math.max(0, targetElement.offsetTop - stickyOffset);
-          const distance = Math.abs(targetElement.getBoundingClientRect().top);
-          const fallbackDelay = Math.min(2400, Math.max(900, distance * 0.42));
-
-          window.addEventListener("scrollend", releaseScrollLock, { once: true });
-          if (typeof window.scrollTo === "function") {
-            window.scrollTo({ top, behavior: "smooth" });
-          } else if (typeof targetElement.scrollIntoView === "function") {
-            targetElement.scrollIntoView({ block: "start", behavior: "smooth" });
-          }
-          window.setTimeout(() => {
-            const currentTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
-            if (Math.abs(currentTop - top) > 24) {
-              document.documentElement.scrollTop = top;
-              document.body.scrollTop = top;
-            }
-          }, 160);
-          programmaticScrollTimerRef.current = window.setTimeout(releaseScrollLock, fallbackDelay);
-          programmaticScrollCleanupRef.current = () => {
-            window.removeEventListener("scrollend", releaseScrollLock);
-            if (retryTimer) {
-              window.clearTimeout(retryTimer);
-            }
-            if (programmaticScrollTimerRef.current) {
-              window.clearTimeout(programmaticScrollTimerRef.current);
-            }
-            programmaticScrollTimerRef.current = 0;
-            programmaticScrollCleanupRef.current = null;
-          };
-        };
-
-        scrollToTarget();
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(() => scrollToTarget());
-        });
+        scrollToAnchor(targetAnchor);
       }
-    }, 80);
+    }, 20);
 
     return () => {
       window.clearTimeout(timer);
-      if (retryTimer) {
-        window.clearTimeout(retryTimer);
-      }
       if (programmaticScrollCleanupRef.current) {
         programmaticScrollCleanupRef.current();
       }
@@ -732,6 +742,39 @@ export default function SvedeniyaPage({ currentUser, onGoAuth, onGoAdmin, onGoPr
 
     const targetLeft = activeLink.offsetLeft - (linksRow.clientWidth - activeLink.clientWidth) / 2;
     linksRow.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
+  }, [activeAnchor]);
+
+  useLayoutEffect(() => {
+    let frame = 0;
+
+    const updateIndicator = () => {
+      frame = 0;
+      const activeLink = activeLinkRef.current;
+      if (!activeLink) {
+        setActiveIndicatorStyle(null);
+        return;
+      }
+
+      setActiveIndicatorStyle({
+        opacity: 1,
+        transform: `translate3d(${activeLink.offsetLeft}px, ${activeLink.offsetTop}px, 0)`,
+        width: `${activeLink.offsetWidth}px`,
+        height: `${activeLink.offsetHeight}px`,
+      });
+    };
+
+    const scheduleUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(updateIndicator);
+    };
+
+    scheduleUpdate();
+    window.addEventListener("resize", scheduleUpdate);
+
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", scheduleUpdate);
+    };
   }, [activeAnchor]);
 
   return (
@@ -793,12 +836,20 @@ export default function SvedeniyaPage({ currentUser, onGoAuth, onGoAdmin, onGoPr
                   <strong>{activeSection.number}. {activeSection.title}</strong>
                 </div>
                 <div className="sv-sidebar-links" ref={sidebarLinksRef}>
+                  {activeIndicatorStyle && (
+                    <span
+                      className="sv-sidebar-active-indicator"
+                      style={activeIndicatorStyle}
+                      aria-hidden="true"
+                    />
+                  )}
                   {SVEDENIYA_NAV_ITEMS.map((item) => (
                     <Link
                       className={`sv-sidebar-link${activeAnchor === item.anchor ? " active" : ""}`}
                       key={item.path}
                       ref={activeAnchor === item.anchor ? activeLinkRef : null}
                       to={`${item.path}#${item.anchor}`}
+                      onClick={(event) => handleSidebarLinkClick(event, item)}
                     >
                       <span><Icon name={item.icon} /></span>
                       <strong>{item.shortTitle || item.label}</strong>

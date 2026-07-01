@@ -5,7 +5,11 @@ export const AUTH_REFRESH_TOKEN_STORAGE_KEYS = ["refresh_token", "mky_refresh_to
 export const ROLE_LABELS = {
   user: "Пользователь",
   methodist: "Методист",
+  metodist_editor: "Редактор-методист",
+  methodist_editor: "Редактор-методист",
   operator: "Психолог",
+  tpmpk_admin: "Администратор ТПМПК",
+  tpmpk_operator: "Оператор ТПМПК",
   domu_editor: "Редактор Дома учителя",
   admin: "Администратор",
 };

@@ -8,19 +8,25 @@ export function BlockPreview({ block }) {
   switch (block.type) {
     case "heading": {
       const Tag = `h${Math.min(Math.max(Number(block.data.level || 2), 1), 3)}`;
+      const text = String(block.data.text || block.data.title || "").trim();
+      if (!text) return null;
       return (
         <Tag style={{ fontWeight: 800, color: "#0F172A", lineHeight: 1.2, margin: "20px 0 10px", textAlign: block.data.align || "left" }}>
-          {block.data.text || block.data.title || "Заголовок"}
+          {text}
         </Tag>
       );
     }
-    case "hero":
+    case "hero": {
+      const title = String(block.data.title || "").trim();
+      const intro = String(block.data.intro || "").trim();
+      if (!title && !intro) return null;
       return (
         <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: "#0F172A", lineHeight: 1.3, marginBottom: 12 }}>{block.data.title || "Заголовок"}</h1>
-          <p style={{ fontSize: 16, color: "#475569", lineHeight: 1.7 }}>{block.data.intro}</p>
+          {title && <h1 style={{ fontSize: 28, fontWeight: 800, color: "#0F172A", lineHeight: 1.3, marginBottom: 12 }}>{title}</h1>}
+          {intro && <p style={{ fontSize: 16, color: "#475569", lineHeight: 1.7 }}>{intro}</p>}
         </div>
       );
+    }
     case "paragraph":
       return block.data.html
         ? <div style={{ fontSize: 15, color: "#334155", lineHeight: 1.75, marginBottom: 18, textAlign: block.data.align || "left" }} dangerouslySetInnerHTML={{ __html: block.data.html }} />
@@ -160,7 +166,7 @@ export function BlockEditor({ block, onChange }) {
     case "hero":
       return (
         <>
-          <Field label="Заголовок" value={block.data.title} onChange={v => update("title", v)} placeholder="Введите заголовок статьи" />
+          <Field label="Заголовок" value={block.data.title} onChange={v => update("title", v)} />
           <Field label="Вводный абзац" value={block.data.intro} onChange={v => update("intro", v)} multiline placeholder="Краткое введение..." />
         </>
       );
