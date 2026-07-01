@@ -82,8 +82,36 @@ function Icon({ name, size = 18 }) {
   return <svg {...common}>{paths[name] || paths.user}</svg>;
 }
 
+function composeUserFullName(user) {
+  const fullName = String(user?.full_name || user?.fullName || "").trim();
+  if (fullName) return fullName;
+
+  return [
+    user?.last_name || user?.lastName,
+    user?.first_name || user?.firstName,
+    user?.middle_name || user?.middleName,
+  ]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
+function getUserInitials(user) {
+  const firstName = String(user?.first_name || user?.firstName || "").trim();
+  const lastName = String(user?.last_name || user?.lastName || "").trim();
+  const initials = `${firstName[0] || ""}${lastName[0] || ""}`;
+  if (initials) return initials;
+
+  return composeUserFullName(user)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("");
+}
+
 function Avatar({ user, size = 88, compact = false }) {
-  const initials = `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`;
+  const initials = getUserInitials(user);
   return (
     <div className={compact ? "profile-avatar profile-avatar--compact" : "profile-avatar"} style={{ "--avatar-size": `${size}px` }}>
       {initials || "?"}
@@ -144,7 +172,6 @@ export default function ProfilePage({ user = MOCK_USER, onBack, onAdmin, onTpmpk
   const [editMode, setEditMode] = useState(false);
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState({
-    username: user.username || "",
     phone: user.phone || "",
     position: user.position || "",
     organization: user.organization || "",
@@ -160,6 +187,13 @@ export default function ProfilePage({ user = MOCK_USER, onBack, onAdmin, onTpmpk
   const hasAdminAccess = canAccessAdmin({ role: roleName }) || canAccessDomuAdmin({ role: roleName });
   const hasTpmpkAccess = canAccessTpmpkAdmin({ role: roleName });
   const accessDenied = new URLSearchParams(location.search).get("access") === "denied";
+  const fullName = composeUserFullName(user);
+  const displayName = fullName || user.email || "Пользователь";
+  const profileSubtitle = [
+    form.position || user.position,
+    displayName,
+    user.email,
+  ].filter(Boolean).join(" · ");
   const visibleTabs = TABS.filter((tab) => {
     if (tab.id === "articles") return isMethodist || isAdmin;
     if (tab.id === "admin") return isAdmin || isDomuEditor;
@@ -516,9 +550,9 @@ export default function ProfilePage({ user = MOCK_USER, onBack, onAdmin, onTpmpk
               <Avatar user={user} size={118} />
               <div className="profile-hero__main">
                 <span className="profile-kicker">{hasTpmpkAccess ? "Рабочий центр психолога ТПМПК" : "Рабочий центр методиста"}</span>
-                <h1>{user.lastName} {user.firstName} {user.middleName}</h1>
+                <h1>{displayName}</h1>
                 <div className="profile-subtitle">
-                  {form.position || user.position} · @{form.username || user.username} · {user.email}
+                  {profileSubtitle}
                 </div>
                 <div className="profile-tags">
                   <Tag tone="hero">{getRoleLabel(roleName)}</Tag>
@@ -620,8 +654,11 @@ export default function ProfilePage({ user = MOCK_USER, onBack, onAdmin, onTpmpk
                   {editMode ? (
                     <>
                       <div className="form-grid">
+                        <div className="form-field">
+                          <label>ФИО</label>
+                          <input className="pinput" value={fullName || "Не указано"} readOnly />
+                        </div>
                         {[
-                          { label: "Username", key: "username" },
                           { label: "Телефон", key: "phone" },
                           { label: "Должность", key: "position" },
                           { label: "Организация", key: "organization", wide: true },
@@ -644,7 +681,7 @@ export default function ProfilePage({ user = MOCK_USER, onBack, onAdmin, onTpmpk
                   ) : (
                     <div className="info-grid">
                       <InfoTile icon="mail" label="Email" value={user.email} />
-                      <InfoTile icon="user" label="Username" value={`@${form.username}`} />
+                      <InfoTile icon="user" label="ФИО" value={fullName || "Не указано"} />
                       <InfoTile icon="shield" label="Роль" value={getRoleLabel(roleName)} />
                       <InfoTile icon="calendar" label="Регистрация" value={new Date(user.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })} />
                       <InfoTile icon="phone" label="Телефон" value={form.phone} />
