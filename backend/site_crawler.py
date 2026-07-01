@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from urllib.parse import urljoin, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup, Tag
@@ -28,6 +28,9 @@ from config import (
     SITE_USER_AGENT,
     SITE_SKIP_TAGS,
     SITE_MIN_TEXT_LEN,
+    SITE_ALLOW_EXTERNAL_DOCUMENTS,
+    SITE_DOCUMENT_ALLOWED_HOSTS,
+    SUPPORTED_DOC_EXTENSIONS,
 )
 
 logger = logging.getLogger("site_crawler")
@@ -47,6 +50,28 @@ def normalize_url(url: str) -> str:
 
 def same_domain(url: str, base: str) -> bool:
     return urlparse(url).netloc == urlparse(base).netloc
+
+
+def is_document_url(url: str) -> bool:
+    path = unquote(urlparse(url).path).lower()
+    return any(path.endswith(ext) for ext in SUPPORTED_DOC_EXTENSIONS)
+
+
+def _document_allowed(url: str, base: str) -> bool:
+    host = urlparse(url).netloc.lower()
+    return (
+        same_domain(url, base)
+        or SITE_ALLOW_EXTERNAL_DOCUMENTS
+        or host in SITE_DOCUMENT_ALLOWED_HOSTS
+    )
+
+
+def _document_title(url: str, link_text: str) -> str:
+    text = re.sub(r"\s+", " ", link_text or "").strip()
+    if text:
+        return text
+    filename = unquote(urlparse(url).path.rsplit("/", 1)[-1] or "").strip()
+    return filename or url
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -126,7 +151,8 @@ def crawl(
     start_url: str   = SITE_START_URL,
     max_pages: int   = SITE_MAX_PAGES,
     delay:     float = SITE_CRAWL_DELAY,
-) -> dict[str, dict]:
+    include_documents: bool = False,
+) -> dict[str, dict] | tuple[dict[str, dict], dict[str, dict]]:
     """
     Обходит сайт начиная с start_url и возвращает:
         { url: {"title": str, "text": str}, ... }
@@ -141,6 +167,7 @@ def crawl(
     queue  = [base]
     seen:   set[str]          = set()
     result: dict[str, dict]   = {}
+    documents: dict[str, dict] = {}
 
     logger.info(f"[crawl] Старт: {start_url}  (лимит: {max_pages or '∞'} стр.)")
 
@@ -173,7 +200,31 @@ def crawl(
         title, text, breadcrumb = extract_page_content(resp.text)
 
         if len(text) < SITE_MIN_TEXT_LEN:
+            for a in soup.find_all("a", href=True):
+                href = normalize_url(urljoin(url, str(a["href"]).strip()))
+                if urlparse(href).scheme not in ("http", "https"):
+                    continue
+                if is_document_url(href):
+                    if _document_allowed(href, base):
+                        documents.setdefault(
+                            href,
+                            {
+                                "url": href,
+                                "title": _document_title(href, a.get_text(" ", strip=True)),
+                                "page_url": url,
+                                "page_title": title,
+                                "breadcrumb": breadcrumb,
+                            },
+                        )
+                    continue
+                if (
+                    href not in seen
+                    and href not in queue
+                    and same_domain(href, base)
+                ):
+                    queue.append(href)
             logger.debug(f"[crawl] Пустой контент: {url}")
+            time.sleep(delay)
             continue
 
         result[url] = {"title": title, "text": text, "breadcrumb": breadcrumb}
@@ -181,16 +232,32 @@ def crawl(
 
         # Собираем ссылки из уже распарсенного soup
         for a in soup.find_all("a", href=True):
-            href = normalize_url(urljoin(url, a["href"]))
+            href = normalize_url(urljoin(url, str(a["href"]).strip()))
+            if urlparse(href).scheme not in ("http", "https"):
+                continue
+            if is_document_url(href):
+                if _document_allowed(href, base):
+                    documents.setdefault(
+                        href,
+                        {
+                            "url": href,
+                            "title": _document_title(href, a.get_text(" ", strip=True)),
+                            "page_url": url,
+                            "page_title": title,
+                            "breadcrumb": breadcrumb,
+                        },
+                    )
+                continue
             if (
                 href not in seen
                 and href not in queue
                 and same_domain(href, base)
-                and urlparse(href).scheme in ("http", "https")
             ):
                 queue.append(href)
 
         time.sleep(delay)
 
-    logger.info(f"[crawl] Готово: {len(result)} страниц")
+    logger.info(f"[crawl] Готово: {len(result)} страниц, {len(documents)} документов")
+    if include_documents:
+        return result, documents
     return result

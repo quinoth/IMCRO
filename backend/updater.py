@@ -22,11 +22,13 @@ import hashlib
 import json
 import logging
 import re
+from urllib.parse import unquote, urlparse
 from datetime import datetime
 from pathlib import Path
 from time import monotonic
 from typing import Callable, Optional
 
+import requests
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -36,12 +38,16 @@ from config import (
     CHUNK_SIZE,
     CHUNK_OVERLAP,
     SITE_CACHE_FILE,
+    SITE_DOCUMENT_MAX_BYTES,
+    SITE_DOCUMENT_TIMEOUT_SECONDS,
     S3_FILE_CACHE_DIR,
+    SUPPORTED_DOC_EXTENSIONS,
     YC_ENDPOINT,
     YC_BUCKET,
 )
 from update_state import UpdateState
 from site_crawler import crawl as crawl_site
+from site_content import load_current_site_content
 from s3_loader import list_documents as list_s3_documents
 from s3_loader import download_file, public_url
 from doc_extractor import extract_text
@@ -170,7 +176,7 @@ def _site_context_meta(site_context: str) -> dict:
     }
 
 
-def _load_site_cache() -> Optional[dict[str, dict]]:
+def _load_site_cache() -> Optional[tuple[dict[str, dict], dict[str, dict]]]:
     cache_path = Path(SITE_CACHE_FILE)
     if not cache_path.exists():
         return None
@@ -187,6 +193,20 @@ def _load_site_cache() -> Optional[dict[str, dict]]:
         return None
 
     valid_pages: dict[str, dict] = {}
+    valid_documents: dict[str, dict] = {}
+    documents = payload.get("documents", {}) if isinstance(payload, dict) else {}
+    if isinstance(documents, dict):
+        for doc_url, info in documents.items():
+            if not isinstance(doc_url, str) or not isinstance(info, dict):
+                continue
+            valid_documents[doc_url] = {
+                "url": doc_url,
+                "title": str(info.get("title", "")),
+                "page_url": str(info.get("page_url", "")),
+                "page_title": str(info.get("page_title", "")),
+                "breadcrumb": str(info.get("breadcrumb", "")),
+                "article_id": info.get("article_id"),
+            }
     for url, page in pages.items():
         if not isinstance(url, str) or not isinstance(page, dict):
             continue
@@ -205,10 +225,10 @@ def _load_site_cache() -> Optional[dict[str, dict]]:
 
     cached_at = payload.get("cached_at", "неизвестно")
     logger.info(f"[site-cache] Загружено {len(valid_pages)} страниц из cache ({cached_at})")
-    return valid_pages
+    return valid_pages, valid_documents
 
 
-def _save_site_cache(crawled: dict[str, dict]) -> None:
+def _save_site_cache(crawled: dict[str, dict], documents: Optional[dict[str, dict]] = None) -> None:
     if not crawled:
         return
 
@@ -216,10 +236,12 @@ def _save_site_cache(crawled: dict[str, dict]) -> None:
     try:
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
-            "version": 1,
+            "version": 2,
             "cached_at": datetime.now().isoformat(),
             "page_count": len(crawled),
             "pages": crawled,
+            "document_count": len(documents or {}),
+            "documents": documents or {},
         }
         tmp_path = cache_path.with_suffix(cache_path.suffix + ".tmp")
         tmp_path.write_text(
@@ -232,16 +254,22 @@ def _save_site_cache(crawled: dict[str, dict]) -> None:
         logger.warning(f"[site-cache] Не удалось сохранить cache {cache_path}: {e}")
 
 
-def _get_site_pages(use_cache: bool = False) -> tuple[dict[str, dict], bool]:
+def _get_site_pages(use_cache: bool = False) -> tuple[dict[str, dict], dict[str, dict], bool]:
     if use_cache:
         cached = _load_site_cache()
         if cached:
-            return cached, True
+            cached_pages, cached_documents = cached
+            if cached_documents:
+                return cached_pages, cached_documents, True
+            logger.warning("[site-cache] Cache has no document list, crawling site again")
         logger.warning("[site-cache] Cache не найден, запускаю краулер")
 
-    crawled = crawl_site()
-    _save_site_cache(crawled)
-    return crawled, False
+    crawled, documents = crawl_site(include_documents=True)
+    db_pages, db_documents = load_current_site_content()
+    crawled.update(db_pages)
+    documents.update(db_documents)
+    _save_site_cache(crawled, documents)
+    return crawled, documents, False
 
 
 def _s3_cache_dir(key: str, etag: str) -> Path:
@@ -378,6 +406,21 @@ def _get_chunk_ids_by_s3_key(
     ]
 
 
+def _get_chunk_ids_by_site_doc_url(
+    vectorstore: Chroma,
+    urls:        list[str],
+) -> list[str]:
+    if not urls:
+        return []
+    urls_set = set(urls)
+    existing = vectorstore.get(include=["metadatas"])
+    return [
+        doc_id
+        for doc_id, meta in zip(existing["ids"], existing["metadatas"])
+        if meta.get("site_doc_url") in urls_set
+    ]
+
+
 def _get_indexed_metadata_values(vectorstore: Chroma, key: str) -> set[str]:
     """Возвращает значения metadata[key], реально присутствующие в Chroma."""
     try:
@@ -406,6 +449,7 @@ def _update_from_site(
     new_chunks:    list[Document],
     ids_to_delete: list[str],
     use_cache:     bool = False,
+    site_documents: Optional[dict[str, dict]] = None,
     progress_cb:   Optional[Callable] = None,
 ) -> dict:
     """
@@ -417,8 +461,11 @@ def _update_from_site(
     stage = "site_cache" if use_cache else "site_crawl"
     detail = "Загружаю страницы сайта из cache…" if use_cache else "Краулинг сайта…"
     if progress_cb: progress_cb(stage, 0, 0, detail)
-    crawled, from_cache = _get_site_pages(use_cache=use_cache)
+    crawled, documents, from_cache = _get_site_pages(use_cache=use_cache)
+    if site_documents is not None:
+        site_documents.update(documents)
     stats["from_cache"] = from_cache
+    stats["documents_found"] = len(documents)
     source_label = "cache" if from_cache else "краулера"
     if progress_cb:
         progress_cb(stage, len(crawled), len(crawled), f"Получено страниц из {source_label}: {len(crawled)}")
@@ -546,6 +593,190 @@ def _update_from_site(
 # ─────────────────────────────────────────────────────────────────────────────
 #  Обновление из Yandex Cloud S3
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _site_doc_filename(url: str, fallback_title: str = "") -> str:
+    filename = unquote(urlparse(url).path.rsplit("/", 1)[-1] or "").strip()
+    if Path(filename).suffix.lower() in SUPPORTED_DOC_EXTENSIONS:
+        return filename
+
+    fallback = Path((fallback_title or "").strip()).name
+    if Path(fallback).suffix.lower() in SUPPORTED_DOC_EXTENSIONS:
+        return fallback
+
+    digest = hashlib.sha256(url.encode("utf-8")).hexdigest()[:12]
+    return f"site-document-{digest}.pdf"
+
+
+def _download_site_document(url: str, filename: str) -> Optional[bytes]:
+    try:
+        with requests.get(url, timeout=SITE_DOCUMENT_TIMEOUT_SECONDS, stream=True) as resp:
+            resp.raise_for_status()
+            chunks: list[bytes] = []
+            total = 0
+            for chunk in resp.iter_content(chunk_size=256 * 1024):
+                if not chunk:
+                    continue
+                total += len(chunk)
+                if total > SITE_DOCUMENT_MAX_BYTES:
+                    logger.warning("[site-docs] Файл слишком большой, пропускаю: %s", filename)
+                    return None
+                chunks.append(chunk)
+            return b"".join(chunks)
+    except requests.RequestException as exc:
+        logger.warning("[site-docs] Не удалось скачать %s: %s", url, exc)
+        return None
+
+
+def _site_doc_meta(info: dict, doc_url: str, doc_type: str, site_context: str) -> dict:
+    meta = {
+        "site_doc_url": doc_url,
+        "doc_type": doc_type,
+        "source_type": "site_document",
+        "access_level": PUBLIC_ACCESS,
+        "page_url": str(info.get("page_url", "")),
+        "page_title": str(info.get("page_title", "")),
+        "breadcrumb": str(info.get("breadcrumb", "")),
+        **_site_context_meta(site_context),
+    }
+    article_id = info.get("article_id")
+    if article_id is not None:
+        meta["article_id"] = str(article_id)
+    return meta
+
+
+def _update_from_site_documents(
+    vectorstore:   Chroma,
+    state:         UpdateState,
+    new_chunks:    list[Document],
+    ids_to_delete: list[str],
+    site_documents: dict[str, dict],
+    site_context:  str = "",
+    progress_cb:   Optional[Callable] = None,
+) -> dict:
+    stats = {
+        "added": 0,
+        "updated": 0,
+        "skipped": 0,
+        "failed": 0,
+        "downloaded": 0,
+        "removed": 0,
+        "removed_files": [],
+        "legacy_s3_removed": 0,
+    }
+
+    total = len(site_documents)
+    if progress_cb:
+        progress_cb("site_docs_list", total, total, f"Найдено документов на сайте: {total}")
+
+    indexed_doc_urls = _get_indexed_metadata_values(vectorstore, "site_doc_url")
+    current_doc_urls = set(site_documents.keys())
+    known_doc_urls = state.all_site_doc_urls() | indexed_doc_urls
+    removed_doc_urls = sorted(known_doc_urls - current_doc_urls)
+
+    if removed_doc_urls:
+        removed_ids = _get_chunk_ids_by_site_doc_url(vectorstore, removed_doc_urls)
+        if removed_ids:
+            ids_to_delete.extend(removed_ids)
+        for doc_url in removed_doc_urls:
+            state.remove_site_doc(doc_url)
+        stats["removed"] = len(removed_doc_urls)
+        stats["removed_files"] = removed_doc_urls
+
+    if current_doc_urls:
+        legacy_s3_keys = state.all_s3_keys() | _get_indexed_metadata_values(vectorstore, "s3_key")
+        if legacy_s3_keys:
+            legacy_ids = _get_chunk_ids_by_s3_key(vectorstore, list(legacy_s3_keys))
+            if legacy_ids:
+                ids_to_delete.extend(legacy_ids)
+            for key in list(state.all_s3_keys()):
+                state.remove_s3(key)
+            stats["legacy_s3_removed"] = len(legacy_s3_keys)
+            logger.info("[site-docs] Старые S3-документы помечены к удалению: %s", len(legacy_s3_keys))
+
+    for idx, (doc_url, info) in enumerate(site_documents.items(), start=1):
+        filename = _site_doc_filename(doc_url, str(info.get("title", "")))
+        doc_type = Path(filename).suffix.lower().lstrip(".")
+        title = str(info.get("title") or filename)
+
+        if progress_cb:
+            progress_cb("site_docs", idx, total, f"Обработка: {filename}")
+
+        file_bytes = _download_site_document(doc_url, filename)
+        if not file_bytes:
+            stats["failed"] += 1
+            continue
+        stats["downloaded"] += 1
+
+        content_hash = hashlib.sha256(file_bytes).hexdigest()
+        old_hash = state.get_site_doc_hash(doc_url)
+        if old_hash == content_hash and doc_url in indexed_doc_urls:
+            stats["skipped"] += 1
+            continue
+
+        text = extract_text(file_bytes, filename)
+        if not text.strip():
+            logger.warning("[site-docs] Пустой текст после извлечения: %s", filename)
+            stats["failed"] += 1
+            continue
+
+        old_ids = _get_chunk_ids_by_site_doc_url(vectorstore, [doc_url])
+        if old_ids:
+            ids_to_delete.extend(old_ids)
+
+        meta = _site_doc_meta(info, doc_url, doc_type, site_context)
+        chunks = _make_chunks(
+            source=doc_url,
+            title=title,
+            text=text,
+            extra_meta=meta,
+        )
+        new_chunks.extend(chunks)
+
+        readable_name = Path(filename).stem.replace("_", " ").strip()
+        header_lines = [
+            f"Документ «{readable_name}»",
+            f"Имя файла: {filename}",
+            f"Тип документа: {doc_type.upper()}",
+            f"Страница сайта: {meta.get('page_title') or title}",
+            f"Страница URL: {meta.get('page_url')}",
+            f"Прямая ссылка: {doc_url}",
+            "",
+            f"Содержание (начало): {text.strip()[:1400]}",
+        ]
+        if site_context:
+            header_lines.extend(["", "Краткий контекст сайта:", site_context])
+
+        header_doc = Document(
+            page_content="\n".join(header_lines),
+            metadata={
+                "source": doc_url,
+                "title": title,
+                "site_doc_url": doc_url,
+                "doc_type": doc_type,
+                "source_type": "site_document",
+                "access_level": PUBLIC_ACCESS,
+                "is_header": True,
+                **meta,
+            },
+        )
+        new_chunks.append(header_doc)
+
+        state.set_site_doc_hash(doc_url, content_hash)
+        if old_hash is None:
+            stats["added"] += 1
+        else:
+            stats["updated"] += 1
+
+    logger.info(
+        "[site-docs] Итого: +%s новых, %s обновлено, %s без изменений, %s удалено, %s ошибок",
+        stats["added"],
+        stats["updated"],
+        stats["skipped"],
+        stats["removed"],
+        stats["failed"],
+    )
+    return stats
+
 
 def _update_from_s3(
     vectorstore:   Chroma,
@@ -779,7 +1010,13 @@ def incremental_update(
     Returns:
         Словарь со статистикой по каждому источнику.
     """
-    sources = sources or ["site", "s3"]
+    source_aliases = {
+        "docs": "site_docs",
+        "s3": "site_docs",
+        "site_documents": "site_docs",
+    }
+    sources = [source_aliases.get(source, source) for source in (sources or ["site", "site_docs"])]
+    sources = list(dict.fromkeys(sources))
     logger.info("═" * 50)
     logger.info(f"[update] Начинаю инкрементальное обновление (sources={sources})")
 
@@ -788,10 +1025,12 @@ def incremental_update(
 
     stats = {
         "site": {},
-        "s3":   {},
+        "site_docs": {},
+        "s3": {"skipped": True, "replaced_by": "site_docs"},
         "total_chunks_added":   0,
         "total_chunks_deleted": 0,
     }
+    discovered_site_documents: dict[str, dict] = {}
 
     # ── Источник 1: Сайт ──────────────────────────────────────────────────────
     if "site" in sources:
@@ -800,6 +1039,7 @@ def incremental_update(
             stats["site"] = _update_from_site(
                 vectorstore, state, all_new_chunks, all_ids_to_delete,
                 use_cache=use_site_cache,
+                site_documents=discovered_site_documents,
                 progress_cb=progress_cb,
             )
         except Exception as e:
@@ -811,12 +1051,29 @@ def incremental_update(
     site_context = _site_context_from_pending(all_new_chunks) or _get_existing_site_context(vectorstore)
     if site_context:
         stats["site_context_chars"] = len(site_context)
-        logger.info(f"[update] Контекст сайта доступен для S3-документов ({len(site_context)} симв.)")
+        logger.info(f"[update] Контекст сайта доступен для документов сайта ({len(site_context)} симв.)")
     else:
-        logger.warning("[update] Контекст сайта не найден — S3-документы будут индексироваться без него")
+        logger.warning("[update] Контекст сайта не найден — документы сайта будут индексироваться без него")
 
-    # ── Источник 2: Yandex Cloud S3 ───────────────────────────────────────────
-    if "s3" in sources:
+    # ── Источник 2: документы текущего сайта ──────────────────────────────────
+    if "site_docs" in sources:
+        logger.info("[update] ── Источник 2: документы текущего сайта ──")
+        try:
+            if not discovered_site_documents:
+                _, discovered_site_documents, _ = _get_site_pages(use_cache=use_site_cache)
+            stats["site_docs"] = _update_from_site_documents(
+                vectorstore, state, all_new_chunks, all_ids_to_delete,
+                discovered_site_documents,
+                site_context=site_context,
+                progress_cb=progress_cb,
+            )
+        except Exception as e:
+            logger.error(f"[update] Ошибка обновления документов сайта: {e}", exc_info=True)
+            stats["site_docs"] = {"error": str(e)}
+    else:
+        stats["site_docs"] = {"skipped": True}
+
+    if "legacy_s3" in sources:
         logger.info("[update] ── Источник 2: Yandex Cloud S3 ──")
         try:
             stats["s3"] = _update_from_s3(

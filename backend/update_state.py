@@ -27,6 +27,7 @@ class UpdateState:
         self._path    = Path(path)
         self._pages:   dict[str, str] = {}  # url   → md5(text)
         self._s3_docs: dict[str, str] = {}  # s3key → etag
+        self._site_docs: dict[str, str] = {}
         self._load()
 
     # ── Загрузка / сохранение ─────────────────────────────────────────────────
@@ -39,6 +40,7 @@ class UpdateState:
             data          = json.loads(self._path.read_text(encoding="utf-8"))
             self._pages   = data.get("pages",   {})
             self._s3_docs = data.get("s3_docs", {})
+            self._site_docs = data.get("site_docs", {})
             logger.info(
                 f"[state] Загружено: {len(self._pages)} страниц, "
                 f"{len(self._s3_docs)} S3-документов"
@@ -50,6 +52,7 @@ class UpdateState:
         """Очищает всё состояние (используется при полной переиндексации)."""
         self._pages.clear()
         self._s3_docs.clear()
+        self._site_docs.clear()
         logger.info("[state] Состояние очищено")
 
     def save(self) -> None:
@@ -59,6 +62,7 @@ class UpdateState:
                     {
                         "pages":      self._pages,
                         "s3_docs":    self._s3_docs,
+                        "site_docs":  self._site_docs,
                         "updated_at": datetime.now().isoformat(),
                     },
                     ensure_ascii=False,
@@ -97,6 +101,18 @@ class UpdateState:
 
     def all_s3_keys(self) -> set[str]:
         return set(self._s3_docs.keys())
+
+    def get_site_doc_hash(self, url: str) -> Optional[str]:
+        return self._site_docs.get(url)
+
+    def set_site_doc_hash(self, url: str, h: str) -> None:
+        self._site_docs[url] = h
+
+    def remove_site_doc(self, url: str) -> None:
+        self._site_docs.pop(url, None)
+
+    def all_site_doc_urls(self) -> set[str]:
+        return set(self._site_docs.keys())
 
     # ── Утилита ───────────────────────────────────────────────────────────────
 

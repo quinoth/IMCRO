@@ -25,6 +25,7 @@ from assistant_settings import (
     update_assistant_settings,
 )
 from auth import get_current_user, get_optional_current_user
+from config import ASSISTANT_ENABLED
 from database import SessionLocal, get_db
 from models import (
     Appointment,
@@ -59,6 +60,7 @@ ASSISTANT_STARTING_MESSAGE = (
     "Ассистент ещё запускается и прогревает базу знаний. "
     "Попробуйте ещё раз через несколько минут."
 )
+ASSISTANT_DISABLED_MESSAGE = "Ассистент временно отключен."
 KNOWLEDGE_BASE_INDEX_MISSING_MESSAGE = (
     "База знаний не готова: индекс не найден. "
     "Запустите обновление или полную переиндексацию базы знаний."
@@ -108,6 +110,7 @@ class AskRequest(BaseModel):
 
 class AssistantStatusResponse(BaseModel):
     status:              str
+    enabled:             bool = True
     ready:               bool
     vectorstore_ready:   bool
     reranker_ready:      bool
@@ -934,6 +937,45 @@ def _appointment_answer_result(
 def get_assistant_status() -> AssistantStatusResponse:
     cleanup_idle_sessions()
     settings = get_assistant_settings()
+    if not ASSISTANT_ENABLED:
+        rate_limit_active_buckets, rate_limit_rejections = _rate_limit_stats()
+        request_metrics = _request_metrics_snapshot()
+        with _status_lock:
+            last_request_error = _assistant_last_request_error
+            last_request_error_at = _assistant_last_request_error_at
+            evicted_sessions = _evicted_sessions_total
+        return AssistantStatusResponse(
+            status="disabled",
+            enabled=False,
+            ready=False,
+            vectorstore_ready=False,
+            reranker_ready=False,
+            embeddings_ready=False,
+            knowledge_base_ready=False,
+            knowledge_base_status="disabled",
+            knowledge_base_message=ASSISTANT_DISABLED_MESSAGE,
+            assistant_message=ASSISTANT_DISABLED_MESSAGE,
+            vector_count=0,
+            sessions=_sessions_count(),
+            warmup_started_at=None,
+            warmup_completed_at=None,
+            last_error=None,
+            last_request_error=last_request_error,
+            last_request_error_at=last_request_error_at,
+            session_ttl_seconds=settings.session_ttl_seconds,
+            max_sessions=ASSISTANT_MAX_SESSIONS,
+            evicted_sessions=evicted_sessions,
+            question_max_length=settings.question_max_length,
+            session_id_max_length=ASSISTANT_SESSION_ID_MAX_LENGTH,
+            history_limit_max=ASSISTANT_HISTORY_LIMIT_MAX,
+            gigachat_timeout_seconds=float(os.getenv("GIGACHAT_TIMEOUT_SECONDS", "30")),
+            gigachat_max_retries=int(os.getenv("GIGACHAT_MAX_RETRIES", "1")),
+            rate_limit_window_seconds=settings.rate_limit_window_seconds,
+            rate_limit_max_requests=settings.rate_limit_max_requests,
+            rate_limit_active_buckets=rate_limit_active_buckets,
+            rate_limit_rejections=rate_limit_rejections,
+            **request_metrics,
+        )
     vectorstore_ready = _vectorstore is not None
     reranker_ready = _is_reranker_ready()
     vector_count = _safe_vector_count()
@@ -980,6 +1022,7 @@ def get_assistant_status() -> AssistantStatusResponse:
 
     return AssistantStatusResponse(
         status=status,
+        enabled=True,
         ready=ready,
         vectorstore_ready=vectorstore_ready,
         reranker_ready=reranker_ready,
@@ -1593,6 +1636,21 @@ def ask_stream(
     current_user: User | None = Depends(get_optional_current_user),
 ):
     started_at = monotonic()
+    if not ASSISTANT_ENABLED:
+        def disabled_stream():
+            yield _sse("status", {"stage": "disabled", "message": ASSISTANT_DISABLED_MESSAGE})
+            yield _sse("error", {"code": "assistant_disabled", "detail": ASSISTANT_DISABLED_MESSAGE})
+
+        _record_assistant_request(monotonic() - started_at, False)
+        return StreamingResponse(
+            disabled_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
     try:
         cleanup_idle_sessions()
         question = _validated_question(body.question)

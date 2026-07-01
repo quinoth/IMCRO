@@ -19,6 +19,8 @@ services:
         value: "false"
       - key: RATE_LIMIT_ENABLED
         value: "true"
+      - key: ASSISTANT_ENABLED
+        value: "false"
       - key: DB_POOL_SIZE
         value: "5"
       - key: DB_MAX_OVERFLOW
@@ -30,13 +32,27 @@ services:
       - key: CORS_ALLOWED_ORIGINS
         sync: false
       - key: SITE_START_URL
-        value: https://mc.eduirk.ru/
+        sync: false
+      - key: PUBLIC_SITE_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: SITE_ASSET_BASE_URL
+        sync: false
       - key: SITE_MAX_PAGES
         value: "2000"
       - key: SITE_CRAWL_DELAY
         value: "0.5"
       - key: SITE_CACHE_FILE
         value: /app/chroma_gigachat/site_pages_cache.json
+      - key: SITE_DOCUMENT_ALLOWED_HOSTS
+        value: ""
+      - key: SITE_ALLOW_EXTERNAL_DOCUMENTS
+        value: "false"
+      - key: SITE_DOCUMENT_TIMEOUT_SECONDS
+        value: "30"
+      - key: SITE_DOCUMENT_MAX_BYTES
+        value: "52428800"
       - key: CHROMA_COLLECTION_NAME
         value: eduirk
       - key: UPDATE_INTERVAL_HOURS

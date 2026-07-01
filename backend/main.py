@@ -16,6 +16,7 @@ import logging
 import os
 from typing import Any
 
+from config import ASSISTANT_ENABLED
 from database import engine, Base, SessionLocal, format_database_connection_error, get_db
 from dev_seed import ensure_dev_test_users
 from assistant_settings import (
@@ -240,6 +241,10 @@ def _prepare_rag_startup() -> tuple[type, Any]:
 async def _init_rag_and_scheduler_bg() -> None:
     global _scheduler
 
+    if not ASSISTANT_ENABLED:
+        logger.info("[main] Assistant disabled by ASSISTANT_ENABLED=false")
+        return
+
     mark_assistant_warmup_started()
     try:
         logger.info("[main] Initializing assistant RAG in background")
@@ -271,7 +276,10 @@ async def lifespan(app: FastAPI):
     global _scheduler, _rag_startup_task
 
     # Start assistant warmup without blocking the API.
-    _rag_startup_task = asyncio.create_task(_init_rag_and_scheduler_bg())
+    if ASSISTANT_ENABLED:
+        _rag_startup_task = asyncio.create_task(_init_rag_and_scheduler_bg())
+    else:
+        logger.info("[main] Assistant warmup skipped: ASSISTANT_ENABLED=false")
 
     yield
 
@@ -511,6 +519,9 @@ def _start_incremental(
     sources:          list[str],
     mode_label:       str,
 ):
+    if not ASSISTANT_ENABLED:
+        raise HTTPException(status_code=503, detail="Ассистент временно отключен")
+
     if _bg_task_status["running"]:
         raise HTTPException(
             status_code=409,
@@ -534,8 +545,8 @@ def _start_incremental(
 
 @app.post("/admin/update/run")
 def update_run_now(background_tasks: BackgroundTasks):
-    """Инкрементальное обновление обоих источников (сайт + S3)."""
-    return _start_incremental(background_tasks, ["site", "s3"], "incremental")
+    """Инкрементальное обновление обоих источников (сайт + документы сайта)."""
+    return _start_incremental(background_tasks, ["site", "site_docs"], "incremental")
 
 
 @app.post("/admin/update/site")
@@ -546,8 +557,8 @@ def update_site_only(background_tasks: BackgroundTasks):
 
 @app.post("/admin/update/docs")
 def update_docs_only(background_tasks: BackgroundTasks):
-    """Инкрементальное обновление только документов из Yandex S3."""
-    return _start_incremental(background_tasks, ["s3"], "incremental_docs")
+    """Инкрементальное обновление только документов текущего сайта."""
+    return _start_incremental(background_tasks, ["site_docs"], "incremental_docs")
 
 
 @app.post("/admin/reindex")
@@ -557,6 +568,9 @@ def full_reindex(background_tasks: BackgroundTasks):
     Возвращает ответ сразу, переиндексация идёт в фоне (несколько минут).
     Статус: GET /admin/update/status
     """
+    if not ASSISTANT_ENABLED:
+        raise HTTPException(status_code=503, detail="Ассистент временно отключен")
+
     if _bg_task_status["running"]:
         raise HTTPException(
             status_code=409,
@@ -703,9 +717,12 @@ def get_me(
 
 
 logger.info("Сервер запущен успешно")
-logger.info(f"  • Автообновление RAG:         каждые {get_assistant_settings().update_interval_hours} ч.")
-logger.info("  • Инкрементальное обновление: POST /admin/update/run   (сайт + S3)")
-logger.info("  • Только сайт:                POST /admin/update/site")
-logger.info("  • Только документы:           POST /admin/update/docs")
-logger.info("  • Полная переиндексация:      POST /admin/reindex")
-logger.info("  • Статус:                     GET  /admin/update/status")
+if ASSISTANT_ENABLED:
+    logger.info(f"  • Автообновление RAG:         каждые {get_assistant_settings().update_interval_hours} ч.")
+    logger.info("  • Инкрементальное обновление: POST /admin/update/run   (сайт + документы сайта)")
+    logger.info("  • Только сайт:                POST /admin/update/site")
+    logger.info("  • Только документы:           POST /admin/update/docs")
+    logger.info("  • Полная переиндексация:      POST /admin/reindex")
+    logger.info("  • Статус:                     GET  /admin/update/status")
+else:
+    logger.info("  • Ассистент:                  отключен (ASSISTANT_ENABLED=false)")
