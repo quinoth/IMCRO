@@ -138,15 +138,26 @@ async function postRegister(payload) {
 export async function apiRegister(input, password) {
   const rawPayload = normalizeRegisterPayload(input, password);
   const email = String(rawPayload.email || "").trim();
-  const fullName = String(rawPayload.full_name || rawPayload.fullName || rawPayload.name || "").trim();
+  const lastName = String(rawPayload.last_name || rawPayload.lastName || "").trim();
+  const firstName = String(rawPayload.first_name || rawPayload.firstName || "").trim();
+  const middleName = String(rawPayload.middle_name || rawPayload.middleName || "").trim();
+  const fullNameFromParts = [lastName, firstName, middleName].filter(Boolean).join(" ");
+  const fullName = String(rawPayload.full_name || rawPayload.fullName || rawPayload.name || fullNameFromParts).trim();
   const basePayload = {
     email,
     password: rawPayload.password || "",
     ...(rawPayload.username ? { username: String(rawPayload.username).trim() } : {}),
   };
-  const structuredPayload = fullName
-    ? { ...basePayload, ...splitFullName(fullName) }
-    : basePayload;
+  const namedPayload = {
+    ...basePayload,
+    ...(lastName ? { last_name: lastName } : {}),
+    ...(firstName ? { first_name: firstName } : {}),
+    ...(middleName ? { middle_name: middleName } : {}),
+  };
+  const hasStructuredName = Boolean(lastName || firstName || middleName);
+  const structuredPayload = hasStructuredName
+    ? namedPayload
+    : (fullName ? { ...basePayload, ...splitFullName(fullName) } : basePayload);
   const legacyPayload = fullName
     ? { ...basePayload, full_name: fullName }
     : basePayload;

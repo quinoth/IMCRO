@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 export default function RegModal({ open, onClose }) {
-  const [form, setForm]       = useState({ name: "", email: "", password: "" });
+  const [form, setForm]       = useState({ lastName: "", firstName: "", middleName: "", email: "", password: "" });
   const [done, setDone]       = useState(false);
   const [showPass, setShowPass] = useState(false);
 
@@ -9,7 +9,7 @@ export default function RegModal({ open, onClose }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.name || !form.email || form.password.length < 8) return;
+    if (!form.lastName.trim() || !form.firstName.trim() || !form.email || form.password.length < 8) return;
     setDone(true);
   };
 
@@ -17,7 +17,7 @@ export default function RegModal({ open, onClose }) {
     onClose();
     setTimeout(() => {
       setDone(false);
-      setForm({ name: "", email: "", password: "" });
+      setForm({ lastName: "", firstName: "", middleName: "", email: "", password: "" });
       setShowPass(false);
     }, 300);
   };
@@ -92,9 +92,19 @@ export default function RegModal({ open, onClose }) {
 
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 6 }}>ФИО</label>
-                <input className="reg-input" placeholder="Иванов Иван Иванович"
-                  value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 6 }}>Фамилия</label>
+                <input className="reg-input" placeholder="Иванов"
+                  value={form.lastName} onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} required />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 6 }}>Имя</label>
+                <input className="reg-input" placeholder="Иван"
+                  value={form.firstName} onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} required />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 6 }}>Отчество <span style={{ color: "#94A3B8" }}>(необязательно)</span></label>
+                <input className="reg-input" placeholder="Иванович"
+                  value={form.middleName} onChange={e => setForm(f => ({ ...f, middleName: e.target.value }))} />
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 6 }}>Email</label>
@@ -128,7 +138,7 @@ export default function RegModal({ open, onClose }) {
               </div>
 
               <button type="submit" className="reg-submit" style={{ marginTop: 6 }}
-                disabled={!form.name || !form.email || form.password.length < 8}>
+                disabled={!form.lastName.trim() || !form.firstName.trim() || !form.email || form.password.length < 8}>
                 Зарегистрироваться
               </button>
 

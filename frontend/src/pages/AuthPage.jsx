@@ -10,7 +10,13 @@ export default function AuthPage({ onLogin }) {
 
   const [tab, setTab] = useState(initialTab);
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
-  const [regForm, setRegForm] = useState({ name: "", email: "", password: "" });
+  const [regForm, setRegForm] = useState({
+    lastName: "",
+    firstName: "",
+    middleName: "",
+    email: "",
+    password: "",
+  });
   const [showPass, setShowPass] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState(
@@ -36,6 +42,12 @@ export default function AuthPage({ onLogin }) {
   };
 
   const passScore = getPasswordStrength(regForm.password);
+  const isRegisterValid = Boolean(
+    regForm.lastName.trim()
+      && regForm.firstName.trim()
+      && regForm.email.trim()
+      && regForm.password.length >= 8,
+  );
 
   const handleLogin = async (event) => {
     event.preventDefault();
@@ -65,14 +77,21 @@ export default function AuthPage({ onLogin }) {
 
   const handleRegister = async (event) => {
     event.preventDefault();
-    if (!regForm.name || !regForm.email || regForm.password.length < 8) return;
+    if (!isRegisterValid) return;
     setError("");
     setSubmitting("register");
     try {
+      const lastName = regForm.lastName.trim();
+      const firstName = regForm.firstName.trim();
+      const middleName = regForm.middleName.trim();
+      const fullName = [lastName, firstName, middleName].filter(Boolean).join(" ");
       const email = regForm.email.trim();
       const password = regForm.password;
       await apiRegister({
-        name: regForm.name.trim(),
+        last_name: lastName,
+        first_name: firstName,
+        ...(middleName ? { middle_name: middleName } : {}),
+        full_name: fullName,
         email,
         password,
       });
@@ -301,8 +320,16 @@ export default function AuthPage({ onLogin }) {
                       <form className="auth-form" onSubmit={handleRegister}>
                         {error && <div className="auth-error">{error}</div>}
                         <div className="auth-field">
-                          <label>ФИО</label>
-                          <input className="auth-input" placeholder="Иванов Иван Иванович" value={regForm.name} onChange={(event) => setRegForm((form) => ({ ...form, name: event.target.value }))} required />
+                          <label>Фамилия</label>
+                          <input className="auth-input" placeholder="Иванов" value={regForm.lastName} onChange={(event) => setRegForm((form) => ({ ...form, lastName: event.target.value }))} required />
+                        </div>
+                        <div className="auth-field">
+                          <label>Имя</label>
+                          <input className="auth-input" placeholder="Иван" value={regForm.firstName} onChange={(event) => setRegForm((form) => ({ ...form, firstName: event.target.value }))} required />
+                        </div>
+                        <div className="auth-field">
+                          <label>Отчество <span style={{ fontWeight: 700, color: "#94A3B8" }}>(необязательно)</span></label>
+                          <input className="auth-input" placeholder="Иванович" value={regForm.middleName} onChange={(event) => setRegForm((form) => ({ ...form, middleName: event.target.value }))} />
                         </div>
                         <div className="auth-field">
                           <label>Электронная почта</label>
@@ -334,7 +361,7 @@ export default function AuthPage({ onLogin }) {
                             </div>
                           )}
                         </div>
-                        <button className="auth-btn" disabled={submitting === "register" || !regForm.name || !regForm.email || regForm.password.length < 8}>
+                        <button className="auth-btn" disabled={submitting === "register" || !isRegisterValid}>
                           {submitting === "register" ? "Регистрируем..." : "Зарегистрироваться"}
                         </button>
                       </form>
