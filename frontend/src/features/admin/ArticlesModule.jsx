@@ -282,8 +282,8 @@ function toPayload(form, nextStatus = form.status, scheduleEnabled = Boolean(for
     title: form.title.trim(),
     slug,
     status: nextStatus,
-    lead,
-    excerpt: lead,
+    lead: lead || null,
+    excerpt: lead || null,
     body,
     blocks,
     cover_image_url: cover || null,
@@ -415,7 +415,7 @@ function SaveStateIndicator({ state, onRetry, compact = false }) {
   );
 }
 
-function ArticleBodyEditor({ value, onChange, uploadImage, createObjectUrl, saveState }) {
+function ArticleBodyEditor({ value, onChange, uploadImage, createObjectUrl, saveState, invalid = false }) {
   const editorRef = useRef(null);
   const imageInputRef = useRef(null);
   const savedRangeRef = useRef(null);
@@ -494,7 +494,7 @@ function ArticleBodyEditor({ value, onChange, uploadImage, createObjectUrl, save
   };
 
   return (
-    <section className="article-wysiwyg-card">
+    <section className={`article-wysiwyg-card${invalid ? " has-error" : ""}`}>
       <div className="article-wysiwyg-head">
         <div>
           <strong>Содержание статьи</strong>
@@ -547,6 +547,7 @@ function ArticleBodyEditor({ value, onChange, uploadImage, createObjectUrl, save
             contentEditable
             role="textbox"
             aria-multiline="true"
+            aria-invalid={invalid || undefined}
             data-placeholder="Начните писать текст статьи..."
             onInput={emitChange}
             onBlur={() => {
@@ -1576,12 +1577,11 @@ function ArticleForm({
   const showFieldError = (field) => Boolean(attemptedSave || touchedFields[field]);
   const selectedSectionKeys = getArticleSectionSelection(form);
   const placementChips = sectionChipsFromKeys(selectedSectionKeys, 3, { allowedSubjects, isDomuMode });
-  const hasText = htmlToPlainText(form.body).length > 0 || /<img\b/i.test(form.body || "");
+  const hasText = htmlToPlainText(form.body).trim().length > 0 || /<img\b/i.test(form.body || "");
   const fieldError = (field) => {
     if (!showFieldError(field)) return "";
     if (field === "title" && !form.title.trim()) return "Заполните заголовок статьи.";
     if (field === "slug" && !form.slug.trim()) return "Заполните адрес страницы.";
-    if (field === "lead" && !form.lead.trim()) return "Добавьте краткое описание.";
     if (field === "blocks" && !hasText) return "Добавьте текст статьи или изображение.";
     if (field === "placement") {
       if (!selectedSectionKeys.length) return "Выберите хотя бы один раздел размещения.";
@@ -1596,7 +1596,6 @@ function ArticleForm({
     const list = [];
     if (!form.title.trim()) list.push("Заполните заголовок.");
     if (!form.slug.trim()) list.push("Заполните адрес страницы.");
-    if (!form.lead.trim()) list.push("Добавьте краткое описание.");
     if (!hasText) list.push("Добавьте текст статьи.");
     if (!selectedSectionKeys.length) list.push("Выберите хотя бы один раздел размещения.");
     if (!allowedScopes.includes(form.publishing_scope)) list.push("Выберите допустимую область публикации.");
@@ -1662,6 +1661,10 @@ function ArticleForm({
     ? ROOT_SECTIONS.filter((section) => section.value === "domu")
     : ROOT_SECTIONS.filter((section) => section.value !== "domu" || allowedScopes.includes("dom_uchitelya_only") || allowedScopes.includes("both"));
   const publishLabel = isNew ? "Опубликовать" : form.status === "published" ? "Обновить публикацию" : "Опубликовать";
+  const titleError = fieldError("title");
+  const slugError = fieldError("slug");
+  const bodyError = fieldError("blocks");
+  const placementError = fieldError("placement");
 
   return (
     <div className="article-editor-shell">
@@ -1703,7 +1706,7 @@ function ArticleForm({
               </div>
             </div>
             <div className="article-basic-fields">
-              <div className="article-field-group">
+              <div className={`article-field-group${titleError ? " has-error" : ""}`}>
                 <label className="article-label" htmlFor="article-title">Заголовок статьи</label>
                 <input
                   id="article-title"
@@ -1711,13 +1714,14 @@ function ArticleForm({
                   value={form.title}
                   onChange={(event) => updateTitle(event.target.value)}
                   onBlur={() => markTouched("title")}
+                  aria-invalid={Boolean(titleError)}
                   placeholder="Введите заголовок статьи"
                 />
                 <p className="article-field-hint">Например: «Городской семинар для педагогов»</p>
-                {fieldError("title") && <div className="article-field-error">{fieldError("title")}</div>}
+                {titleError && <div className="article-field-error">{titleError}</div>}
               </div>
 
-              <div className="article-field-group article-slug-field">
+              <div className={`article-field-group article-slug-field${slugError ? " has-error" : ""}`}>
                 <label className="article-label" htmlFor="article-slug">Адрес страницы</label>
                 <div className="article-slug-control">
                   <span>/articles/</span>
@@ -1726,15 +1730,16 @@ function ArticleForm({
                     value={form.slug}
                     onChange={(event) => { setSlugLocked(true); set("slug", generateSlug(event.target.value) || event.target.value); }}
                     onBlur={() => { markTouched("slug"); set("slug", makeUniqueSlug(form.slug || form.title, articles, article?.id)); }}
+                    aria-invalid={Boolean(slugError)}
                     placeholder="gorodskoy-seminar-dlya-pedagogov"
                   />
                   <button type="button" onClick={() => { setSlugLocked(false); set("slug", makeUniqueSlug(form.title, articles, article?.id)); }}>Сгенерировать</button>
                 </div>
-                {fieldError("slug") && <div className="article-field-error">{fieldError("slug")}</div>}
+                {slugError && <div className="article-field-error">{slugError}</div>}
               </div>
 
               <div className="article-field-group">
-                <label className="article-label" htmlFor="article-lead">Краткое описание</label>
+                <label className="article-label" htmlFor="article-lead">Краткое описание (необязательно)</label>
                 <textarea
                   id="article-lead"
                   className="article-lead-input"
@@ -1744,8 +1749,7 @@ function ArticleForm({
                   onBlur={() => markTouched("lead")}
                   placeholder="Коротко опишите, о чём эта статья"
                 />
-                <p className="article-field-hint">Используется в карточке статьи и в предпросмотре на сайте.</p>
-                {fieldError("lead") && <div className="article-field-error">{fieldError("lead")}</div>}
+                <p className="article-field-hint">Если оставить пустым, статья всё равно опубликуется.</p>
               </div>
             </div>
           </section>
@@ -1759,8 +1763,9 @@ function ArticleForm({
             uploadImage={uploadCover}
             createObjectUrl={createLocalObjectUrl}
             saveState={saveState}
+            invalid={Boolean(bodyError)}
           />
-          {fieldError("blocks") && <div className="article-field-error">{fieldError("blocks")}</div>}
+          {bodyError && <div className="article-field-error">{bodyError}</div>}
 
           <section
             className={`article-panel article-files-panel${attachmentDragActive ? " is-active" : ""}`}
@@ -1862,7 +1867,7 @@ function ArticleForm({
               <SaveStateIndicator state={saveState} onRetry={() => handleSave(lastSaveStatusRef.current)} compact />
             </section>
 
-            <section className="article-panel article-panel-compact">
+            <section className={`article-panel article-panel-compact${placementError ? " has-error" : ""}`}>
               <div className="article-side-card-head">
                 <div className="article-label">Размещение на сайте</div>
                 <span className="article-counter">Выбрано: {selectedSectionKeys.length}</span>
@@ -1883,7 +1888,7 @@ function ArticleForm({
               >
                 Выбрать разделы
               </button>
-              {fieldError("placement") && <div className="article-field-error">{fieldError("placement")}</div>}
+              {placementError && <div className="article-field-error">{placementError}</div>}
             </section>
 
             <section className="article-panel article-panel-compact">
@@ -2445,6 +2450,29 @@ const ARTICLE_CSS = `
 .article-errors { border: 1px solid #fecaca; background: #fffafa; color: #b91c1c; border-radius: 8px; padding: 12px; font-size: 13px; font-weight: 800; line-height: 1.5; }
 .article-errors strong { display: block; margin-bottom: 6px; color: #991b1b; }
 .article-field-error { margin-top: 8px; color: #b91c1c; font-size: 12px; font-weight: 850; }
+.article-field-group.has-error .article-title-input,
+.article-field-group.has-error .article-lead-input,
+.article-field-group.has-error .article-slug-control,
+.article-wysiwyg-card.has-error,
+.article-panel.has-error {
+  border-color: #ef4444;
+  background: #fff7f7;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, .12);
+}
+.article-field-group.has-error .article-title-input:focus,
+.article-field-group.has-error .article-lead-input:focus,
+.article-field-group.has-error .article-slug-control:focus-within {
+  border-color: #dc2626;
+  outline-color: rgba(239, 68, 68, .18);
+}
+.article-wysiwyg-card.has-error .article-wysiwyg-area {
+  background: #fffafa;
+}
+.article-panel.has-error .article-wide-btn {
+  border-color: #fca5a5;
+  background: #fffafa;
+  color: #b91c1c;
+}
 .article-global-error, .article-draft-banner { margin-bottom: 14px; }
 .article-draft-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid #fde68a; background: #fffbeb; color: #92400e; border-radius: 8px; padding: 12px; font-size: 13px; font-weight: 800; }
 .article-draft-banner button { border: 1px solid #f59e0b; background: #fff; border-radius: 8px; min-height: 34px; padding: 0 10px; color: #92400e; font: inherit; font-weight: 900; cursor: pointer; }
