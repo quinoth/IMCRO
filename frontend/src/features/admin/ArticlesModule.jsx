@@ -1231,7 +1231,7 @@ function ArticlePreviewModal({ article, onClose }) {
 }
 
 function ArticlePreview({ article, expanded = false }) {
-  const title = article.title.trim() || "Заголовок статьи";
+  const title = article.title.trim();
   const lead = article.lead.trim() || "Лид появится здесь и поможет читателю понять, о чем материал.";
   const date = article.published_at ? new Date(article.published_at).toLocaleString("ru-RU") : "Дата публикации не выбрана";
   const bodyHtml = article.body || blocksToEditorHtml(article.blocks || []);
@@ -1244,7 +1244,7 @@ function ArticlePreview({ article, expanded = false }) {
           <span>{date}</span>
           {article.is_pinned && <span>Закреплена</span>}
         </div>
-        <h1>{title}</h1>
+        {title && <h1>{title}</h1>}
         <p>{lead}</p>
         <div className="block-preview-stack">
           {bodyHtml ? <div className="article-md article-preview-body" dangerouslySetInnerHTML={{ __html: bodyHtml }} /> : <div className="article-preview-empty">Напишите текст статьи, чтобы увидеть предпросмотр.</div>}
@@ -1261,21 +1261,21 @@ function ArticlePreview({ article, expanded = false }) {
         )}
       </section>
       <section className="seo-preview">
-        <div className="seo-title">{title}</div>
+        {title && <div className="seo-title">{title}</div>}
         <div className="seo-url">imcro.ru/news/{article.slug || "slug-materiala"}</div>
         <p>{lead.slice(0, 160)}</p>
       </section>
       <section className="feed-preview">
         <strong>Карточка в ленте</strong>
         <div>{article.is_pinned ? "Закрепленная новость" : "Обычная новость"}</div>
-        <p>{title}</p>
+        {title && <p>{title}</p>}
       </section>
     </aside>
   );
 }
 
 function ArticlePreviewV2({ article, expanded = false }) {
-  const title = article.title.trim() || "Заголовок статьи";
+  const title = article.title.trim();
   const lead = article.lead.trim() || "Лид появится здесь и поможет читателю понять, о чем материал.";
   const date = article.published_at ? new Date(article.published_at).toLocaleString("ru-RU") : "Дата публикации не выбрана";
   const sectionLabel = getCategoryLabel(article);
@@ -1315,7 +1315,7 @@ function ArticlePreviewV2({ article, expanded = false }) {
             <span>{date}</span>
             {article.author && <span>{article.author}</span>}
           </div>
-          <h1>{title}</h1>
+          {title && <h1>{title}</h1>}
           <p>{lead}</p>
           <div className="block-preview-stack">
             {bodyHtml ? <div className="article-md article-preview-body" dangerouslySetInnerHTML={{ __html: bodyHtml }} /> : <div className="article-preview-empty">Напишите текст статьи, чтобы увидеть предпросмотр.</div>}
@@ -1365,7 +1365,7 @@ function ValidationPanel({ errors, modeLabel }) {
 }
 
 function ArticleCardPreview({ article }) {
-  const title = article.title.trim() || "Заголовок статьи";
+  const title = article.title.trim();
   const lead = article.lead.trim() || "Краткое описание появится здесь после заполнения лида.";
   const date = article.published_at ? new Date(article.published_at).toLocaleDateString("ru-RU") : "Дата не выбрана";
   const sectionLabel = sectionChipsFromKeys(getArticleSectionSelection(article), 1).visible[0]?.label || getCategoryLabel(article);
@@ -1384,7 +1384,7 @@ function ArticleCardPreview({ article }) {
           <span>{date}</span>
           <span>{author}</span>
         </div>
-        <h3>{title}</h3>
+        {title && <h3>{title}</h3>}
         <p>{lead}</p>
         <span className="article-card-preview-link">Читать далее</span>
       </div>
